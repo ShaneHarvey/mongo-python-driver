@@ -173,8 +173,19 @@ class TestJsonUtil(unittest.TestCase):
         self.assertEqual(dct, rtdct)
 
     def test_uuid(self):
-        self.round_trip(
-                {'uuid': uuid.UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479')})
+        uu = {'uuid': uuid.UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479')}
+        self.round_trip(uu)
+        self.assertEqual(
+            json_util.dumps(uu),
+            '{"uuid": {"$binary": "f47ac10b58cc4372a5670e02b2c3d479", '
+            '"$type": "03"}}')
+        # PYTHON-1103 ensure old $uuid format is supported
+        self.assertEqual(uu, json_util.loads(
+            '{"uuid": {"$uuid": "f47ac10b58cc4372a5670e02b2c3d479"}}'))
+        # ensure $type is preserved for uuid's
+        new_uuid = ('{"uuid": {"$binary": "f47ac10b58cc4372a5670e02b2c3d479", '
+                    '"$type": "04"}}')
+        self.assertEquals(new_uuid, json_util.dumps(json_util.loads(new_uuid)))
 
     def test_binary(self):
         bin_type_dict = {"bin": Binary(b"\x00\x01\x02\x03\x04")}

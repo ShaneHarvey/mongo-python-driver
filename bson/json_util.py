@@ -47,6 +47,8 @@ It won't handle :class:`~bson.binary.Binary` and :class:`~bson.code.Code`
 instances (as they are extended strings you can't provide custom defaults),
 but it will be faster as there is less recursion.
 
+   >>>
+
 .. versionchanged:: 2.8
    The output format for :class:`~bson.timestamp.Timestamp` has changed from
    '{"t": <int>, "i": <int>}' to '{"$timestamp": {"t": <int>, "i": <int>}}'.
@@ -78,6 +80,7 @@ import uuid
 from bson import EPOCH_AWARE, RE_TYPE, SON
 from bson.binary import Binary
 from bson.code import Code
+from bson.codec_options import DEFAULT_CODEC_OPTIONS
 from bson.dbref import DBRef
 from bson.int64 import Int64
 from bson.max_key import MaxKey
@@ -118,7 +121,8 @@ def loads(s, *args, **kwargs):
 
     Automatically passes the object_hook for BSON type conversion.
     """
-    kwargs['object_hook'] = lambda dct: object_hook(dct)
+    codec_options = kwargs.pop('codec_options', DEFAULT_CODEC_OPTIONS)
+    kwargs['object_hook'] = lambda dct: object_hook(dct, codec_options)
     return json.loads(s, *args, **kwargs)
 
 
@@ -136,7 +140,7 @@ def _json_convert(obj):
         return obj
 
 
-def object_hook(dct):
+def object_hook(dct, codec_options=DEFAULT_CODEC_OPTIONS):
     if "$oid" in dct:
         return ObjectId(str(dct["$oid"]))
     if "$ref" in dct:
@@ -205,6 +209,9 @@ def object_hook(dct):
         subtype = int(dct["$type"], 16)
         if subtype >= 0xffffff80:  # Handle mongoexport values
             subtype = int(dct["$type"][6:], 16)
+        # Special handling for UUID
+        if subtype in (3, 4, codec_options.uuid_representation):
+            return uuid.UUID(dct["$binary"])
         return Binary(base64.b64decode(dct["$binary"].encode()), subtype)
     if "$code" in dct:
         return Code(dct["$code"], dct.get("$scope"))
@@ -270,5 +277,7 @@ def default(obj):
             ('$binary', base64.b64encode(obj).decode()),
             ('$type', "00")])
     if isinstance(obj, uuid.UUID):
-        return {"$uuid": obj.hex}
+        return SON([
+            ('$binary', obj.hex),
+            ('$type', "03")])
     raise TypeError("%r is not JSON serializable" % obj)
