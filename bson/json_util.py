@@ -79,6 +79,7 @@ from bson import EPOCH_AWARE, RE_TYPE, SON
 from bson.binary import Binary
 from bson.code import Code
 from bson.codec_options import CodecOptions
+from bson.errors import InvalidDatetime
 from bson.dbref import DBRef
 from bson.int64 import Int64
 from bson.max_key import MaxKey
@@ -109,23 +110,32 @@ class JSONOptions(CodecOptions):
         to the MongoDB extended JSON type NumberLong, ie ``'{ "$numberLong":
         "<number>" }'``. Otherwise they will be encoded as an `int`.
         Defaults to ``False``.
+      - `strict_date`: If ``True``, :class:`~datetime.datetime` is encoded to
+        the MongoDB extended JSON *Strict* mode type ``Date``.
+        Otherwise it will be encoded as milliseconds since Unix epoch.
+        Defaults to ``False``.
       - `args`: arguments to :class:`~bson.codec_options.CodecOptions`
       - `kwargs`: arguments to :class:`~bson.codec_options.CodecOptions`
+
+    .. versionadded:: 3.4
     """
 
-    def __new__(cls, strict_number_long=False, *args, **kwargs):
+    def __new__(cls, strict_number_long=False, strict_date=False, *args,
+                **kwargs):
         self = super(JSONOptions, cls).__new__(cls, *args, **kwargs)
         self.strict_number_long = strict_number_long
+        self.strict_date = strict_date
         return self
 
     def _arguments_repr(self):
-        return 'strict_number_long=%r, %s' % (
+        return 'strict_number_long=%r, strict_date=%r, %s' % (
             self.strict_number_long,
+            self.strict_date,
             super(JSONOptions, self)._arguments_repr())
 
 
 DEFAULT_JSON_OPTIONS = JSONOptions()
-STRICT_JSON_OPTIONS = JSONOptions(strict_number_long=True)
+STRICT_JSON_OPTIONS = JSONOptions(strict_number_long=True, strict_date=True)
 
 
 def dumps(obj, *args, **kwargs):
@@ -133,6 +143,14 @@ def dumps(obj, *args, **kwargs):
 
     Recursive function that handles all BSON types including
     :class:`~bson.binary.Binary` and :class:`~bson.code.Code`.
+
+    Raises :class:`bson.errors.InvalidDatetime` if `obj` contains a
+    :class:`datetime.datetime` without a time zone and
+    `json_options.strict_date` is ``True``.
+
+    .. versionchanged:: 3.4
+       Accepts optional parameter `json_options`. See
+       :class:`~bson.json_util.JSONOptions`.
 
     .. versionchanged:: 2.7
        Preserves order when rendering SON, Timestamp, Code, Binary, and DBRef
@@ -146,6 +164,10 @@ def loads(s, *args, **kwargs):
     """Helper function that wraps :func:`json.loads`.
 
     Automatically passes the object_hook for BSON type conversion.
+
+    .. versionchanged:: 3.4
+       Accepts optional parameter `json_options`. See
+       :class:`~bson.json_util.JSONOptions`.
     """
     json_options = kwargs.pop("json_options", DEFAULT_JSON_OPTIONS)
     kwargs["object_hook"] = lambda dct: object_hook(dct, json_options)
@@ -259,12 +281,24 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
     if isinstance(obj, DBRef):
         return _json_convert(obj.as_doc())
     if isinstance(obj, datetime.datetime):
+        if json_options.strict_date:
+            if not obj.tzinfo:
+                raise InvalidDatetime("datetime is not time zone aware", obj)
+            if obj >= EPOCH_AWARE:
+                return {"$date": "%s.%03d%s" % (
+                    obj.strftime("%Y-%m-%dT%H:%M:%S"),
+                    int(obj.microsecond / 1000),
+                    obj.strftime("%z"))}
+
         # TODO share this code w/ bson.py?
         if obj.utcoffset() is not None:
             obj = obj - obj.utcoffset()
         millis = int(calendar.timegm(obj.timetuple()) * 1000 +
                      obj.microsecond / 1000)
-        return {"$date": millis}
+        if json_options.strict_date:
+            return {"$date": {"$numberLong": str(millis)}}
+        else:
+            return {"$date": millis}
     if json_options.strict_number_long and isinstance(obj, Int64):
         return {"$numberLong": str(obj)}
     if isinstance(obj, (RE_TYPE, Regex)):

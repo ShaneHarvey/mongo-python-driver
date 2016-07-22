@@ -22,9 +22,10 @@ import uuid
 
 sys.path[0:0] = [""]
 
-from bson import json_util, EPOCH_AWARE
+from bson import json_util, EPOCH_AWARE, EPOCH_NAIVE
 from bson.binary import Binary, MD5_SUBTYPE, USER_DEFINED_SUBTYPE
 from bson.code import Code
+from bson.errors import InvalidDatetime
 from bson.dbref import DBRef
 from bson.int64 import Int64
 from bson.max_key import MaxKey
@@ -114,6 +115,26 @@ class TestJsonUtil(unittest.TestCase):
         self.assertEqual(dtm, json_util.loads(jsn)["dt"])
         jsn = '{"dt": {"$date": {"$numberLong": "-62135593139000"}}}'
         self.assertEqual(dtm, json_util.loads(jsn)["dt"])
+
+        # test dumps format
+        pre_epoch = {"dt": datetime.datetime(1, 1, 1, 1, 1, 1, 10000, utc)}
+        post_epoch = {"dt": datetime.datetime(1972, 1, 1, 1, 1, 1, 10000, utc)}
+        json_options = json_util.JSONOptions(strict_date=True)
+        self.assertEqual(
+            '{"dt": {"$date": -62135593138990}}',
+            json_util.dumps(pre_epoch))
+        self.assertEqual(
+            '{"dt": {"$date": 63075661010}}',
+            json_util.dumps(post_epoch))
+        self.assertEqual(
+            '{"dt": {"$date": {"$numberLong": "-62135593138990"}}}',
+            json_util.dumps(pre_epoch, json_options=json_options))
+        self.assertEqual(
+            '{"dt": {"$date": "1972-01-01T01:01:01.010+0000"}}',
+            json_util.dumps(post_epoch, json_options=json_options))
+        unaware = {"dt": EPOCH_NAIVE}
+        self.assertRaises(InvalidDatetime, json_util.dumps, unaware,
+                          json_options=json_options)
 
     def test_regex_object_hook(self):
         # Extended JSON format regular expression.
