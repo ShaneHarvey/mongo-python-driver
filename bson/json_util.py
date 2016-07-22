@@ -105,18 +105,27 @@ class JSONOptions(CodecOptions):
     """Encapsulates JSON options for :func:`dumps` and :func:`loads`.
 
     :Parameters:
+      - `strict_number_long`: If ``True``, :class:`~bson.int64.Int64` is encoded
+        to the MongoDB extended JSON type NumberLong, ie ``'{ "$numberLong":
+        "<number>" }'``. Otherwise they will be encoded as an `int`.
+        Defaults to ``False``.
+      - `args`: arguments to :class:`~bson.codec_options.CodecOptions`
       - `kwargs`: arguments to :class:`~bson.codec_options.CodecOptions`
     """
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, strict_number_long=False, *args, **kwargs):
         self = super(JSONOptions, cls).__new__(cls, *args, **kwargs)
+        self.strict_number_long = strict_number_long
         return self
 
-    def __repr__(self):
-        return 'JSONOptions(%s)' % (self._arguments_repr(),)
+    def _arguments_repr(self):
+        return 'strict_number_long=%r, %s' % (
+            self.strict_number_long,
+            super(JSONOptions, self)._arguments_repr())
 
 
 DEFAULT_JSON_OPTIONS = JSONOptions()
+STRICT_JSON_OPTIONS = JSONOptions(strict_number_long=True)
 
 
 def dumps(obj, *args, **kwargs):
@@ -256,6 +265,8 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
         millis = int(calendar.timegm(obj.timetuple()) * 1000 +
                      obj.microsecond / 1000)
         return {"$date": millis}
+    if json_options.strict_number_long and isinstance(obj, Int64):
+        return {"$numberLong": str(obj)}
     if isinstance(obj, (RE_TYPE, Regex)):
         flags = ""
         if obj.flags & re.IGNORECASE:

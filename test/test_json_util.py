@@ -230,13 +230,19 @@ class TestJsonUtil(unittest.TestCase):
         self.assertEqual('{"$code": "return z", "$scope": {"z": 2}}', res)
 
     def test_undefined(self):
-        json = '{"name": {"$undefined": true}}'
-        self.assertIsNone(json_util.loads(json)['name'])
+        jsn = '{"name": {"$undefined": true}}'
+        self.assertIsNone(json_util.loads(jsn)['name'])
 
     def test_numberlong(self):
-        json = '{"weight": {"$numberLong": 65535}}'
-        self.assertEqual(json_util.loads(json)['weight'],
+        jsn = '{"weight": {"$numberLong": "65535"}}'
+        self.assertEqual(json_util.loads(jsn)['weight'],
                          Int64(65535))
+        self.assertEqual(json_util.dumps({"weight": Int64(65535)}),
+                         '{"weight": 65535}')
+        json_options = json_util.JSONOptions(strict_number_long=True)
+        self.assertEqual(json_util.dumps({"weight": Int64(65535)},
+                                         json_options=json_options),
+                         jsn)
 
 
 class TestJsonUtilRoundtrip(IntegrationTest):
