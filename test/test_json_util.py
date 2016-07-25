@@ -24,7 +24,7 @@ sys.path[0:0] = [""]
 
 from bson import json_util, EPOCH_AWARE, EPOCH_NAIVE
 from bson.binary import (Binary, MD5_SUBTYPE, USER_DEFINED_SUBTYPE,
-                         JAVA_LEGACY, CSHARP_LEGACY)
+                         JAVA_LEGACY, CSHARP_LEGACY, STANDARD)
 from bson.code import Code
 from bson.errors import InvalidDatetime
 from bson.dbref import DBRef
@@ -201,12 +201,16 @@ class TestJsonUtil(unittest.TestCase):
             '{"uuid": {"$uuid": "f47ac10b58cc4372a5670e02b2c3d479"}}',
             json_util.dumps(doc))
         self.assertEqual(
-            '{"uuid": {"$binary": "9HrBC1jMQ3KlZw4CssPUeQ==", "$type": "04"}}',
+            '{"uuid": {"$binary": "9HrBC1jMQ3KlZw4CssPUeQ==", "$type": "03"}}',
             json_util.dumps(doc, json_options=json_util.STRICT_JSON_OPTIONS))
-        self.assertEqual(json_util.loads(
+        self.assertEqual(
             '{"uuid": {"$binary": "9HrBC1jMQ3KlZw4CssPUeQ==", "$type": "04"}}',
-            json_options=json_util.STRICT_JSON_OPTIONS),
-            doc)
+            json_util.dumps(doc, json_options=json_util.JSONOptions(
+                strict_uuid=True, uuid_representation=STANDARD)))
+        self.assertEqual(doc, json_util.loads(
+            '{"uuid": {"$binary": "9HrBC1jMQ3KlZw4CssPUeQ==", "$type": "03"}}'))
+        self.assertEqual(doc, json_util.loads(
+            '{"uuid": {"$binary": "9HrBC1jMQ3KlZw4CssPUeQ==", "$type": "04"}}'))
         self.round_trip(doc, json_options=json_util.JSONOptions(
             strict_uuid=True, uuid_representation=JAVA_LEGACY))
         self.round_trip(doc, json_options=json_util.JSONOptions(

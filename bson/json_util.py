@@ -357,13 +357,13 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
     if isinstance(obj, uuid.UUID):
         if json_options.strict_uuid:
             data = obj.bytes
-            subtype = UUID_SUBTYPE
+            subtype = OLD_UUID_SUBTYPE
             if json_options.uuid_representation == CSHARP_LEGACY:
                 data = obj.bytes_le
-                subtype = OLD_UUID_SUBTYPE
             elif json_options.uuid_representation == JAVA_LEGACY:
                 data = data[7::-1] + data[:7:-1]
-                subtype = OLD_UUID_SUBTYPE
+            elif json_options.uuid_representation == UUID_SUBTYPE:
+                subtype = UUID_SUBTYPE
             return SON([
                 ('$binary', base64.b64encode(data).decode()),
                 ('$type', "%02x" % subtype)])
