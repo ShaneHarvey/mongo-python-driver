@@ -23,7 +23,8 @@ import uuid
 sys.path[0:0] = [""]
 
 from bson import json_util, EPOCH_AWARE, EPOCH_NAIVE
-from bson.binary import Binary, MD5_SUBTYPE, USER_DEFINED_SUBTYPE
+from bson.binary import (Binary, MD5_SUBTYPE, USER_DEFINED_SUBTYPE,
+                         JAVA_LEGACY, CSHARP_LEGACY)
 from bson.code import Code
 from bson.errors import InvalidDatetime
 from bson.dbref import DBRef
@@ -41,11 +42,11 @@ PY3 = sys.version_info[0] == 3
 
 
 class TestJsonUtil(unittest.TestCase):
-    def round_tripped(self, doc):
-        return json_util.loads(json_util.dumps(doc))
+    def round_tripped(self, doc, **kwargs):
+        return json_util.loads(json_util.dumps(doc, **kwargs), **kwargs)
 
-    def round_trip(self, doc):
-        self.assertEqual(doc, self.round_tripped(doc))
+    def round_trip(self, doc, **kwargs):
+        self.assertEqual(doc, self.round_tripped(doc, **kwargs))
 
     def test_basic(self):
         self.round_trip({"hello": "world"})
@@ -194,8 +195,22 @@ class TestJsonUtil(unittest.TestCase):
         self.assertEqual(dct, rtdct)
 
     def test_uuid(self):
-        self.round_trip(
-                {'uuid': uuid.UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479')})
+        doc = {'uuid': uuid.UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479')}
+        self.round_trip(doc)
+        self.assertEqual(
+            '{"uuid": {"$uuid": "f47ac10b58cc4372a5670e02b2c3d479"}}',
+            json_util.dumps(doc))
+        self.assertEqual(
+            '{"uuid": {"$binary": "9HrBC1jMQ3KlZw4CssPUeQ==", "$type": "04"}}',
+            json_util.dumps(doc, json_options=json_util.STRICT_JSON_OPTIONS))
+        self.assertEqual(json_util.loads(
+            '{"uuid": {"$binary": "9HrBC1jMQ3KlZw4CssPUeQ==", "$type": "04"}}',
+            json_options=json_util.STRICT_JSON_OPTIONS),
+            doc)
+        self.round_trip(doc, json_options=json_util.JSONOptions(
+            strict_uuid=True, uuid_representation=JAVA_LEGACY))
+        self.round_trip(doc, json_options=json_util.JSONOptions(
+            strict_uuid=True, uuid_representation=CSHARP_LEGACY))
 
     def test_binary(self):
         bin_type_dict = {"bin": Binary(b"\x00\x01\x02\x03\x04")}

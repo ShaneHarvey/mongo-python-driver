@@ -76,7 +76,8 @@ import re
 import uuid
 
 from bson import EPOCH_AWARE, RE_TYPE, SON
-from bson.binary import Binary
+from bson.binary import (Binary, JAVA_LEGACY, CSHARP_LEGACY, OLD_UUID_SUBTYPE,
+                         UUID_SUBTYPE)
 from bson.code import Code
 from bson.codec_options import CodecOptions
 from bson.errors import InvalidDatetime
@@ -114,28 +115,35 @@ class JSONOptions(CodecOptions):
         the MongoDB extended JSON *Strict* mode type ``Date``.
         Otherwise it will be encoded as milliseconds since Unix epoch.
         Defaults to ``False``.
+      - `strict_uuid`: If ``True``, :class:`~uuid.UUID` is encoded to
+        the MongoDB extended JSON *Strict* mode type ``Binary``.
+        Otherwise it will be encoded as ``'{ "$uuid": "<hex>" }'``.
+        Defaults to ``False``.
       - `args`: arguments to :class:`~bson.codec_options.CodecOptions`
       - `kwargs`: arguments to :class:`~bson.codec_options.CodecOptions`
 
     .. versionadded:: 3.4
     """
 
-    def __new__(cls, strict_number_long=False, strict_date=False, *args,
-                **kwargs):
+    def __new__(cls, strict_number_long=False, strict_date=False,
+                strict_uuid=False, *args, **kwargs):
         self = super(JSONOptions, cls).__new__(cls, *args, **kwargs)
         self.strict_number_long = strict_number_long
         self.strict_date = strict_date
+        self.strict_uuid = strict_uuid
         return self
 
     def _arguments_repr(self):
-        return 'strict_number_long=%r, strict_date=%r, %s' % (
+        return 'strict_number_long=%r, strict_date=%r, strict_uuid=%r, %s' % (
             self.strict_number_long,
             self.strict_date,
+            self.strict_uuid,
             super(JSONOptions, self)._arguments_repr())
 
 
 DEFAULT_JSON_OPTIONS = JSONOptions()
-STRICT_JSON_OPTIONS = JSONOptions(strict_number_long=True, strict_date=True)
+STRICT_JSON_OPTIONS = JSONOptions(strict_number_long=True, strict_date=True,
+                                  strict_uuid=True)
 
 
 def dumps(obj, *args, **kwargs):
@@ -258,7 +266,17 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
         subtype = int(dct["$type"], 16)
         if subtype >= 0xffffff80:  # Handle mongoexport values
             subtype = int(dct["$type"][6:], 16)
-        return Binary(base64.b64decode(dct["$binary"].encode()), subtype)
+        data = base64.b64decode(dct["$binary"].encode())
+        # special handling for UUID
+        if subtype == OLD_UUID_SUBTYPE:
+            if json_options.uuid_representation == CSHARP_LEGACY:
+                return uuid.UUID(bytes_le=data)
+            if json_options.uuid_representation == JAVA_LEGACY:
+                data = data[7::-1] + data[:7:-1]
+            return uuid.UUID(bytes=data)
+        if subtype == UUID_SUBTYPE:
+            return uuid.UUID(bytes=data)
+        return Binary(data, subtype)
     if "$code" in dct:
         return Code(dct["$code"], dct.get("$scope"))
     if "$uuid" in dct:
@@ -337,5 +355,18 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
             ('$binary', base64.b64encode(obj).decode()),
             ('$type', "00")])
     if isinstance(obj, uuid.UUID):
-        return {"$uuid": obj.hex}
+        if json_options.strict_uuid:
+            data = obj.bytes
+            subtype = UUID_SUBTYPE
+            if json_options.uuid_representation == CSHARP_LEGACY:
+                data = obj.bytes_le
+                subtype = OLD_UUID_SUBTYPE
+            elif json_options.uuid_representation == JAVA_LEGACY:
+                data = data[7::-1] + data[:7:-1]
+                subtype = OLD_UUID_SUBTYPE
+            return SON([
+                ('$binary', base64.b64encode(data).decode()),
+                ('$type', "%02x" % subtype)])
+        else:
+            return {"$uuid": obj.hex}
     raise TypeError("%r is not JSON serializable" % obj)
