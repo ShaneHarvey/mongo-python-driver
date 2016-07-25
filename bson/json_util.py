@@ -106,10 +106,10 @@ class JSONOptions(CodecOptions):
     """Encapsulates JSON options for :func:`dumps` and :func:`loads`.
 
     :Parameters:
-      - `strict_number_long`: If ``True``, :class:`~bson.int64.Int64` is encoded
-        to the MongoDB extended JSON type NumberLong, ie ``'{ "$numberLong":
-        "<number>" }'``. Otherwise they will be encoded as an `int`.
-        Defaults to ``False``.
+      - `strict_number_long`: If ``True``, :class:`~bson.int64.Int64` is
+        encoded to the MongoDB extended JSON type NumberLong, ie ``'{
+        "$numberLong": "<number>" }'``. Otherwise they will be encoded as an
+        `int`. Defaults to ``False``.
       - `strict_date`: If ``True``, :class:`~datetime.datetime` is encoded to
         the MongoDB extended JSON *Strict* mode type ``Date``.
         Otherwise it will be encoded as milliseconds since Unix epoch.
