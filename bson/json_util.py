@@ -119,6 +119,9 @@ class JSONOptions(CodecOptions):
         the MongoDB extended JSON *Strict* mode type ``Binary``.
         Otherwise it will be encoded as ``'{ "$uuid": "<hex>" }'``.
         Defaults to ``False``.
+      - `document_class`: BSON documents returned by :func:`loads` will be
+        decoded to an instance of this class. Must be a subclass of
+        :class:`~collections.MutableMapping`. Defaults to :class:`dict`.
       - `args`: arguments to :class:`~bson.codec_options.CodecOptions`
       - `kwargs`: arguments to :class:`~bson.codec_options.CodecOptions`
 
@@ -178,7 +181,8 @@ def loads(s, *args, **kwargs):
        :class:`~bson.json_util.JSONOptions`.
     """
     json_options = kwargs.pop("json_options", DEFAULT_JSON_OPTIONS)
-    kwargs["object_hook"] = lambda dct: object_hook(dct, json_options)
+    kwargs["object_pairs_hook"] = lambda pairs: object_pairs_hook(pairs,
+                                                                  json_options)
     return json.loads(s, *args, **kwargs)
 
 
@@ -195,6 +199,11 @@ def _json_convert(obj, json_options=DEFAULT_JSON_OPTIONS):
         return default(obj, json_options)
     except TypeError:
         return obj
+
+
+def object_pairs_hook(pairs, json_options=DEFAULT_JSON_OPTIONS):
+    result = json_options.document_class(pairs)
+    return object_hook(result, json_options)
 
 
 def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):

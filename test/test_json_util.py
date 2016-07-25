@@ -22,7 +22,7 @@ import uuid
 
 sys.path[0:0] = [""]
 
-from bson import json_util, EPOCH_AWARE, EPOCH_NAIVE
+from bson import json_util, EPOCH_AWARE, EPOCH_NAIVE, SON
 from bson.binary import (Binary, MD5_SUBTYPE, USER_DEFINED_SUBTYPE,
                          JAVA_LEGACY, CSHARP_LEGACY, STANDARD)
 from bson.code import Code
@@ -283,6 +283,11 @@ class TestJsonUtil(unittest.TestCase):
         self.assertEqual(json_util.dumps({"weight": Int64(65535)},
                                          json_options=json_options),
                          jsn)
+
+    def test_loads_document_class(self):
+        self.assertEqual(SON([("foo", "bar"), ("b", 1)]), json_util.loads(
+            '{"foo": "bar", "b": 1}',
+            json_options=json_util.JSONOptions(document_class=SON)))
 
 
 class TestJsonUtilRoundtrip(IntegrationTest):
