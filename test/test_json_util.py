@@ -117,7 +117,7 @@ class TestJsonUtil(unittest.TestCase):
         jsn = '{"dt": {"$date": {"$numberLong": "-62135593139000"}}}'
         self.assertEqual(dtm, json_util.loads(jsn)["dt"])
 
-        # test dumps format
+        # Test dumps format
         pre_epoch = {"dt": datetime.datetime(1, 1, 1, 1, 1, 1, 10000, utc)}
         post_epoch = {"dt": datetime.datetime(1972, 1, 1, 1, 1, 1, 10000, utc)}
         json_options = json_util.JSONOptions(strict_date=True)
@@ -136,6 +136,25 @@ class TestJsonUtil(unittest.TestCase):
         unaware = {"dt": EPOCH_NAIVE}
         self.assertRaises(InvalidDatetime, json_util.dumps, unaware,
                           json_options=json_options)
+
+        # Test tzinfo option
+        self.assertEqual(
+            datetime.datetime(1972, 1, 1, 1, 1, 1, 10000, utc),
+            json_util.loads(
+                '{"dt": {"$date": "1972-01-01T01:01:01.010+0000"}}')["dt"])
+        self.assertEqual(
+            datetime.datetime(1972, 1, 1, 1, 1, 1, 10000, utc),
+            json_util.loads(
+                '{"dt": {"$date": "1972-01-01T01:01:01.010+0000"}}',
+                json_options=json_util.JSONOptions(tz_aware=True,
+                                                   tzinfo=utc))["dt"])
+        self.assertEqual(
+            datetime.datetime(1972, 1, 1, 1, 1, 1, 10000),
+            json_util.loads(
+                '{"dt": {"$date": "1972-01-01T01:01:01.010+0000"}}',
+                json_options=json_util.JSONOptions(tz_aware=True,
+                                                   tzinfo=None))["dt"])
+
 
     def test_regex_object_hook(self):
         # Extended JSON format regular expression.

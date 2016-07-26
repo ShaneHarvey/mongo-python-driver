@@ -122,6 +122,16 @@ class JSONOptions(CodecOptions):
       - `document_class`: BSON documents returned by :func:`loads` will be
         decoded to an instance of this class. Must be a subclass of
         :class:`~collections.MutableMapping`. Defaults to :class:`dict`.
+      - `uuid_representation`: The BSON representation to use when encoding
+        and decoding instances of :class:`~uuid.UUID`. Defaults to
+        :data:`~bson.binary.PYTHON_LEGACY`.
+      - `tz_aware`: If ``True``, MongoDB extended JSON type ``Date`` will be
+        decoded to instances of :class:`~datetime.datetime` using tzinfo as
+        the time zone. Otherwise the time zone will be
+        :const:`bson.tz_util.utc`. Defaults to ``False``.
+      - `tzinfo`: A :class:`~datetime.tzinfo` subclass that specifies the
+        timezone to/from which :class:`~datetime.datetime` objects should be
+        encoded/decoded.
       - `args`: arguments to :class:`~bson.codec_options.CodecOptions`
       - `kwargs`: arguments to :class:`~bson.codec_options.CodecOptions`
 
@@ -213,6 +223,10 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
         return DBRef(dct["$ref"], dct["$id"], dct.get("$db", None))
     if "$date" in dct:
         dtm = dct["$date"]
+        if json_options.tz_aware:
+            tzinfo = json_options.tzinfo
+        else:
+            tzinfo = utc
         # mongoexport 2.6 and newer
         if isinstance(dtm, string_type):
             # Parse offset
@@ -235,8 +249,9 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
                 dt = dtm
                 offset = ''
 
-            aware = datetime.datetime.strptime(
-                dt, "%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=utc)
+            aware = datetime.datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S.%f")
+            if tzinfo:
+                aware = aware.replace(tzinfo=tzinfo)
 
             if not offset or offset == 'Z':
                 # UTC
@@ -258,7 +273,8 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
         # mongoexport before 2.6
         else:
             secs = float(dtm) / 1000.0
-        return EPOCH_AWARE + datetime.timedelta(seconds=secs)
+        return (datetime.datetime.fromtimestamp(0, tzinfo) +
+                datetime.timedelta(seconds=secs))
     if "$regex" in dct:
         flags = 0
         # PyMongo always adds $options but some other tools may not.
