@@ -152,9 +152,12 @@ class TestJsonUtil(unittest.TestCase):
             datetime.datetime(1972, 1, 1, 1, 1, 1, 10000),
             json_util.loads(
                 '{"dt": {"$date": "1972-01-01T01:01:01.010+0000"}}',
-                json_options=json_util.JSONOptions(tz_aware=True,
-                                                   tzinfo=None))["dt"])
+                json_options=json_util.JSONOptions(tz_aware=False))["dt"])
 
+        post_epoch_naive = {"dt": datetime.datetime(1, 1, 1, 1, 1, 1, 10000,
+                                                    utc)}
+        self.round_trip(post_epoch_naive, json_options=json_util.JSONOptions(
+            tz_aware=True))
 
     def test_regex_object_hook(self):
         # Extended JSON format regular expression.
