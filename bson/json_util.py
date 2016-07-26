@@ -75,6 +75,7 @@ import json
 import re
 import uuid
 
+import bson
 from bson import EPOCH_AWARE, EPOCH_NAIVE, RE_TYPE, SON
 from bson.binary import (Binary, JAVA_LEGACY, CSHARP_LEGACY, OLD_UUID_SUBTYPE,
                          UUID_SUBTYPE)
@@ -270,17 +271,11 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
                 return aware.replace(tzinfo=None)
         # mongoexport 2.6 and newer, time before the epoch (SERVER-15275)
         elif isinstance(dtm, collections.Mapping):
-            secs = float(dtm["$numberLong"]) / 1000.0
+            millis = int(dtm["$numberLong"])
         # mongoexport before 2.6
         else:
-            secs = float(dtm) / 1000.0
-        if json_options.tz_aware:
-            dt = EPOCH_AWARE + datetime.timedelta(seconds=secs)
-            if json_options.tzinfo:
-                dt = dt.astimezone(json_options.tzinfo)
-            return dt
-        else:
-            return EPOCH_NAIVE + datetime.timedelta(seconds=secs)
+            millis = int(dtm)
+        return bson._millis_to_datetime(millis, json_options)
     if "$regex" in dct:
         flags = 0
         # PyMongo always adds $options but some other tools may not.
@@ -339,11 +334,7 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
                     int(obj.microsecond / 1000),
                     obj.strftime("%z"))}
 
-        # TODO share this code w/ bson.py?
-        if obj.utcoffset() is not None:
-            obj = obj - obj.utcoffset()
-        millis = int(calendar.timegm(obj.timetuple()) * 1000 +
-                     obj.microsecond / 1000)
+        millis = bson._datetime_to_millis(obj)
         if json_options.strict_date:
             return {"$date": {"$numberLong": str(millis)}}
         else:
