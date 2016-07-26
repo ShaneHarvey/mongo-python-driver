@@ -34,7 +34,7 @@ from bson.min_key import MinKey
 from bson.objectid import ObjectId
 from bson.regex import Regex
 from bson.timestamp import Timestamp
-from bson.tz_util import utc
+from bson.tz_util import FixedOffset, utc
 
 from test import unittest, IntegrationTest
 
@@ -133,11 +133,16 @@ class TestJsonUtil(unittest.TestCase):
         self.assertEqual(
             '{"dt": {"$date": "1972-01-01T01:01:01.010+0000"}}',
             json_util.dumps(post_epoch, json_options=json_options))
-        unaware = {"dt": EPOCH_NAIVE}
-        self.assertRaises(InvalidDatetime, json_util.dumps, unaware,
+
+        # Strict mode requires dates to have a timezone
+        pre_epoch_naive = {"dt": datetime.datetime(1, 1, 1, 1, 1, 1, 1000)}
+        post_epoch_naive = {"dt": datetime.datetime(1972, 1, 1, 1, 1, 1, 1000)}
+        self.assertRaises(InvalidDatetime, json_util.dumps, pre_epoch_naive,
+                          json_options=json_options)
+        self.assertRaises(InvalidDatetime, json_util.dumps, post_epoch_naive,
                           json_options=json_options)
 
-        # Test tzinfo option
+        # Test tz_aware and tzinfo options
         self.assertEqual(
             datetime.datetime(1972, 1, 1, 1, 1, 1, 10000, utc),
             json_util.loads(
@@ -153,10 +158,20 @@ class TestJsonUtil(unittest.TestCase):
             json_util.loads(
                 '{"dt": {"$date": "1972-01-01T01:01:01.010+0000"}}',
                 json_options=json_util.JSONOptions(tz_aware=False))["dt"])
-
-        pre_epoch_naive = {"dt": datetime.datetime(1, 1, 1, 1, 1, 1, 1000)}
         self.round_trip(pre_epoch_naive, json_options=json_util.JSONOptions(
             tz_aware=False))
+
+        # Test a non-utc timezone
+        pacific = FixedOffset(-8 * 60, 'US/Pacific')
+        aware_datetime = {"dt": datetime.datetime(2002, 10, 27, 6, 0, 0, 10000,
+                                                  pacific)}
+        self.assertEqual(
+            '{"dt": {"$date": "2002-10-27T06:00:00.010-0800"}}',
+            json_util.dumps(aware_datetime, json_options=json_options))
+        self.round_trip(aware_datetime, json_options=json_util.JSONOptions(
+            tz_aware=True, tzinfo=pacific))
+        self.round_trip(aware_datetime, json_options=json_util.JSONOptions(
+            strict_date=True, tz_aware=True, tzinfo=pacific))
 
     def test_regex_object_hook(self):
         # Extended JSON format regular expression.

@@ -17,9 +17,9 @@
 This module provides two helper methods `dumps` and `loads` that wrap the
 native :mod:`json` methods and provide explicit BSON conversion to and from
 json.  This allows for specialized encoding and decoding of BSON documents
-into `Mongo Extended JSON
-<http://www.mongodb.org/display/DOCS/Mongo+Extended+JSON>`_'s *Strict*
-mode.  This lets you encode / decode BSON documents to JSON even when
+into `MongoDB Extended JSON
+<http://www.mongodb.org/display/DOCS/Mongo+Extended+JSON>`_'s *Strict
+mode*.  This lets you encode / decode BSON documents to JSON even when
 they use special BSON types.
 
 Example usage (serialization):
@@ -68,7 +68,6 @@ but it will be faster as there is less recursion.
 """
 
 import base64
-import calendar
 import collections
 import datetime
 import json
@@ -76,7 +75,7 @@ import re
 import uuid
 
 import bson
-from bson import EPOCH_AWARE, EPOCH_NAIVE, RE_TYPE, SON
+from bson import EPOCH_AWARE, RE_TYPE, SON
 from bson.binary import (Binary, JAVA_LEGACY, CSHARP_LEGACY, OLD_UUID_SUBTYPE,
                          UUID_SUBTYPE)
 from bson.code import Code
@@ -108,32 +107,34 @@ class JSONOptions(CodecOptions):
     """Encapsulates JSON options for :func:`dumps` and :func:`loads`.
 
     :Parameters:
-      - `strict_number_long`: If ``True``, :class:`~bson.int64.Int64` is
-        encoded to the MongoDB extended JSON type NumberLong, ie ``'{
-        "$numberLong": "<number>" }'``. Otherwise they will be encoded as an
-        `int`. Defaults to ``False``.
-      - `strict_date`: If ``True``, :class:`~datetime.datetime` is encoded to
-        the MongoDB extended JSON *Strict* mode type ``Date``.
-        Otherwise it will be encoded as milliseconds since Unix epoch.
-        Defaults to ``False``.
-      - `strict_uuid`: If ``True``, :class:`~uuid.UUID` is encoded to
-        the MongoDB extended JSON *Strict* mode type ``Binary``.
-        Otherwise it will be encoded as ``'{ "$uuid": "<hex>" }'``.
-        Defaults to ``False``.
+      - `strict_number_long`: If ``True``, :class:`~bson.int64.Int64` objects
+        are encoded to MongoDB Extended JSON's *Strict mode* type
+        `NumberLong`, ie ``'{"$numberLong": "<number>" }'``. Otherwise they
+        will be encoded as an `int`. Defaults to ``False``.
+      - `strict_date`: If ``True``, `datetime.datetime` objects are encoded to
+        MongoDB Extended JSON's *Strict mode* type `Date`. Otherwise it will
+        be encoded as milliseconds since Unix epoch. Defaults to ``False``.
+      - `strict_uuid`: If ``True``, :class:`uuid.UUID` object are encoded to
+        MongoDB Extended JSON's *Strict mode* type `Binary`. Otherwise it
+        will be encoded as ``'{"$uuid": "<hex>" }'``. Defaults to ``False``.
       - `document_class`: BSON documents returned by :func:`loads` will be
         decoded to an instance of this class. Must be a subclass of
-        :class:`~collections.MutableMapping`. Defaults to :class:`dict`.
+        :class:`collections.MutableMapping`. Defaults to :class:`dict`.
       - `uuid_representation`: The BSON representation to use when encoding
-        and decoding instances of :class:`~uuid.UUID`. Defaults to
-        :data:`~bson.binary.PYTHON_LEGACY`.
-      - `tz_aware`: If ``True``, MongoDB extended JSON type ``Date`` will be
-        decoded to timezone aware instances of :class:`~datetime.datetime`.
-        Otherwise they will be naive. Defaults to ``True``.
-      - `tzinfo`: A :class:`~datetime.tzinfo` subclass that specifies the
-        timezone to/from which :class:`~datetime.datetime` objects should be
-        decoded. Defaults to :const:`bson.tz_util.utc`.
+        and decoding instances of :class:`uuid.UUID`. Defaults to
+        :const:`~bson.binary.PYTHON_LEGACY`.
+      - `tz_aware`: If ``True``, MongoDB Extended JSON's *Strict mode* type
+        `Date` will be decoded to timezone aware instances of
+        :class:`datetime.datetime`. Otherwise they will be naive. Defaults
+        to ``True``.
+      - `tzinfo`: A :class:`datetime.tzinfo` subclass that specifies the
+        timezone from which :class:`~datetime.datetime` objects should be
+        decoded. Defaults to :const:`~bson.tz_util.utc`.
       - `args`: arguments to :class:`~bson.codec_options.CodecOptions`
       - `kwargs`: arguments to :class:`~bson.codec_options.CodecOptions`
+
+    .. seealso:: The documentation for `MongoDB Extended JSON
+       <http://www.mongodb.org/display/DOCS/Mongo+Extended+JSON>`_.
 
     .. versionadded:: 3.4
     """
@@ -158,8 +159,16 @@ class JSONOptions(CodecOptions):
 
 
 DEFAULT_JSON_OPTIONS = JSONOptions()
+"""The default :class:`JSONOptions` for JSON encoding/decoding.
+
+.. versionadded:: 3.4
+"""
 STRICT_JSON_OPTIONS = JSONOptions(strict_number_long=True, strict_date=True,
                                   strict_uuid=True)
+""":class:`JSONOptions` for MongoDB Extended JSON's *Strict mode* encoding.
+
+.. versionadded:: 3.4
+"""
 
 
 def dumps(obj, *args, **kwargs):
@@ -168,13 +177,17 @@ def dumps(obj, *args, **kwargs):
     Recursive function that handles all BSON types including
     :class:`~bson.binary.Binary` and :class:`~bson.code.Code`.
 
-    Raises :class:`bson.errors.InvalidDatetime` if `obj` contains a
-    :class:`datetime.datetime` without a time zone and
+    Raises :class:`~bson.errors.InvalidDatetime` if `obj` contains a
+    :class:`datetime.datetime` without a timezone and
     `json_options.strict_date` is ``True``.
 
+    :Parameters:
+      - `json_options`: A :class:`JSONOptions` instance used to modify the
+        encoding of MongoDB Extended JSON types. Defaults to
+        :const:`DEFAULT_JSON_OPTIONS`.
+
     .. versionchanged:: 3.4
-       Accepts optional parameter `json_options`. See
-       :class:`~bson.json_util.JSONOptions`.
+       Accepts optional parameter `json_options`. See :class:`JSONOptions`.
 
     .. versionchanged:: 2.7
        Preserves order when rendering SON, Timestamp, Code, Binary, and DBRef
@@ -189,9 +202,13 @@ def loads(s, *args, **kwargs):
 
     Automatically passes the object_hook for BSON type conversion.
 
+    :Parameters:
+      - `json_options`: A :class:`JSONOptions` instance used to modify the
+        decoding of MongoDB Extended JSON types. Defaults to
+        :const:`DEFAULT_JSON_OPTIONS`.
+
     .. versionchanged:: 3.4
-       Accepts optional parameter `json_options`. See
-       :class:`~bson.json_util.JSONOptions`.
+       Accepts optional parameter `json_options`. See :class:`JSONOptions`.
     """
     json_options = kwargs.pop("json_options", DEFAULT_JSON_OPTIONS)
     kwargs["object_pairs_hook"] = lambda pairs: object_pairs_hook(pairs,
@@ -327,7 +344,7 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
     if isinstance(obj, datetime.datetime):
         if json_options.strict_date:
             if not obj.tzinfo:
-                raise InvalidDatetime("datetime is not time zone aware", obj)
+                raise InvalidDatetime("datetime is not timezone aware", obj)
             if obj >= EPOCH_AWARE:
                 return {"$date": "%s.%03d%s" % (
                     obj.strftime("%Y-%m-%dT%H:%M:%S"),

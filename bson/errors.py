@@ -48,7 +48,6 @@ class JSONError(Exception):
 class InvalidDatetime(JSONError):
     """Raised when trying to encode a datetime without a timezone.
 
-
-    Only raised when :class:`~bson.json_util.JSONOptions`.strict_date is
-    ``True``.
+    Only raised when
+    :class:`JSONOptions.strict_date <bson.json_util.JSONOptions>` is ``True``.
     """
