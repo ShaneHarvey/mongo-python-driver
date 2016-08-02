@@ -29,7 +29,8 @@ except ImportError:
 from pymongo import MongoClient, ssl_support
 from pymongo.errors import (ConfigurationError,
                             ConnectionFailure,
-                            OperationFailure)
+                            OperationFailure,
+                            ServerSelectionTimeoutError)
 from pymongo.ssl_support import HAVE_SSL, get_ssl_context, validate_cert_reqs
 from test import (IntegrationTest,
                   client_context,
@@ -486,8 +487,9 @@ class TestSSL(IntegrationTest):
                'MONGODB-X509' % (
                    quote_plus(MONGODB_X509_USERNAME), host, port))
         # SSL options aren't supported in the URI...
-        self.assertTrue(MongoClient(uri,
-                                    ssl=True, ssl_certfile=CLIENT_PEM))
+        self.assertTrue(MongoClient(uri, ssl=True,
+                                    ssl_cert_reqs=ssl.CERT_NONE,
+                                    ssl_certfile=CLIENT_PEM))
 
         # Should require a username
         uri = ('mongodb://%s:%d/?authMechanism=MONGODB-X509' % (host,
@@ -518,10 +520,10 @@ class TestSSL(IntegrationTest):
         try:
             connected(MongoClient(uri,
                                   ssl=True,
-                                  ssl_cert_reqs="CERT_NONE",
+                                  ssl_cert_reqs=ssl.CERT_NONE,
                                   ssl_certfile=CA_PEM,
                                   serverSelectionTimeoutMS=100))
-        except OperationFailure:
+        except ServerSelectionTimeoutError:
             pass
         else:
             self.fail("Invalid certificate accepted.")
