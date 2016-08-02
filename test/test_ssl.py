@@ -29,9 +29,9 @@ except ImportError:
 from pymongo import MongoClient, ssl_support
 from pymongo.errors import (ConfigurationError,
                             ConnectionFailure,
-                            OperationFailure,
-                            ServerSelectionTimeoutError)
+                            OperationFailure)
 from pymongo.ssl_support import HAVE_SSL, get_ssl_context, validate_cert_reqs
+from pymongo.write_concern import WriteConcern
 from test import (IntegrationTest,
                   client_context,
                   db_pwd,
@@ -147,30 +147,20 @@ class TestClientSSL(unittest.TestCase):
 class TestSSL(IntegrationTest):
 
     def assertClientWorks(self, client):
-        db = client.pymongo_ssl_test
-        db.test.drop()
-        db.test.insert_one({'ssl': True})
-        self.assertTrue(db.test.find_one()['ssl'])
-        client.drop_database('pymongo_ssl_test')
+        coll = client.pymongo_test.ssl_test.with_options(
+            write_concern=WriteConcern(w=client_context.w))
+        coll.drop()
+        coll.insert_one({'ssl': True})
+        self.assertTrue(coll.find_one()['ssl'])
+        coll.drop()
 
     @unittest.skipUnless(HAVE_SSL, "The ssl module is not available.")
     def setUp(self):
         super(TestSSL, self).setUp()
-        self.coll = self.db.pymongo_ssl_test
 
-    @client_context.require_ssl_cert_none
-    @client_context.require_no_auth
+    @client_context.require_ssl
     def test_simple_ssl(self):
-        client = self.client
-        response = client.admin.command('ismaster')
-        if 'setName' in response:
-            client = MongoClient(pair,
-                                 replicaSet=response['setName'],
-                                 w=len(response['hosts']),
-                                 ssl=True,
-                                 ssl_cert_reqs=ssl.CERT_NONE)
-
-        self.assertClientWorks(client)
+        self.assertClientWorks(self.client)
 
     @client_context.require_ssl_certfile
     @client_context.require_server_resolvable
@@ -198,21 +188,6 @@ class TestSSL(IntegrationTest):
                        "&ssl_certfile=%s&ssl_pem_passphrase=clientpassword"
                        "&ssl_ca_certs=%s&serverSelectionTimeoutMS=100")
             connected(MongoClient(uri_fmt % (CLIENT_ENCRYPTED_PEM, CA_PEM)))
-
-    @client_context.require_ssl_certfile
-    @client_context.require_no_auth
-    def test_cert_ssl(self):
-        client = self.client
-        response = client.admin.command('ismaster')
-        if 'setName' in response:
-            client = MongoClient(pair,
-                                 replicaSet=response['setName'],
-                                 w=len(response['hosts']),
-                                 ssl=True,
-                                 ssl_cert_reqs=ssl.CERT_NONE,
-                                 ssl_certfile=CLIENT_PEM)
-
-        self.assertClientWorks(client)
 
     @client_context.require_ssl_certfile
     @client_context.require_no_auth
@@ -366,6 +341,12 @@ class TestSSL(IntegrationTest):
     @client_context.require_ssl_certfile
     @client_context.require_server_resolvable
     def test_validation_with_system_ca_certs(self):
+        # Expects the server to be running with server.pem and ca.pem.
+        #
+        # --sslPEMKeyFile=/path/to/pymongo/test/certificates/server.pem
+        # --sslCAFile=/path/to/pymongo/test/certificates/ca.pem
+        # --sslWeakCertificateValidation
+        #
         if sys.platform == "win32":
             raise SkipTest("Can't test system ca certs on Windows.")
 
@@ -465,13 +446,13 @@ class TestSSL(IntegrationTest):
     @client_context.require_auth
     @client_context.require_ssl
     def test_mongodb_x509_auth(self):
-        ssl_client = self.client
-        self.addCleanup(ssl_client['$external'].logout)
+        ssl_client = MongoClient(pair, ssl=True, ssl_cert_reqs=ssl.CERT_NONE,
+                                 ssl_certfile=CLIENT_PEM)
         self.addCleanup(remove_all_users, ssl_client['$external'])
 
         ssl_client.admin.authenticate(db_user, db_pwd)
 
-        # Give admin all necessary privileges.
+        # Give x509 user all necessary privileges.
         ssl_client['$external'].add_user(MONGODB_X509_USERNAME, roles=[
             {'role': 'readWriteAnyDatabase', 'db': 'admin'},
             {'role': 'userAdminAnyDatabase', 'db': 'admin'}])
@@ -523,7 +504,7 @@ class TestSSL(IntegrationTest):
                                   ssl_cert_reqs=ssl.CERT_NONE,
                                   ssl_certfile=CA_PEM,
                                   serverSelectionTimeoutMS=100))
-        except ServerSelectionTimeoutError:
+        except (ConnectionFailure, ssl.SSLError):
             pass
         else:
             self.fail("Invalid certificate accepted.")

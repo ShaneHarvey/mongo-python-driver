@@ -166,8 +166,8 @@ class ClientContext(object):
                 self.ssl_cert_none = True
 
             # Can client connect with certfile?
-            client = connect(ssl=True, ssl_certfile=CLIENT_PEM,
-                                     ssl_cert_reqs=ssl.CERT_NONE)
+            client = connect(ssl=True,  ssl_cert_reqs=ssl.CERT_NONE,
+                             ssl_certfile=CLIENT_PEM,)
             if client:
                 self.ssl_certfile = True
                 self.client = client
