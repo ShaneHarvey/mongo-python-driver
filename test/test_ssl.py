@@ -40,6 +40,8 @@ from test import (IntegrationTest,
                   unittest)
 from test.utils import remove_all_users, connected
 
+if HAVE_SSL:
+    import ssl
 
 CERT_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                          'certificates')
@@ -47,9 +49,6 @@ CLIENT_PEM = os.path.join(CERT_PATH, 'client.pem')
 CLIENT_ENCRYPTED_PEM = os.path.join(CERT_PATH, 'client_encrypted.pem')
 CA_PEM = os.path.join(CERT_PATH, 'ca.pem')
 CRL_PEM = os.path.join(CERT_PATH, 'crl.pem')
-SIMPLE_SSL = False
-CERT_SSL = False
-SERVER_IS_RESOLVABLE = False
 MONGODB_X509_USERNAME = (
     "C=US,ST=California,L=Palo Alto,O=,OU=Drivers,CN=client")
 
@@ -63,11 +62,8 @@ MONGODB_X509_USERNAME = (
 # Note: For all replica set tests to pass, the replica set configuration must
 # use 'server' for the hostname of all hosts.
 
-if HAVE_SSL:
-    import ssl
 
-
-class TestClientSSL(IntegrationTest):
+class TestClientSSL(unittest.TestCase):
 
     @client_context.require_no_ssl
     def test_no_ssl_module(self):
@@ -167,6 +163,7 @@ class TestSSL(IntegrationTest):
         client.drop_database('pymongo_ssl_test')
 
     @client_context.require_ssl_certfile
+    @client_context.require_server_resolvable
     def test_ssl_pem_passphrase(self):
         vi = sys.version_info
         if vi[0] == 2 and vi < (2, 7, 9) or vi[0] == 3 and vi < (3, 3):
@@ -319,7 +316,6 @@ class TestSSL(IntegrationTest):
                               ssl_match_hostname=False,
                               serverSelectionTimeoutMS=100))
 
-
         if 'setName' in response:
             with self.assertRaises(ConnectionFailure):
                 connected(MongoClient(pair,
@@ -340,6 +336,7 @@ class TestSSL(IntegrationTest):
                                   serverSelectionTimeoutMS=100))
 
     @client_context.require_ssl_certfile
+    @client_context.require_server_resolvable
     def test_ssl_crlfile_support(self):
         if not hasattr(ssl, 'VERIFY_CRL_CHECK_LEAF'):
             self.assertRaises(
