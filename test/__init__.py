@@ -143,7 +143,7 @@ class ClientContext(object):
         self.has_ipv6 = False
         self.ssl_cert_none = False
         self.ssl_certfile = False
-        self.server_is_resolvable = False
+        self.server_is_resolvable = is_server_resolvable()
 
         self.client = self.rs_or_standalone_client = None
 
@@ -406,7 +406,7 @@ class ClientContext(object):
 
     def require_server_resolvable(self, func):
         """Run a test only if the hostname 'server' is resolvable."""
-        return self._require(self.ssl_certfile,
+        return self._require(self.server_is_resolvable,
                              "No hosts entry for 'server'. Cannot validate "
                              "hostname in the certificate",
                              func=func)

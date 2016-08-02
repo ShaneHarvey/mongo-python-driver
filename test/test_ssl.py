@@ -160,11 +160,17 @@ class TestSSL(IntegrationTest):
 
     @client_context.require_ssl
     def test_simple_ssl(self):
+        # Expects the server to be running with ssl and with
+        # no --sslPEMKeyFile or with --sslWeakCertificateValidation
         self.assertClientWorks(self.client)
 
     @client_context.require_ssl_certfile
     @client_context.require_server_resolvable
     def test_ssl_pem_passphrase(self):
+        # Expects the server to be running with server.pem and ca.pem
+        #
+        #   --sslPEMKeyFile=/path/to/pymongo/test/certificates/server.pem
+        #   --sslCAFile=/path/to/pymongo/test/certificates/ca.pem
         vi = sys.version_info
         if vi[0] == 2 and vi < (2, 7, 9) or vi[0] == 3 and vi < (3, 3):
             self.assertRaises(
@@ -192,6 +198,13 @@ class TestSSL(IntegrationTest):
     @client_context.require_ssl_certfile
     @client_context.require_no_auth
     def test_cert_ssl_implicitly_set(self):
+        # Expects the server to be running with server.pem and ca.pem
+        #
+        #   --sslPEMKeyFile=/path/to/pymongo/test/certificates/server.pem
+        #   --sslCAFile=/path/to/pymongo/test/certificates/ca.pem
+        #
+
+        # test that setting ssl_certfile causes ssl to be set to True
         client = MongoClient(host, port,
                              ssl_cert_reqs=ssl.CERT_NONE,
                              ssl_certfile=CLIENT_PEM)
@@ -209,6 +222,11 @@ class TestSSL(IntegrationTest):
     @client_context.require_server_resolvable
     @client_context.require_no_auth
     def test_cert_ssl_validation(self):
+        # Expects the server to be running with server.pem and ca.pem
+        #
+        #   --sslPEMKeyFile=/path/to/pymongo/test/certificates/server.pem
+        #   --sslCAFile=/path/to/pymongo/test/certificates/ca.pem
+        #
         client = MongoClient('server',
                              ssl=True,
                              ssl_certfile=CLIENT_PEM,
@@ -234,6 +252,11 @@ class TestSSL(IntegrationTest):
     @client_context.require_server_resolvable
     @client_context.require_no_auth
     def test_cert_ssl_uri_support(self):
+        # Expects the server to be running with server.pem and ca.pem
+        #
+        #   --sslPEMKeyFile=/path/to/pymongo/test/certificates/server.pem
+        #   --sslCAFile=/path/to/pymongo/test/certificates/ca.pem
+        #
         uri_fmt = ("mongodb://server/?ssl=true&ssl_certfile=%s&ssl_cert_reqs"
                    "=%s&ssl_ca_certs=%s&ssl_match_hostname=true")
         client = MongoClient(uri_fmt % (CLIENT_PEM, 'CERT_REQUIRED', CA_PEM))
@@ -243,6 +266,11 @@ class TestSSL(IntegrationTest):
     @client_context.require_server_resolvable
     @client_context.require_no_auth
     def test_cert_ssl_validation_optional(self):
+        # Expects the server to be running with server.pem and ca.pem
+        #
+        #   --sslPEMKeyFile=/path/to/pymongo/test/certificates/server.pem
+        #   --sslCAFile=/path/to/pymongo/test/certificates/ca.pem
+        #
         client = MongoClient('server',
                              ssl=True,
                              ssl_certfile=CLIENT_PEM,
@@ -267,6 +295,11 @@ class TestSSL(IntegrationTest):
 
     @client_context.require_ssl_certfile
     def test_cert_ssl_validation_hostname_matching(self):
+        # Expects the server to be running with server.pem and ca.pem
+        #
+        #   --sslPEMKeyFile=/path/to/pymongo/test/certificates/server.pem
+        #   --sslCAFile=/path/to/pymongo/test/certificates/ca.pem
+        #
         response = self.client.admin.command('ismaster')
 
         with self.assertRaises(ConnectionFailure):
@@ -343,9 +376,9 @@ class TestSSL(IntegrationTest):
     def test_validation_with_system_ca_certs(self):
         # Expects the server to be running with server.pem and ca.pem.
         #
-        # --sslPEMKeyFile=/path/to/pymongo/test/certificates/server.pem
-        # --sslCAFile=/path/to/pymongo/test/certificates/ca.pem
-        # --sslWeakCertificateValidation
+        #   --sslPEMKeyFile=/path/to/pymongo/test/certificates/server.pem
+        #   --sslCAFile=/path/to/pymongo/test/certificates/ca.pem
+        #   --sslWeakCertificateValidation
         #
         if sys.platform == "win32":
             raise SkipTest("Can't test system ca certs on Windows.")
@@ -444,7 +477,7 @@ class TestSSL(IntegrationTest):
 
     @client_context.require_version_min(2, 5, 3, -1)
     @client_context.require_auth
-    @client_context.require_ssl
+    @client_context.require_ssl_certfile
     def test_mongodb_x509_auth(self):
         ssl_client = MongoClient(pair, ssl=True, ssl_cert_reqs=ssl.CERT_NONE,
                                  ssl_certfile=CLIENT_PEM)
