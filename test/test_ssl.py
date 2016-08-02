@@ -33,6 +33,8 @@ from pymongo.errors import (ConfigurationError,
 from pymongo.ssl_support import HAVE_SSL, get_ssl_context, validate_cert_reqs
 from test import (IntegrationTest,
                   client_context,
+                  db_pwd,
+                  db_user,
                   host,
                   pair,
                   port,
@@ -65,7 +67,8 @@ MONGODB_X509_USERNAME = (
 
 class TestClientSSL(unittest.TestCase):
 
-    @client_context.require_no_ssl
+    @unittest.skipIf(HAVE_SSL, "The ssl module is available, can't test what "
+                               "happens without it.")
     def test_no_ssl_module(self):
         # Explicit
         self.assertRaises(ConfigurationError,
@@ -75,6 +78,7 @@ class TestClientSSL(unittest.TestCase):
         self.assertRaises(ConfigurationError,
                           MongoClient, ssl_certfile=CLIENT_PEM)
 
+    @unittest.skipUnless(HAVE_SSL, "The ssl module is not available.")
     def test_config_ssl(self):
         # Tests various ssl configurations
         self.assertRaises(ValueError, MongoClient, ssl='foo')
@@ -141,11 +145,20 @@ class TestClientSSL(unittest.TestCase):
 
 class TestSSL(IntegrationTest):
 
-    @client_context.require_ssl
+    def assertClientWorks(self, client):
+        db = client.pymongo_ssl_test
+        db.test.drop()
+        db.test.insert_one({'ssl': True})
+        self.assertTrue(db.test.find_one()['ssl'])
+        client.drop_database('pymongo_ssl_test')
+
+    @unittest.skipUnless(HAVE_SSL, "The ssl module is not available.")
     def setUp(self):
         super(TestSSL, self).setUp()
+        self.coll = self.db.pymongo_ssl_test
 
     @client_context.require_ssl_cert_none
+    @client_context.require_no_auth
     def test_simple_ssl(self):
         client = self.client
         response = client.admin.command('ismaster')
@@ -156,11 +169,7 @@ class TestSSL(IntegrationTest):
                                  ssl=True,
                                  ssl_cert_reqs=ssl.CERT_NONE)
 
-        db = client.pymongo_ssl_test
-        db.test.drop()
-        db.test.insert_one({'ssl': True})
-        self.assertTrue(db.test.find_one()['ssl'])
-        client.drop_database('pymongo_ssl_test')
+        self.assertClientWorks(client)
 
     @client_context.require_ssl_certfile
     @client_context.require_server_resolvable
@@ -190,6 +199,7 @@ class TestSSL(IntegrationTest):
             connected(MongoClient(uri_fmt % (CLIENT_ENCRYPTED_PEM, CA_PEM)))
 
     @client_context.require_ssl_certfile
+    @client_context.require_no_auth
     def test_cert_ssl(self):
         client = self.client
         response = client.admin.command('ismaster')
@@ -201,13 +211,10 @@ class TestSSL(IntegrationTest):
                                  ssl_cert_reqs=ssl.CERT_NONE,
                                  ssl_certfile=CLIENT_PEM)
 
-        db = client.pymongo_ssl_test
-        db.test.drop()
-        db.test.insert_one({'ssl': True})
-        self.assertTrue(db.test.find_one()['ssl'])
-        client.drop_database('pymongo_ssl_test')
+        self.assertClientWorks(client)
 
     @client_context.require_ssl_certfile
+    @client_context.require_no_auth
     def test_cert_ssl_implicitly_set(self):
         client = MongoClient(host, port,
                              ssl_cert_reqs=ssl.CERT_NONE,
@@ -220,14 +227,11 @@ class TestSSL(IntegrationTest):
                                  ssl_cert_reqs=ssl.CERT_NONE,
                                  ssl_certfile=CLIENT_PEM)
 
-        db = client.pymongo_ssl_test
-        db.test.drop()
-        db.test.insert_one({'ssl': True})
-        self.assertTrue(db.test.find_one()['ssl'])
-        client.drop_database('pymongo_ssl_test')
+        self.assertClientWorks(client)
 
     @client_context.require_ssl_certfile
     @client_context.require_server_resolvable
+    @client_context.require_no_auth
     def test_cert_ssl_validation(self):
         client = MongoClient('server',
                              ssl=True,
@@ -248,27 +252,20 @@ class TestSSL(IntegrationTest):
                                  ssl_cert_reqs=ssl.CERT_REQUIRED,
                                  ssl_ca_certs=CA_PEM)
 
-        db = client.pymongo_ssl_test
-        db.test.drop()
-        db.test.insert_one({'ssl': True})
-        self.assertTrue(db.test.find_one()['ssl'])
-        client.drop_database('pymongo_ssl_test')
+        self.assertClientWorks(client)
 
     @client_context.require_ssl_certfile
     @client_context.require_server_resolvable
+    @client_context.require_no_auth
     def test_cert_ssl_uri_support(self):
         uri_fmt = ("mongodb://server/?ssl=true&ssl_certfile=%s&ssl_cert_reqs"
                    "=%s&ssl_ca_certs=%s&ssl_match_hostname=true")
         client = MongoClient(uri_fmt % (CLIENT_PEM, 'CERT_REQUIRED', CA_PEM))
-
-        db = client.pymongo_ssl_test
-        db.test.drop()
-        db.test.insert_one({'ssl': True})
-        self.assertTrue(db.test.find_one()['ssl'])
-        client.drop_database('pymongo_ssl_test')
+        self.assertClientWorks(client)
 
     @client_context.require_ssl_certfile
     @client_context.require_server_resolvable
+    @client_context.require_no_auth
     def test_cert_ssl_validation_optional(self):
         client = MongoClient('server',
                              ssl=True,
@@ -290,11 +287,7 @@ class TestSSL(IntegrationTest):
                                  ssl_cert_reqs=ssl.CERT_OPTIONAL,
                                  ssl_ca_certs=CA_PEM)
 
-        db = client.pymongo_ssl_test
-        db.test.drop()
-        db.test.insert_one({'ssl': True})
-        self.assertTrue(db.test.find_one()['ssl'])
-        client.drop_database('pymongo_ssl_test')
+        self.assertClientWorks(client)
 
     @client_context.require_ssl_certfile
     def test_cert_ssl_validation_hostname_matching(self):
@@ -469,14 +462,13 @@ class TestSSL(IntegrationTest):
 
     @client_context.require_version_min(2, 5, 3, -1)
     @client_context.require_auth
+    @client_context.require_ssl
     def test_mongodb_x509_auth(self):
         ssl_client = self.client
         self.addCleanup(ssl_client['$external'].logout)
         self.addCleanup(remove_all_users, ssl_client['$external'])
-        self.addCleanup(remove_all_users, ssl_client.admin)
 
-        ssl_client.admin.add_user('admin', 'pass')
-        ssl_client.admin.authenticate('admin', 'pass')
+        ssl_client.admin.authenticate(db_user, db_pwd)
 
         # Give admin all necessary privileges.
         ssl_client['$external'].add_user(MONGODB_X509_USERNAME, roles=[
