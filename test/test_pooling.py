@@ -193,15 +193,23 @@ class TestPooling(_TestPoolingBase):
 
     def test_pool_reuses_open_socket(self):
         # Test Pool's _check_closed() method doesn't close a healthy socket.
-        cx_pool = self.create_pool(max_pool_size=10)
-        cx_pool._check_interval_seconds = 0  # Always check.
-        with cx_pool.get_socket({}) as sock_info:
-            pass
+        for i in range(10000):
+            try:
+                cx_pool = self.create_pool(max_pool_size=10)
+                cx_pool._check_interval_seconds = 0  # Always check.
+                with cx_pool.get_socket({}) as sock_info:
+                    pass
 
-        with cx_pool.get_socket({}) as new_sock_info:
-            self.assertEqual(sock_info, new_sock_info)
+                with cx_pool.get_socket({}) as new_sock_info:
+                    self.assertEqual(sock_info, new_sock_info)
 
-        self.assertEqual(1, len(cx_pool.sockets))
+                self.assertEqual(1, len(cx_pool.sockets))
+            except KeyboardInterrupt:
+                break
+            except BaseException as exc:
+                print(exc)
+                import pdb; pdb.set_trace()
+                print(exc)
 
     def test_get_socket_and_exception(self):
         # get_socket() returns socket after a non-network error.
@@ -249,11 +257,21 @@ class TestPooling(_TestPoolingBase):
             pass
 
     def test_socket_closed(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((client_context.host, client_context.port))
-        self.assertFalse(socket_closed(s))
-        s.close()
-        self.assertTrue(socket_closed(s))
+        for i in range(10000):
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.connect((client_context.host, client_context.port))
+                self.assertFalse(socket_closed(s))
+                s.close()
+                self.assertTrue(socket_closed(s))
+            except KeyboardInterrupt:
+                break
+            except BaseException as exc:
+                print(exc)
+                import pdb; pdb.set_trace()
+                print(exc)
+            finally:
+                s.close()
 
     def test_return_socket_after_reset(self):
         pool = self.create_pool()
