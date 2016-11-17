@@ -208,4 +208,9 @@ def socket_closed(sock, debug=False):
             print('Exception in socket_closed: %r' % (exc,))
             print('Socket: %r' % (sock,))
         return True
+    if debug and len(rd) > 0:
+        print_all_stacks()
+        print('%s returned: %r' % ('poll' if _HAS_POLL else 'select', sock))
+        print('Socket: %r' % (sock,))
+
     return len(rd) > 0
