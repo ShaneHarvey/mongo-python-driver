@@ -201,12 +201,14 @@ def socket_closed(sock, debug=False):
         else:
             rd, _, _ = select.select([sock], [], [], 0)
     # Any exception here is equally bad (select.error, ValueError, etc.).
-    except Exception as exc:
+    except:
         if debug:
             print_all_stacks()
             print(traceback.format_exc())
-            print('Exception in socket_closed: %r' % (exc,))
             print('Socket: %r' % (sock,))
+            for attr in dir(sock):
+                if not attr.startswith('__'):
+                    print('socket.%s: %r' % (attr, getattr(sock, attr)))
         return True
     if debug and len(rd) > 0:
         print_all_stacks()
