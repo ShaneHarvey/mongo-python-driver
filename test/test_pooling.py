@@ -261,7 +261,7 @@ class TestPooling(_TestPoolingBase):
             except BaseException as exc:
                 print('Exception in test: %r' % (exc,))
                 print('Socket: %r' % (s,))
-                break
+                raise
             finally:
                 try:
                     s.close()
