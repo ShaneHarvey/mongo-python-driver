@@ -18,6 +18,8 @@ import datetime
 import errno
 import select
 import struct
+import sys
+import traceback
 
 _HAS_POLL = True
 _poller = None
@@ -176,7 +178,19 @@ def _receive_data_on_socket(sock, length):
     return msg
 
 
-def socket_closed(sock):
+def print_all_stacks():
+    to_print = []
+    for threadid, stack in sys._current_frames().items():
+        to_print.append("\n# ThreadID: %s" % threadid)
+        to_print.append(''.join(traceback.format_stack(stack)))
+
+    print("\n*** STACKTRACE - START ***\n")
+    for string in to_print:
+        print(string)
+    print("\n*** STACKTRACE - END ***\n")
+
+
+def socket_closed(sock, debug=False):
     """Return True if we know socket has been closed, False otherwise.
     """
     try:
@@ -187,6 +201,11 @@ def socket_closed(sock):
         else:
             rd, _, _ = select.select([sock], [], [], 0)
     # Any exception here is equally bad (select.error, ValueError, etc.).
-    except:
+    except Exception as exc:
+        if debug:
+            print_all_stacks()
+            print(traceback.format_exc())
+            print('Exception in socket_closed: %r' % (exc,))
+            print('Socket: %r' % (sock,))
         return True
     return len(rd) > 0
