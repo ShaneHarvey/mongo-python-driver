@@ -34,11 +34,20 @@ if [ "$PYTHON" == "" ]; then
     exit 1
 fi
 
+echo "Installing nose..."
+virtualenv -p "$PYTHON" venv
+if [ -f venv/bin/activate ]; then
+  . venv/bin/activate
+elif [ -f venv/Scripts/activate ]; then
+  . venv/Scripts/activate
+fi
+pip install nose
+
 echo "Running $AUTH tests over $SSL with python $PYTHON, connecting to $MONGODB_URI"
-$PYTHON -c 'import sys; print(sys.version)'
+python -c 'import sys; print(sys.version)'
 
-# Run the tests, and store the results in Evergreen compatible XUnit XML
-# files in the xunit-results/ directory.
+# Run the tests, and store the results in the Evergreen compatible XUnit XML
+# file nosetests.xml.
 
-$PYTHON setup.py clean
-$PYTHON setup.py test --xunit-output=xunit-results
+python setup.py clean
+python setup.py nosetests
