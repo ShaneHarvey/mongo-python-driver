@@ -718,9 +718,9 @@ axes:
         display_name: "Archlinux"
         run_on: archlinux-test
 
-      - id: solaris
-        display_name: "Solaris"
-        run_on: solaris
+#      - id: solaris
+#        display_name: "Solaris"
+#        run_on: solaris
 
       - id: osx-1010
         display_name: "macOS 10.10"
