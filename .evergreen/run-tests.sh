@@ -34,6 +34,13 @@ if [ "$PYTHON" == "" ]; then
     exit 1
 fi
 
+# virtualenv needs a Windows style path (C:/...) to the Python interpreter
+case "$OS" in
+   cygwin*)
+      PYTHON=$(cygpath -m "$PYTHON")
+      ;;
+esac
+
 echo "Installing nose..."
 virtualenv -p "$PYTHON" venv
 if [ -f venv/bin/activate ]; then
