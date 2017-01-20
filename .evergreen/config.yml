@@ -745,29 +745,29 @@ axes:
         display_name: "Ubuntu 16.04"
         run_on: ubuntu1604-test
 
-      - id: rhel71-power8-test
-        display_name: "RHEL 7.1 (POWER8)"
-        run_on: rhel71-power8-test
-
-      - id: rhel72-zseries-test
-        display_name: "RHEL 7.2 (zSeries)"
-        run_on: rhel72-zseries-test
-
-      - id: suse12-zseries-test
-        display_name: "SUSE 12 (zSeries)"
-        run_on: suse12-zseries-test
-
-      - id: ubuntu1604-arm64-small
-        display_name: "Ubuntu 16.04 (ARM64)"
-        run_on: ubuntu1604-arm64-small
-
-      - id: ubuntu1604-power8-test
-        display_name: "Ubuntu 16.04 (POWER8)"
-        run_on: ubuntu1604-power8-test
-
-      - id: ubuntu1604-zseries-small
-        display_name: "Ubuntu 16.04 (zSeries)"
-        run_on: ubuntu1604-zseries-small
+#      - id: rhel71-power8-test
+#        display_name: "RHEL 7.1 (POWER8)"
+#        run_on: rhel71-power8-test
+#
+#      - id: rhel72-zseries-test
+#        display_name: "RHEL 7.2 (zSeries)"
+#        run_on: rhel72-zseries-test
+#
+#      - id: suse12-zseries-test
+#        display_name: "SUSE 12 (zSeries)"
+#        run_on: suse12-zseries-test
+#
+#      - id: ubuntu1604-arm64-small
+#        display_name: "Ubuntu 16.04 (ARM64)"
+#        run_on: ubuntu1604-arm64-small
+#
+#      - id: ubuntu1604-power8-test
+#        display_name: "Ubuntu 16.04 (POWER8)"
+#        run_on: ubuntu1604-power8-test
+#
+#      - id: ubuntu1604-zseries-small
+#        display_name: "Ubuntu 16.04 (zSeries)"
+#        run_on: ubuntu1604-zseries-small
 
   - id: os-requires-32
     display_name: OS
