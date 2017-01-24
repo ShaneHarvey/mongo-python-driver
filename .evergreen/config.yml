@@ -706,9 +706,10 @@ axes:
         display_name: "Windows (VS2010)"
         run_on: windows-64-vs2010-test
 
-      - id: windows-64-vs2013-test
-        display_name: "Windows (VS2013)"
-        run_on: windows-64-vs2013-test
+# No Python versions support C extension builds on VS2013
+#      - id: windows-64-vs2013-test
+#        display_name: "Windows (VS2013)"
+#        run_on: windows-64-vs2013-test
 
       - id: windows-64-vs2015-test
         display_name: "Windows (VS2015)"
