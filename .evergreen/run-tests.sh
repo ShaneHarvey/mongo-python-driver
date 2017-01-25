@@ -25,6 +25,7 @@ fi
 if [ "$SSL" != "nossl" ]; then
    export CLIENT_PEM="$DRIVERS_TOOLS/.evergreen/x509gen/client.pem"
    export CA_PEM="$DRIVERS_TOOLS/.evergreen/x509gen/ca.pem"
+   NOSETEST_SSL_OPTIONS="--tests test/test_ssl.py"
 fi
 
 PYTHON=$(command -v python || command -v python3)
@@ -41,4 +42,4 @@ $PYTHON -c 'import sys; print(sys.version)'
 # file nosetests.xml.
 
 $PYTHON setup.py clean
-$PYTHON setup.py nosetests
+$PYTHON setup.py nosetests --verbosity=2 $NOSETEST_SSL_OPTIONS

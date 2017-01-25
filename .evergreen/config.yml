@@ -862,6 +862,10 @@ axes:
   - id: ssl
     display_name: SSL
     values:
+      - id: ssl
+        display_name: SSL
+        variables:
+           SSL: "ssl"
       - id: nossl
         display_name: NoSSL
         variables:
@@ -918,17 +922,16 @@ buildvariants:
      - name: "test-2.6-sharded"
      - name: "test-2.6-standalone"
 
-# SSL tests are disabled for PyMongo v2.9
-#- matrix_name: "tests-ssl-requires-34"
-#  matrix_spec: {"os-ssl-requires-34": "*", auth: "*", ssl: "ssl" }
-#  display_name: "${os-ssl-requires-34} ${auth} ${ssl}"
-#  tasks:
-#     - name: "test-latest-replicaset"
-#     - name: "test-latest-sharded"
-#     - name: "test-latest-standalone"
-#     - name: "test-3.4-replicaset"
-#     - name: "test-3.4-sharded"
-#     - name: "test-3.4-standalone"
+- matrix_name: "tests-ssl-requires-34"
+  matrix_spec: {"os-ssl-requires-34": "*", auth: "*", ssl: "ssl" }
+  display_name: "${os-ssl-requires-34} ${auth} ${ssl}"
+  tasks:
+     - name: "test-latest-replicaset"
+     - name: "test-latest-sharded"
+     - name: "test-latest-standalone"
+     - name: "test-3.4-replicaset"
+     - name: "test-3.4-sharded"
+     - name: "test-3.4-standalone"
 
 - matrix_name: "tests-nossl"
   matrix_spec: {"os-nossl": "*", auth: "*", ssl: "nossl" }
