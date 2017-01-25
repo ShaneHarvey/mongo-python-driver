@@ -34,27 +34,11 @@ if [ "$PYTHON" == "" ]; then
     exit 1
 fi
 
-# virtualenv needs a Windows style path (C:/...) to the Python interpreter
-case "$OS" in
-   cygwin*)
-      PYTHON=$(cygpath -m "$PYTHON")
-      ;;
-esac
-
-echo "Installing nose..."
-virtualenv -p "$PYTHON" venv
-if [ -f venv/bin/activate ]; then
-  . venv/bin/activate
-elif [ -f venv/Scripts/activate ]; then
-  . venv/Scripts/activate
-fi
-pip install nose
-
 echo "Running $AUTH tests over $SSL with python $PYTHON, connecting to $MONGODB_URI"
-python -c 'import sys; print(sys.version)'
+$PYTHON -c 'import sys; print(sys.version)'
 
 # Run the tests, and store the results in the Evergreen compatible XUnit XML
 # file nosetests.xml.
 
-python setup.py clean
-python setup.py nosetests
+$PYTHON setup.py clean
+$PYTHON setup.py nosetests

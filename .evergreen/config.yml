@@ -776,10 +776,9 @@ axes:
         display_name: "macOS 10.10"
         run_on: osx-1010
 
-# Virtualenv does not function on Solaris
-#      - id: solaris
-#        display_name: "Solaris"
-#        run_on: solaris
+      - id: solaris
+        display_name: "Solaris"
+        run_on: solaris
 
 
   - id: os-ssl-requires-34

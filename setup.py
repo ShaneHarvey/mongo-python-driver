@@ -315,6 +315,10 @@ Performance may be degraded.\n
 else:
     extra_opts['ext_modules'] = ext_modules
 
+# The nosetests command requires nose to be installed.
+if "nosetests" in sys.argv:
+    extra_opts["setup_requires"] = ["nose"]
+
 if PY3:
     extra_opts["use_2to3"] = True
     if should_run_tests:
