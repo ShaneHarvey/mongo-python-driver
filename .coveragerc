@@ -1,6 +1,5 @@
 [run]
 branch = True
-omit = pymongo/ssl*.py,pymongo/auth.py,test/*
 source = pymongo,bson,gridfs
 
 [report]
@@ -18,3 +17,6 @@ exclude_lines =
 partial_branches =
     if (.*and +)*not PY3( and.*)*:
     if (.*and +)*not _use_c( and.*)*:
+
+[html]
+directory = htmlcov

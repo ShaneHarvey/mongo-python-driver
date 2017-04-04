@@ -53,9 +53,17 @@ $PYTHON -c 'import sys; print(sys.version)'
 # Run the tests, and store the results in Evergreen compatible XUnit XML
 # files in the xunit-results/ directory.
 
+COVERAGE="$(command -v coverage)"
+if [ -z "$COVERAGE" ]; then
+    echo "INFO: coverage is not installed, running tests without coverage..."
+else
+    echo "INFO: coverage is installed, running tests with coverage..."
+    COVERAGE="$COVERAGE run"
+fi
+
 $PYTHON setup.py clean
 if [ -z "$GREEN_FRAMEWORK" ]; then
-    $PYTHON setup.py $C_EXTENSIONS test $OUTPUT
+    $PYTHON $COVERAGE run setup.py $C_EXTENSIONS test $OUTPUT
 else
     # --no_ext has to come before "test" so there is no way to toggle extensions here.
     $PYTHON green_framework_test.py $GREEN_FRAMEWORK $OUTPUT

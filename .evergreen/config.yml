@@ -190,23 +190,56 @@ functions:
         display_name: "Rendered docs"
 
   "upload coverage" :
-    - command: shell.exec
-      params:
-        silent: true
-        script: |
-           export AWS_ACCESS_KEY_ID=${aws_key}
-           export AWS_SECRET_ACCESS_KEY=${aws_secret}
-           aws s3 cp ${PROJECT_DIRECTORY}/coverage s3://mciuploads/${UPLOAD_BUCKET}/${build_variant}/${revision}/${version_id}/${build_id}/coverage/ --recursive --acl public-read --region us-east-1
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file:  ${PROJECT_DIRECTORY}/coverage/index.html
-        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${version_id}/${build_id}/coverage/index.html
+        local_file:  ${PROJECT_DIRECTORY}/.coverage
+        # Upload the coverage report for all tasks in a single build to the same directory.
+        remote_file: ${UPLOAD_BUCKET}/coverage/${build_id}/coverage/coverage.${task_id}
         bucket: mciuploads
         permissions: public-read
         content_type: text/html
-        display_name: "Coverage Report"
+        display_name: "Raw Coverage Report"
+
+  "download and merge coverage" :
+    - command: shell.exec
+      params:
+        silent: true
+        working_dir: "src"
+        script: |
+           export AWS_ACCESS_KEY_ID=${aws_key}
+           export AWS_SECRET_ACCESS_KEY=${aws_secret}
+           aws s3 cp s3://mciuploads/${UPLOAD_BUCKET}/coverage/${build_id}/coverage/ coverage/ --recursive
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          # Coverage combine merges (and removes) all the coverage files and
+          # generates a new .coverage file in the current directory.
+          coverage combine coverage/coverage.*
+          coverage html -d htmlcov
+    # Upload the resulting html coverage report.
+    - command: shell.exec
+      params:
+        silent: true
+        working_dir: "src"
+        script: |
+           export AWS_ACCESS_KEY_ID=${aws_key}
+           export AWS_SECRET_ACCESS_KEY=${aws_secret}
+           aws s3 cp htmlcov/ s3://mciuploads/${UPLOAD_BUCKET}/coverage/${build_id}/htmlcov/ --recursive --acl public-read --region us-east-1
+    # Attach the index.html with s3.put so it shows up in the Evergreen UI.
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file:  ${PROJECT_DIRECTORY}/htmlcov/index.html
+        remote_file: ${UPLOAD_BUCKET}/coverage/${build_id}/htmlcov/index.html
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/html
+        display_name: "Coverage Report HTML"
 
   "upload scan artifacts" :
     - command: shell.exec
@@ -439,6 +472,7 @@ pre:
 post:
   # Disabled, causing timeouts
   # - func: "upload working dir"
+  - func: "upload coverage"
   - func: "upload mo artifacts"
   - func: "upload test results"
   - func: "stop mongo-orchestration"
@@ -682,6 +716,20 @@ tasks:
         - func: "run mod_wsgi tests"
 
 # }}}
+    - name: "coverage-report"
+      tags: ["coverage"]
+#      depends_on:
+#       # The coverage task depends on all other tasks.
+#       - ".standalone"
+#       - ".replica_set"
+#       - ".sharded_cluster"
+# TODO: is this possible with tags?
+#         # Run the coverage task even if some tasks fail.
+#         status: *
+#         # Run the coverage task even if some tasks are not scheduled in a patch build.
+#         patch_optional: true
+      commands:
+        - func: "download and merge coverage"
 
 
 axes:
@@ -1063,8 +1111,8 @@ buildvariants:
 
 
 # Test all versions of Python against all versions of MongoDB >= 3.2.
-- matrix_name: "tests-python-version-ubuntu1604-test-ssl"
-  matrix_spec: {"python-version": "*", auth: "*", ssl: "ssl" }
+- matrix_name: "tests-python-version-ubuntu1604"
+  matrix_spec: {"python-version": "*", auth: "*", ssl: "*" }
   exclude_spec:
     # PYTHON-498: disable Jython SSL tests
     python-version: "jython2.7"
@@ -1083,32 +1131,23 @@ buildvariants:
      - name: "test-3.2-replica_set"
      - name: "test-3.2-sharded_cluster"
      - name: "test-3.2-standalone"
-
-# Test all versions of Python against all versions on MongoDB <= 3.0.
-# MongoDB <=3.0 on Ubuntu 16.04 (x86_64) does not support SSL.
-- matrix_name: "tests-python-version-ubuntu1604-test-nossl"
-  matrix_spec: {"python-version": "*", auth: "*", ssl: "nossl" }
-  display_name: "${python-version} Ubuntu 16.04 (x86_64) ${auth} ${ssl}"
-  run_on: ubuntu1604-test
-  tasks:
-     - name: "test-latest-replica_set"
-     - name: "test-latest-sharded_cluster"
-     - name: "test-latest-standalone"
-     - name: "test-3.4-replica_set"
-     - name: "test-3.4-sharded_cluster"
-     - name: "test-3.4-standalone"
-     - name: "test-3.2-replica_set"
-     - name: "test-3.2-sharded_cluster"
-     - name: "test-3.2-standalone"
-     - name: "test-3.0-replica_set"
-     - name: "test-3.0-sharded_cluster"
-     - name: "test-3.0-standalone"
-     - name: "test-2.6-replica_set"
-     - name: "test-2.6-sharded_cluster"
-     - name: "test-2.6-standalone"
-     - name: "test-2.4-replica_set"
-     - name: "test-2.4-sharded_cluster"
-     - name: "test-2.4-standalone"
+  rules:
+     # There are no builds of MongoDB <= 3.0 with SSL for Ubuntu 16.04
+     - if:
+         python-version: "*"
+         auth: "*"
+         ssl: "nossl"
+       then:
+         add_tasks:
+            - name: "test-3.0-replica_set"
+            - name: "test-3.0-sharded_cluster"
+            - name: "test-3.0-standalone"
+            - name: "test-2.6-replica_set"
+            - name: "test-2.6-sharded_cluster"
+            - name: "test-2.6-standalone"
+            - name: "test-2.4-replica_set"
+            - name: "test-2.4-sharded_cluster"
+            - name: "test-2.4-standalone"
 
 - matrix_name: "tests-python-version-ubuntu1604-without-c-extensions"
   matrix_spec: {"python-version": "*", "c-extensions": "without-c-extensions", auth: "noauth", ssl: "nossl" }
@@ -1316,6 +1355,11 @@ buildvariants:
   tasks:
      - name: "doctests"
 
+- name: "Coverage Report"
+  display_name: "Coverage Report"
+  run_on: ubuntu1604-test
+  tasks:
+     - name: "coverage-report"
       # Platform notes
       # i386 builds of OpenSSL or Cyrus SASL are not available
       # Ubuntu14.04 only supports 2.6+ with SSL
