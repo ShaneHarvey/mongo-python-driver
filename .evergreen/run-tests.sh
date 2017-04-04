@@ -54,6 +54,14 @@ $PYTHON -c 'import sys; print(sys.version)'
 # Run the tests, and store the results in Evergreen compatible XUnit XML
 # files in the xunit-results/ directory.
 
+COVERAGE="-m coverage run --branch"
+if $PYTHON $COVERAGE --help; then
+    echo "INFO: coverage is installed, running tests with coverage..."
+else
+    echo "INFO: coverage is not installed, running tests without coverage..."
+    COVERAGE=""
+fi
+
 $PYTHON setup.py clean
 if [ -z "$GREEN_FRAMEWORK" ]; then
     if [ -z "$C_EXTENSIONS" -a $PYTHON_IMPL = "CPython" ]; then
@@ -66,10 +74,8 @@ if [ -z "$GREEN_FRAMEWORK" ]; then
         # This will set a non-zero exit status if either import fails,
         # causing this script to exit.
         $PYTHON -c "from bson import _cbson; from pymongo import _cmessage"
-        $PYTHON setup.py test $OUTPUT
-    else
-        $PYTHON setup.py $C_EXTENSIONS test $OUTPUT
     fi
+    $PYTHON $COVERAGE setup.py $C_EXTENSIONS test $OUTPUT
 else
     # --no_ext has to come before "test" so there is no way to toggle extensions here.
     $PYTHON green_framework_test.py $GREEN_FRAMEWORK $OUTPUT
