@@ -53,7 +53,7 @@ $PYTHON -c 'import sys; print(sys.version)'
 # Run the tests, and store the results in Evergreen compatible XUnit XML
 # files in the xunit-results/ directory.
 
-COVERAGE="-m coverage run"
+COVERAGE="-m coverage run --branch"
 if $PYTHON $COVERAGE --help; then
     echo "INFO: coverage is installed, running tests with coverage..."
 else
