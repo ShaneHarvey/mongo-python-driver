@@ -57,7 +57,7 @@ $PYTHON -c 'import sys; print(sys.version)'
 # files in the xunit-results/ directory.
 
 COVERAGE_ARGS=""
-if [ -z "$COVERAGE" ]; then
+if [ -n "$COVERAGE" ]; then
     COVERAGE_ARGS="-m coverage run --branch"
     if $PYTHON $COVERAGE_ARGS --help; then
         echo "INFO: coverage is installed, running tests with coverage..."
