@@ -774,7 +774,7 @@ tasks:
       depends_on:
         # The coverage task depends on all coverage tasks.
         - name: "*"
-          variant: ".coverage_tag"
+          #variant: ".coverage_tag"
           # Run the coverage task even if some tasks fail.
           status: "*"
           # Run the coverage task even if some tasks are not scheduled in a patch build.
