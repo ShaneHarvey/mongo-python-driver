@@ -196,7 +196,7 @@ functions:
         aws_secret: ${aws_secret}
         local_file:  ${PROJECT_DIRECTORY}/.coverage
         # Upload the coverage report for all tasks in a single build to the same directory.
-        remote_file: ${UPLOAD_BUCKET}/coverage/${build_id}/coverage/coverage.${task_id}
+        remote_file: ${UPLOAD_BUCKET}/coverage/${build_id}/coverage/coverage.${PYTHON_NAME}-${MONGODB_VERSION}-${TOPOLOGY}-${AUTH}-${SSL}
         bucket: mciuploads
         permissions: public-read
         content_type: text/html
@@ -208,9 +208,26 @@ functions:
         silent: true
         working_dir: "src"
         script: |
-           export AWS_ACCESS_KEY_ID=${aws_key}
-           export AWS_SECRET_ACCESS_KEY=${aws_secret}
-           aws s3 cp s3://mciuploads/${UPLOAD_BUCKET}/coverage/${build_id}/coverage/ coverage/ --recursive
+          export AWS_ACCESS_KEY_ID=${aws_key}
+          export AWS_SECRET_ACCESS_KEY=${aws_secret}
+
+          mkdir -p coverage/
+          for PYTHON_NAME in cypython2.6 cypython2.7 cypython3.3 cypython3.4 cypython3.5 cypython3.6
+          do
+            for MONGODB_VERSION in 2.4 2.6 3.0 3.2 3.4 latest
+            do
+              for TOPOLOGY in server replica_set sharded_cluster
+              do
+                for AUTH in auth noauth
+                do
+                  for SSL in ssl nossl
+                  do
+                    aws s3 cp s3://mciuploads/${UPLOAD_BUCKET}/coverage/${build_id}/coverage/coverage.$PYTHON_NAME-$MONGODB_VERSION-$TOPOLOGY-$AUTH-$SSL coverage/
+                  done
+                done
+              done
+            done
+          done
     - command: shell.exec
       params:
         working_dir: "src"
@@ -352,6 +369,17 @@ functions:
     - command: expansions.update
       params:
         file: mo-expansion.yml
+    - command: expansions.update
+      params:
+        updates:
+          - key: MONGODB_VERSION
+            value: ${VERSION}
+          - key: TOPOLOGY
+            value: ${TOPOLOGY}
+          - key: SSL
+            value: ${SSL}
+          - key: STORAGE_ENGINE
+            value: ${STORAGE_ENGINE}
 
   "stop mongo-orchestration":
     - command: shell.exec
@@ -403,7 +431,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          PYTHON_BINARY=${PYTHON_BINARY} GREEN_FRAMEWORK=${GREEN_FRAMEWORK} C_EXTENSIONS=${C_EXTENSIONS} AUTH=${AUTH} SSL=${SSL} sh ${PROJECT_DIRECTORY}/.evergreen/run-tests.sh
+          PYTHON_BINARY=${PYTHON_BINARY} GREEN_FRAMEWORK=${GREEN_FRAMEWORK} C_EXTENSIONS=${C_EXTENSIONS} COVERAGE=${COVERAGE} AUTH=${AUTH} SSL=${SSL} sh ${PROJECT_DIRECTORY}/.evergreen/run-tests.sh
 
   "run enterprise auth tests":
     - command: shell.exec
@@ -933,38 +961,47 @@ axes:
         display_name: "Python 2.6"
         variables:
            PYTHON_BINARY: "/opt/python/2.6/bin/python"
+           PYTHON_NAME: "cpython2.6"
       - id: "2.7"
         display_name: "Python 2.7"
         variables:
            PYTHON_BINARY: "/opt/python/2.7/bin/python"
+           PYTHON_NAME: "cpython2.7"
       - id: "3.3"
         display_name: "Python 3.3"
         variables:
            PYTHON_BINARY: "/opt/python/3.3/bin/python3"
+           PYTHON_NAME: "cpython3.3"
       - id: "3.4"
         display_name: "Python 3.4"
         variables:
            PYTHON_BINARY: "/opt/python/3.4/bin/python3"
+           PYTHON_NAME: "cpython3.4"
       - id: "3.5"
         display_name: "Python 3.5"
         variables:
            PYTHON_BINARY: "/opt/python/3.5/bin/python3"
+           PYTHON_NAME: "cpython3.5"
       - id: "3.6"
         display_name: "Python 3.6"
         variables:
            PYTHON_BINARY: "/opt/python/3.6/bin/python3"
+           PYTHON_NAME: "cpython3.6"
       - id: "pypy"
         display_name: "PyPy"
         variables:
            PYTHON_BINARY: "/opt/python/pypy/bin/pypy"
+           PYTHON_NAME: "pypy"
       - id: "pypy3"
         display_name: "PyPy 3"
         variables:
            PYTHON_BINARY: "/opt/python/pypy3/bin/pypy3"
+           PYTHON_NAME: "pypy3"
       - id: "jython2.7"
         display_name: "Jython 2.7"
         variables:
            PYTHON_BINARY: "/opt/python/jython2.7/bin/jython"
+           PYTHON_NAME: "jython2.7"
   - id: mod-wsgi-version
     display_name: "mod_wsgi version"
     values:
@@ -1046,6 +1083,13 @@ axes:
         display_name: "Python 3.6"
         variables:
            PYTHON_BINARY: "/cygdrive/c/python/Python36/python.exe"
+  - id: coverage
+    display_name: "Coverage"
+    values:
+      - id: "coverage"
+        display_name: "Coverage"
+        variables:
+           COVERAGE: "coverage"
 
 
 buildvariants:
@@ -1106,13 +1150,14 @@ buildvariants:
      - ".3.4"
 
 - matrix_name: "tests-python-version-ubuntu1204-test-ssl"
-  matrix_spec: {"python-version": "*", auth: "*", ssl: "*"}
+  matrix_spec: {"python-version": "*", auth: "*", ssl: "*", coverage: "*"}
   exclude_spec:
     # PYTHON-498: disable Jython SSL tests
     python-version: "jython2.7"
     # EVG-1410: exlcude_spec must specifiy values for all axes
     auth: "*"
     ssl: "ssl"
+    coverage: "*"
   display_name: "${python-version} Ubuntu 12.04 (x86_64) ${auth} ${ssl}"
   run_on: ubuntu1204-test
   tasks:

@@ -6,8 +6,9 @@ set -o errexit  # Exit the script with error if any of the commands fail
 #       AUTH                    Set to enable authentication. Defaults to "noauth"
 #       SSL                     Set to enable SSL. Defaults to "nossl"
 #       PYTHON_BINARY           The Python version to use. Defaults to whatever is available
-#       GREEN_FRAMEWORK         The green framwork to test with, if any.
+#       GREEN_FRAMEWORK         The green framework to test with, if any.
 #       C_EXTENSIONS            Pass --no_ext to setup.py, or not.
+#       COVERAGE                If non-empty, run the test suite with coverage.
 
 
 AUTH=${AUTH:-noauth}
@@ -15,6 +16,7 @@ SSL=${SSL:-nossl}
 PYTHON_BINARY=${PYTHON_BINARY:-}
 GREEN_FRAMEWORK=${GREEN_FRAMEWORK:-}
 C_EXTENSIONS=${C_EXTENSIONS:-}
+COVERAGE=${COVERAGE:-}
 
 export JAVA_HOME=/opt/java/jdk8
 
@@ -54,12 +56,15 @@ $PYTHON -c 'import sys; print(sys.version)'
 # Run the tests, and store the results in Evergreen compatible XUnit XML
 # files in the xunit-results/ directory.
 
-COVERAGE="-m coverage run --branch"
-if $PYTHON $COVERAGE --help; then
-    echo "INFO: coverage is installed, running tests with coverage..."
-else
-    echo "INFO: coverage is not installed, running tests without coverage..."
-    COVERAGE=""
+COVERAGE_ARGS=""
+if [ -z "$COVERAGE" ]; then
+    COVERAGE_ARGS="-m coverage run --branch"
+    if $PYTHON $COVERAGE_ARGS --help; then
+        echo "INFO: coverage is installed, running tests with coverage..."
+    else
+        echo "INFO: coverage is not installed, running tests without coverage..."
+        COVERAGE_ARGS=""
+    fi
 fi
 
 $PYTHON setup.py clean
@@ -75,7 +80,7 @@ if [ -z "$GREEN_FRAMEWORK" ]; then
         # causing this script to exit.
         $PYTHON -c "from bson import _cbson; from pymongo import _cmessage"
     fi
-    $PYTHON $COVERAGE setup.py $C_EXTENSIONS test $OUTPUT
+    $PYTHON $COVERAGE_ARGS setup.py $C_EXTENSIONS test $OUTPUT
 else
     # --no_ext has to come before "test" so there is no way to toggle extensions here.
     $PYTHON green_framework_test.py $GREEN_FRAMEWORK $OUTPUT
