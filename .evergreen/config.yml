@@ -212,6 +212,8 @@ functions:
           export AWS_ACCESS_KEY_ID=${aws_key}
           export AWS_SECRET_ACCESS_KEY=${aws_secret}
 
+          # TODO: Replace this once BUILD-3148 is resolved.
+          # aws s3 cp s3://mciuploads/${UPLOAD_BUCKET}/coverage/${revision}/${version_id}/coverage/ coverage/
           mkdir -p coverage/
           for PYTHON_NAME in cpython2.6 cpython2.7 cpython3.3 cpython3.4 cpython3.5 cpython3.6 pypy pypy3 jython2.7
           do
