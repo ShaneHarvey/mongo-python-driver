@@ -213,7 +213,7 @@ functions:
           export AWS_SECRET_ACCESS_KEY=${aws_secret}
 
           mkdir -p coverage/
-          for PYTHON_NAME in cypython2.6 cypython2.7 cypython3.3 cypython3.4 cypython3.5 cypython3.6
+          for PYTHON_NAME in cypython2.6 cypython2.7 cypython3.3 cypython3.4 cypython3.5 cypython3.6 pypy pypy3 jython2.7
           do
             for MONGODB_VERSION in 2.4 2.6 3.0 3.2 3.4 latest
             do
@@ -239,8 +239,9 @@ functions:
           ${PREPARE_SHELL}
           # Coverage combine merges (and removes) all the coverage files and
           # generates a new .coverage file in the current directory.
-          coverage combine coverage/coverage.*
-          coverage html -d htmlcov
+          ls -la coverage/
+          /opt/python/3.6/bin/python -m coverage combine coverage/coverage.*
+          /opt/python/3.6/bin/python -m coverage html -d htmlcov
     # Upload the resulting html coverage report.
     - command: shell.exec
       params:
