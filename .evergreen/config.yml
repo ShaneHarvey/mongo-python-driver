@@ -784,14 +784,6 @@ tasks:
           status: "*"
           # Run the coverage task even if some tasks are not scheduled in a patch build.
           patch_optional: true
-#       - ".standalone"
-#       - ".replica_set"
-#       - ".sharded_cluster"
-# TODO: is this possible with tags?
-#         # Run the coverage task even if some tasks fail.
-#         status: *
-#         # Run the coverage task even if some tasks are not scheduled in a patch build.
-#         patch_optional: true
       commands:
         - func: "download and merge coverage"
 
