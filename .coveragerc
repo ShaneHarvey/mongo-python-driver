@@ -2,6 +2,11 @@
 branch = True
 source = pymongo,bson,gridfs
 
+[paths]
+source=
+    .
+    /data/mci/*/src
+
 [report]
 exclude_lines =
     if (.*and +)*PY3( and.*)*:
