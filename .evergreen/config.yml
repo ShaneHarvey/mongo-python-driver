@@ -1118,7 +1118,7 @@ buildvariants:
     auth: "*"
     ssl: "ssl"
     coverage: "*"
-  display_name: "${python-version} Ubuntu 12.04 (x86_64) ${auth} ${ssl}"
+  display_name: "${python-version} Ubuntu 12.04 (x86_64) ${auth} ${ssl} ${coverage}"
   run_on: ubuntu1204-test
   tasks:
      - ".latest"
@@ -1129,14 +1129,15 @@ buildvariants:
      - ".2.4"
 
 - matrix_name: "tests-python-version-ubuntu1204-without-c-extensions"
-  matrix_spec: {"python-version": "*", "c-extensions": "without-c-extensions", auth: "noauth", ssl: "nossl"}
+  matrix_spec: {"python-version": "*", "c-extensions": "without-c-extensions", auth: "noauth", ssl: "nossl", coverage: "*"}
   exclude_spec:
    # These interpreters are always tested without extensions.
    - python-version: ["pypy", "pypy3", "jython2.7"]
      c-extensions: "*"
      auth: "*"
      ssl: "*"
-  display_name: "${c-extensions} ${python-version} Ubuntu 12.04 (x86_64) ${auth} ${ssl}"
+     coverage: "*"
+  display_name: "${c-extensions} ${python-version} Ubuntu 12.04 (x86_64) ${auth} ${ssl} ${coverage}"
   run_on: ubuntu1204-test
   tasks:
      - ".latest"
