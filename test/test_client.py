@@ -509,6 +509,37 @@ class TestClient(IntegrationTest):
 
         coll.count()
 
+    def test_close_kills_cursors(self):
+        # Kill any cursors possibly queued up by previous tests.
+        self.client._process_periodic_tasks()
+
+        # Add some test data.
+        docs_inserted = 1000
+        coll = self.client.pymongo_test.test_close_kills_cursors
+        bulk = coll.initialize_unordered_bulk_op()
+        for i in range(docs_inserted):
+            bulk.insert({"i": i})
+        bulk.execute()
+
+        # Open a cursor and leave it open on the server.
+        def f():
+            cursor = coll.find().batch_size(10)
+            self.assertTrue(bool(next(cursor)))
+            self.assertLess(cursor.retrieved, docs_inserted)
+            # PyPy and Jython won't call __del__ when garbage collecting
+            # cursor so let's help them out for the sake of this test.
+            cursor.__del__()
+        f()
+
+        # Close the client and ensure the topology is closed.
+        self.assertTrue(self.client._topology._opened)
+        self.client.close()
+        self.assertFalse(self.client._topology._opened)
+
+        # The killCursors task should not need to re-open the topology.
+        self.client._process_periodic_tasks()
+        self.assertFalse(self.client._topology._opened)
+
     def test_bad_uri(self):
         with self.assertRaises(InvalidURI):
             MongoClient("http://localhost")

@@ -1126,7 +1126,6 @@ class TestCursor(IntegrationTest):
 
         self.assertEqual(3, db.test.count())
 
-
     def test_distinct(self):
         self.db.drop_collection("test")
 
@@ -1244,6 +1243,26 @@ class TestCursor(IntegrationTest):
                 break
 
             self.assertTrue(cursor.alive)
+
+    def test_close_kills_cursor(self):
+        # Kill any cursors possibly queued up by previous tests.
+        self.client._process_periodic_tasks()
+
+        # Add some test data.
+        docs_inserted = 1000
+        coll = self.client.pymongo_test.test_close_kills_cursors
+        bulk = coll.initialize_unordered_bulk_op()
+        for i in range(docs_inserted):
+            bulk.insert({"i": i})
+        bulk.execute()
+
+        # Close the cursor while it's still open on the server.
+        cursor = coll.find().batch_size(10)
+        self.assertTrue(bool(next(cursor)))
+        self.assertLess(cursor.retrieved, docs_inserted)
+        cursor.close()
+
+        # TODO: test that the cursor was closed synchronously?
 
 
 if __name__ == "__main__":

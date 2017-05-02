@@ -778,6 +778,9 @@ class MongoClient(common.BaseObject):
         If this instance is used again it will be automatically re-opened and
         the threads restarted.
         """
+        # Run _process_periodic_tasks to send pending killCursor requests
+        # before closing the topology.
+        self._process_periodic_tasks()
         self._topology.close()
 
     def set_cursor_manager(self, manager_class):

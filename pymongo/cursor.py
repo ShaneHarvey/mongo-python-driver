@@ -214,8 +214,7 @@ class Cursor(object):
         return self.__retrieved
 
     def __del__(self):
-        if self.__id and not self.__killed:
-            self.__die()
+        self.__die()
 
     def rewind(self):
         """Rewind this cursor to its unevaluated state.
@@ -264,7 +263,7 @@ class Cursor(object):
         """
         return Cursor(self.__collection)
 
-    def __die(self):
+    def __die(self, synchronous=False):
         """Closes this cursor.
         """
         if self.__id and not self.__killed:
@@ -278,6 +277,8 @@ class Cursor(object):
                     self.__id,
                     _CursorAddress(
                         self.__address, self.__collection.full_name))
+                if synchronous:
+                    self.__collection.database.client._process_periodic_tasks()
         if self.__exhaust and self.__exhaust_mgr:
             self.__exhaust_mgr.close()
         self.__killed = True
@@ -287,7 +288,7 @@ class Cursor(object):
         other Python implementations that don't use reference counting
         garbage collection.
         """
-        self.__die()
+        self.__die(True)
 
     def __query_spec(self):
         """Get the spec to use for a query.
@@ -1126,7 +1127,7 @@ class Cursor(object):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.__die()
+        self.close()
 
     def __copy__(self):
         """Support function for `copy.copy()`.
