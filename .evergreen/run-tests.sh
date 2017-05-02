@@ -56,14 +56,18 @@ $PYTHON -c 'import sys; print(sys.version)'
 # Run the tests, and store the results in Evergreen compatible XUnit XML
 # files in the xunit-results/ directory.
 
+# Run the tests with coverage if requested and coverage is installed.
+# Only cover CPython. Jython and PyPy report suspiciously low coverage.
+COVERAGE_OR_PYTHON="$PYTHON"
 COVERAGE_ARGS=""
-if [ -n "$COVERAGE" ]; then
-    COVERAGE_ARGS="-m coverage run --branch"
-    if $PYTHON $COVERAGE_ARGS --help; then
+if [ -n "$COVERAGE" -a $PYTHON_IMPL = "CPython" ]; then
+    COVERAGE_BIN="$(dirname "$PYTHON")/coverage"
+    if $COVERAGE_BIN --version; then
         echo "INFO: coverage is installed, running tests with coverage..."
+        COVERAGE_OR_PYTHON="$COVERAGE_BIN"
+        COVERAGE_ARGS="run --branch"
     else
         echo "INFO: coverage is not installed, running tests without coverage..."
-        COVERAGE_ARGS=""
     fi
 fi
 
@@ -80,7 +84,7 @@ if [ -z "$GREEN_FRAMEWORK" ]; then
         # causing this script to exit.
         $PYTHON -c "from bson import _cbson; from pymongo import _cmessage"
     fi
-    $PYTHON $COVERAGE_ARGS setup.py $C_EXTENSIONS test $OUTPUT
+    $COVERAGE_OR_PYTHON $COVERAGE_ARGS setup.py $C_EXTENSIONS test $OUTPUT
 else
     # --no_ext has to come before "test" so there is no way to toggle extensions here.
     $PYTHON green_framework_test.py $GREEN_FRAMEWORK $OUTPUT
