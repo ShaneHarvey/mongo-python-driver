@@ -273,12 +273,14 @@ class Cursor(object):
                 # to stop the server from sending more data.
                 self.__exhaust_mgr.sock.close()
             else:
-                self.__collection.database.client.close_cursor(
-                    self.__id,
-                    _CursorAddress(
-                        self.__address, self.__collection.full_name))
+                address = _CursorAddress(
+                    self.__address, self.__collection.full_name)
                 if synchronous:
-                    self.__collection.database.client._process_periodic_tasks()
+                    self.__collection.database.client._close_cursors(
+                        [self.__id], address)
+                else:
+                    self.__collection.database.client.close_cursor(
+                        self.__id, address)
         if self.__exhaust and self.__exhaust_mgr:
             self.__exhaust_mgr.close()
         self.__killed = True

@@ -16,6 +16,7 @@
 
 import contextlib
 import datetime
+import gc
 import os
 import signal
 import socket
@@ -511,25 +512,22 @@ class TestClient(IntegrationTest):
 
     def test_close_kills_cursors(self):
         # Kill any cursors possibly queued up by previous tests.
+        gc.collect()
         self.client._process_periodic_tasks()
 
         # Add some test data.
-        docs_inserted = 1000
         coll = self.client.pymongo_test.test_close_kills_cursors
-        bulk = coll.initialize_unordered_bulk_op()
-        for i in range(docs_inserted):
-            bulk.insert({"i": i})
-        bulk.execute()
+        docs_inserted = 1000
+        coll.insert_many([{"i": i} for i in range(docs_inserted)])
 
         # Open a cursor and leave it open on the server.
-        def f():
-            cursor = coll.find().batch_size(10)
-            self.assertTrue(bool(next(cursor)))
-            self.assertLess(cursor.retrieved, docs_inserted)
-            # PyPy and Jython won't call __del__ when garbage collecting
-            # cursor so let's help them out for the sake of this test.
-            cursor.__del__()
-        f()
+        cursor = coll.find().batch_size(10)
+        self.assertTrue(bool(next(cursor)))
+        self.assertLess(cursor.retrieved, docs_inserted)
+        del cursor
+        # Required for PyPy, Jython and other Python implementations that
+        # don't use reference counting garbage collection.
+        gc.collect()
 
         # Close the client and ensure the topology is closed.
         self.assertTrue(self.client._topology._opened)
