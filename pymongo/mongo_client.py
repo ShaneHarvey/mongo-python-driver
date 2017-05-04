@@ -1027,6 +1027,21 @@ class MongoClient(common.BaseObject):
         else:
             self.__kill_cursors_queue.append((address, [cursor_id]))
 
+    def _close_cursor(self, cursor_id, address=None):
+        """Send a kill cursors message with the given id.
+
+        What closing the cursor actually means depends on this client's
+        cursor manager. If there is none, the cursor is closed synchronously
+        on the current thread.
+        """
+        if not isinstance(cursor_id, integer_types):
+            raise TypeError("cursor_id must be an instance of (int, long)")
+
+        if self.__cursor_manager is not None:
+            self.__cursor_manager.close(cursor_id, address)
+        else:
+            self._kill_cursors([cursor_id], address, self._get_topology())
+
     def kill_cursors(self, cursor_ids, address=None):
         """DEPRECATED - Send a kill cursors message soon with the given ids.
 
@@ -1058,13 +1073,10 @@ class MongoClient(common.BaseObject):
         # "Atomic", needs no lock.
         self.__kill_cursors_queue.append((address, cursor_ids))
 
-    def _close_cursors(self, cursor_ids, address, topology=None):
+    def _kill_cursors(self, cursor_ids, address, topology):
         """Send a kill cursors message with the given ids."""
         listeners = self._event_listeners
         publish = listeners.enabled_for_commands
-        if topology is None:
-            topology = self._get_topology()
-
         if address:
             # address could be a tuple or _CursorAddress, but
             # select_server_by_address needs (host, port).
@@ -1137,7 +1149,7 @@ class MongoClient(common.BaseObject):
             topology = self._get_topology()
             for address, cursor_ids in address_to_cursor_ids.items():
                 try:
-                    self._close_cursors(cursor_ids, address, topology)
+                    self._kill_cursors(cursor_ids, address, topology)
                 except Exception:
                     helpers._handle_exception()
         try:
