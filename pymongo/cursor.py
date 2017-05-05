@@ -214,7 +214,8 @@ class Cursor(object):
         return self.__retrieved
 
     def __del__(self):
-        self.__die()
+        if self.__id and not self.__killed:
+            self.__die()
 
     def rewind(self):
         """Rewind this cursor to its unevaluated state.
