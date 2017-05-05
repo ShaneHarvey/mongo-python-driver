@@ -748,12 +748,21 @@ tasks:
     - name: "coverage-report"
       tags: ["coverage"]
       depends_on:
-        # The coverage task depends on all coverage tasks.
-        - name: "*"
-          #variant: ".coverage_tag"
+        # BUILD-3165: We can't use "*" (all tasks) and specify "variant".
+        # Instead list out all coverage tasks using tags.
+        - name: ".standalone"
+          variant: ".coverage_tag"
           # Run the coverage task even if some tasks fail.
           status: "*"
           # Run the coverage task even if some tasks are not scheduled in a patch build.
+          patch_optional: true
+        - name: ".replica_set"
+          variant: ".coverage_tag"
+          status: "*"
+          patch_optional: true
+        - name: ".sharded_cluster"
+          variant: ".coverage_tag"
+          status: "*"
           patch_optional: true
       commands:
         - func: "download and merge coverage"
