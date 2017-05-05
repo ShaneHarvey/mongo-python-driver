@@ -1027,7 +1027,7 @@ class MongoClient(common.BaseObject):
         else:
             self.__kill_cursors_queue.append((address, [cursor_id]))
 
-    def _close_cursor(self, cursor_id, address=None):
+    def _close_cursor_now(self, cursor_id, address=None):
         """Send a kill cursors message with the given id.
 
         What closing the cursor actually means depends on this client's

@@ -276,7 +276,7 @@ class Cursor(object):
                 address = _CursorAddress(
                     self.__address, self.__collection.full_name)
                 if synchronous:
-                    self.__collection.database.client._close_cursor(
+                    self.__collection.database.client._close_cursor_now(
                         self.__id, address)
                 else:
                     self.__collection.database.client.close_cursor(
