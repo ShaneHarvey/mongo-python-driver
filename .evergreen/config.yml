@@ -197,7 +197,7 @@ functions:
         local_file:  ${PROJECT_DIRECTORY}/.coverage
         optional: true
         # Upload the coverage report for all tasks in a single build to the same directory.
-        remote_file: ${UPLOAD_BUCKET}/coverage/${revision}/${version_id}/coverage/coverage.${task_id}
+        remote_file: ${UPLOAD_BUCKET}/coverage/${revision}/${version_id}/coverage/coverage.${build_variant}.${task_name}
         bucket: mciuploads
         permissions: public-read
         content_type: text/html
