@@ -115,6 +115,8 @@ class Cursor(object):
         .. mongodoc:: cursors
         """
         self.__id = None
+        self.__exhaust = False
+        self.__exhaust_mgr = None
 
         spec = filter
         if spec is None:
@@ -163,8 +165,6 @@ class Cursor(object):
         self.__collation = validate_collation_or_none(collation)
 
         # Exhaust cursor support
-        self.__exhaust = False
-        self.__exhaust_mgr = None
         if cursor_type == CursorType.EXHAUST:
             if self.__collection.database.client.is_mongos:
                 raise InvalidOperation('Exhaust cursors are '
@@ -214,8 +214,7 @@ class Cursor(object):
         return self.__retrieved
 
     def __del__(self):
-        if self.__id and not self.__killed:
-            self.__die()
+        self.__die()
 
     def rewind(self):
         """Rewind this cursor to its unevaluated state.
