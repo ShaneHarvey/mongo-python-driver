@@ -21,6 +21,8 @@ import glob
 import os
 import sys
 
+from decimal import DecimalException
+
 if sys.version_info[:2] == (2, 6):
     try:
         import simplejson as json
@@ -33,6 +35,7 @@ sys.path[0:0] = [""]
 
 from bson import BSON, EPOCH_AWARE, json_util
 from bson.binary import STANDARD
+from bson.decimal128 import Decimal128
 from bson.codec_options import CodecOptions
 from bson.dbref import DBRef
 from bson.errors import InvalidBSON
@@ -223,6 +226,13 @@ def create_test(case_spec):
                 decode_bson(
                     binascii.unhexlify(b(decode_error_case['bson'])))
 
+        for parse_error_case in case_spec.get('parseErrors', []):
+            if bson_type == '0x13':
+                self.assertRaises(
+                    DecimalException, Decimal128, parse_error_case['string'])
+            else:
+                raise AssertionError('cannot test parseErrors for type ' +
+                                     bson_type)
     return run_test
 
 
