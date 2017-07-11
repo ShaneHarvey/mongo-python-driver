@@ -92,7 +92,6 @@ but it will be faster as there is less recursion.
 """
 
 import base64
-import collections
 import datetime
 import math
 import re
@@ -114,18 +113,20 @@ else:
 from pymongo.errors import ConfigurationError
 
 import bson
-from bson import EPOCH_AWARE, RE_TYPE, SON
+from bson import EPOCH_AWARE, EPOCH_NAIVE, RE_TYPE, SON
 from bson.binary import (Binary, JAVA_LEGACY, CSHARP_LEGACY, OLD_UUID_SUBTYPE,
                          UUID_SUBTYPE)
 from bson.code import Code
 from bson.codec_options import CodecOptions
 from bson.dbref import DBRef
 from bson.decimal128 import Decimal128
+from bson.errors import InvalidJSON
 from bson.int64 import Int64
 from bson.max_key import MaxKey
 from bson.min_key import MinKey
 from bson.objectid import ObjectId
-from bson.py3compat import PY3, iteritems, integer_types, string_type, text_type
+from bson.py3compat import (PY3, iteritems, integer_types, string_type,
+                            text_type)
 from bson.regex import Regex
 from bson.timestamp import Timestamp
 from bson.tz_util import utc
@@ -180,6 +181,31 @@ class DatetimeRepresentation:
     """
 
 
+class JSONMode:
+    LEGACY = 0
+    """Legacy Extended JSON representation.
+    .. versionadded:: 3.5
+    """
+
+    RELAXED = 1
+    """Relaxed Extended JSON representation.
+
+    .. seealso:: The documentation for the `Extended JSON Specification
+       <https://github.com/mongodb/specifications/blob/master/source/extended-json.rst>`_.
+
+    .. versionadded:: 3.5
+    """
+
+    CANONICAL = 2
+    """Canonical Extended JSON representation.
+
+    .. seealso:: The documentation for the `Extended JSON Specification
+       <https://github.com/mongodb/specifications/blob/master/source/extended-json.rst>`_.
+
+    .. versionadded:: 3.5
+    """
+
+
 class JSONOptions(CodecOptions):
     """Encapsulates JSON options for :func:`dumps` and :func:`loads`.
 
@@ -198,11 +224,8 @@ class JSONOptions(CodecOptions):
       - `strict_uuid`: If ``True``, :class:`uuid.UUID` object are encoded to
         MongoDB Extended JSON's *Strict mode* type `Binary`. Otherwise it
         will be encoded as ``'{"$uuid": "<hex>" }'``. Defaults to ``False``.
-      - `canonical_extended_json`: If ``True``, use Canonical Extended JSON
-        representations for all BSON values. This option implies
-        ``strict_number_long=True``,
-        ``datetime_representation=DatetimeRepresentation.NUMBERLONG``, and
-        ``strict_uuid=True``.
+      - `json_mode`: The JSON representation to use for encoding and
+        decoding Extended JSON`. Defaults to :const:`~JSONMode.LEGACY`.
       - `document_class`: BSON documents returned by :func:`loads` will be
         decoded to an instance of this class. Must be a subclass of
         :class:`collections.MutableMapping`. Defaults to :class:`dict`.
@@ -219,19 +242,22 @@ class JSONOptions(CodecOptions):
       - `args`: arguments to :class:`~bson.codec_options.CodecOptions`
       - `kwargs`: arguments to :class:`~bson.codec_options.CodecOptions`
 
+    .. seealso:: The documentation for the `Extended JSON Specification
+       <https://github.com/mongodb/specifications/blob/master/source/extended-json.rst>`_.
+
     .. seealso:: The documentation for `MongoDB Extended JSON
        <http://www.mongodb.org/display/DOCS/Mongo+Extended+JSON>`_.
 
     .. versionadded:: 3.4
 
     .. versionchanged:: 3.5
-       Accepts the optional parameter `canonical_extended_json`.
+       Accepts the optional parameter `json_mode`.
 
     """
 
     def __new__(cls, strict_number_long=False,
                 datetime_representation=DatetimeRepresentation.LEGACY,
-                strict_uuid=False, canonical_extended_json=False,
+                strict_uuid=False, json_mode=JSONMode.LEGACY,
                 *args, **kwargs):
         kwargs["tz_aware"] = kwargs.get("tz_aware", True)
         if kwargs["tz_aware"]:
@@ -240,7 +266,7 @@ class JSONOptions(CodecOptions):
                                            DatetimeRepresentation.NUMBERLONG,
                                            DatetimeRepresentation.ISO8601):
             raise ConfigurationError(
-                "JSONOptions.datetime_representation must be one of LEGACY,"
+                "JSONOptions.datetime_representation must be one of LEGACY, "
                 "NUMBERLONG, or ISO8601 from DatetimeRepresentation.")
         self = super(JSONOptions, cls).__new__(cls, *args, **kwargs)
         if not _HAS_OBJECT_PAIRS_HOOK and self.document_class != dict:
@@ -248,8 +274,19 @@ class JSONOptions(CodecOptions):
                 "Support for JSONOptions.document_class on Python 2.6 "
                 "requires simplejson "
                 "(https://pypi.python.org/pypi/simplejson) to be installed.")
-        self.canonical_extended_json = canonical_extended_json
-        if self.canonical_extended_json:
+        if json_mode not in (JSONMode.LEGACY,
+                             JSONMode.RELAXED,
+                             JSONMode.CANONICAL):
+            raise ConfigurationError(
+                "JSONOptions.json_mode must be one of LEGACY, RELAXED, "
+                "or CANONICAL from JSONMode.")
+        self.json_mode = json_mode
+        self.canonical_extended_json = json_mode != JSONMode.LEGACY
+        if self.json_mode == JSONMode.RELAXED:
+            self.strict_number_long = False
+            self.datetime_representation = DatetimeRepresentation.ISO8601
+            self.strict_uuid = True
+        elif self.json_mode == JSONMode.CANONICAL:
             self.strict_number_long = True
             self.datetime_representation = DatetimeRepresentation.NUMBERLONG
             self.strict_uuid = True
@@ -262,11 +299,11 @@ class JSONOptions(CodecOptions):
     def _arguments_repr(self):
         return ('strict_number_long=%r, '
                 'datetime_representation=%r, '
-                'strict_uuid=%r, canonical_extended_json=%r, %s' % (
+                'strict_uuid=%r, json_mode=%r, %s' % (
                     self.strict_number_long,
                     self.datetime_representation,
                     self.strict_uuid,
-                    self.canonical_extended_json,
+                    self.json_mode,
                     super(JSONOptions, self)._arguments_repr()))
 
 
@@ -285,8 +322,14 @@ STRICT_JSON_OPTIONS = JSONOptions(
 .. versionadded:: 3.4
 """
 
-CANONICAL_JSON_OPTIONS = JSONOptions(canonical_extended_json=True)
+CANONICAL_JSON_OPTIONS = JSONOptions(json_mode=JSONMode.CANONICAL)
 """:class:`JSONOptions` for `canonical extended JSON`_.
+
+.. versionadded:: 3.5
+"""
+
+RELAXED_JSON_OPTIONS = JSONOptions(json_mode=JSONMode.RELAXED)
+""":class:`JSONOptions` for `relaxed extended JSON`_.
 
 .. versionadded:: 3.5
 """
@@ -379,7 +422,7 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
     if "$maxKey" in dct:
         return MaxKey()
     if "$binary" in dct:
-        return _get_binary(dct, json_options)
+        return _parse_legacy_binary(dct, json_options)
     if "$code" in dct:
         return Code(dct["$code"], dct.get("$scope"))
     if "$uuid" in dct:
@@ -396,13 +439,7 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
     return dct
 
 
-def _get_binary(doc, json_options):
-    if isinstance(doc["$type"], int):
-        doc["$type"] = "%02x" % doc["$type"]
-    subtype = int(doc["$type"], 16)
-    if subtype >= 0xffffff80:  # Handle mongoexport values
-        subtype = int(doc["$type"][6:], 16)
-    data = base64.b64decode(doc["$binary"].encode())
+def _binary_or_uuid(data, subtype, json_options):
     # special handling for UUID
     if subtype == OLD_UUID_SUBTYPE:
         if json_options.uuid_representation == CSHARP_LEGACY:
@@ -415,6 +452,33 @@ def _get_binary(doc, json_options):
     if PY3 and subtype == 0:
         return data
     return Binary(data, subtype)
+
+
+def _parse_legacy_binary(doc, json_options):
+    if isinstance(doc["$type"], int):
+        doc["$type"] = "%02x" % doc["$type"]
+    subtype = int(doc["$type"], 16)
+    if subtype >= 0xffffff80:  # Handle mongoexport values
+        subtype = int(doc["$type"][6:], 16)
+    data = base64.b64decode(doc["$binary"].encode())
+    return _binary_or_uuid(data, subtype, json_options)
+
+
+def _parse_canonical_binary(doc, json_options):
+    binary = doc["$binary"]
+    b64 = binary["base64"]
+    subtype = binary["subType"]
+    if not isinstance(b64, string_type):
+        raise InvalidJSON('$binary base64 must be a string: %s', doc)
+    if not isinstance(subtype, string_type) or len(subtype) > 2:
+        raise InvalidJSON(
+            '$binary subType must be a string at most 2 characters: %s', doc)
+    if len(binary) != 2:
+        raise InvalidJSON(
+            '$binary must include only "base64" and "subType" components: %s', doc)
+
+    data = base64.b64decode(b64.encode())
+    return _binary_or_uuid(data, int(subtype, 16), json_options)
 
 
 def _get_date(doc, json_options):
@@ -441,8 +505,16 @@ def _get_date(doc, json_options):
             dt = dtm
             offset = ''
 
+        # Parse the optional factional seconds portion.
+        dot_index = dt.rfind('.')
+        microsecond = 0
+        if dot_index != -1:
+            microsecond = int(float(dt[dot_index:]) * 1000000)
+            dt = dt[:dot_index]
+
         aware = datetime.datetime.strptime(
-            dt, "%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=utc)
+            dt, "%Y-%m-%dT%H:%M:%S").replace(microsecond=microsecond,
+                                             tzinfo=utc)
 
         if offset and offset != 'Z':
             if len(offset) == 6:
@@ -462,68 +534,163 @@ def _get_date(doc, json_options):
             return aware
         else:
             return aware.replace(tzinfo=None)
-    # mongoexport 2.6 and newer, time before the epoch (SERVER-15275)
-    elif isinstance(dtm, collections.Mapping):
-        millis = int(dtm["$numberLong"])
+    if json_options.canonical_extended_json:
+        if not isinstance(dtm, Int64):
+            raise TypeError('$date should be Int64 or ISO-8601 string: %s', doc)
+        return bson._millis_to_datetime(dtm, json_options)
     # mongoexport before 2.6
-    else:
-        millis = int(dtm)
-    return bson._millis_to_datetime(millis, json_options)
+    return bson._millis_to_datetime(int(dtm), json_options)
 
 
-def _get_dbpointer(doc, json_options):
+def _parse_canonical_oid(doc, dummy0):
+    """Decode a JSON ObjectId to bson.objectid.ObjectId."""
+    return ObjectId(doc['$oid'])
+
+
+def _parse_canonical_date(doc, json_options):
+    """Decode a JSON datetime to python datetime.datetime."""
+    return _get_date(doc, json_options)
+
+
+def _parse_canonical_code(doc, dummy0):
+    """Decode a JSON code to bson.code.Code."""
+    return Code(doc['$code'], scope=doc.get('$scope'))
+
+
+def _parse_canonical_regex(doc, dummy0):
+    """Decode a JSON regex to bson.regex.Regex."""
+    r = doc['$regularExpression']
+    return Regex(r['pattern'], r['options'])
+
+
+def _parse_canonical_dbref(doc, dummy0):
+    """Decode a JSON DBRef to bson.dbref.DBRef."""
+    return DBRef(doc.pop('$ref'), doc.pop('$id'),
+                 database=doc.pop('$db', None), **doc)
+
+
+def _parse_canonical_dbpointer(doc, dummy0):
+    """Decode a JSON (deprecated) DBPointer to bson.dbref.DBRef."""
     dbref = doc['$dbPointer']
     if isinstance(dbref, DBRef):
         # DBPointer must not contain $db in its value.
-        if dbref.database is None:
-            return dbref
-        # Otherwise, this is just a regular document.
-        return json_options.document_class(
-            [('$dbPointer', json_options.document_class(dbref.as_doc()))])
-    return doc
+        if dbref.database is not None:
+            raise InvalidJSON('$dbPointer cannot contain a $db: %s', dbref.as_doc())
+        if not isinstance(dbref.id, ObjectId):
+            raise InvalidJSON('$dbPointer must have an ObjectId id: %s', dbref.as_doc())
+        return dbref
+    else:
+        raise InvalidJSON('$dbPointer expected a DBRef: %s', doc)
+
+
+def _parse_canonical_timestamp(doc, dummy0):
+    """Decode a JSON timestamp to bson.timestamp.Timestamp."""
+    timestamp = doc['$timestamp']
+    time = timestamp['t']
+    inc = timestamp['i']
+
+    if len(timestamp) != 2:
+        raise InvalidJSON(
+            '$timestamp must include only "t" and "i" components: %s', doc)
+    return Timestamp(time, inc)
+
+
+def _parse_canonical_int32(doc, dummy0):
+    """Decode a JSON int32 to python int."""
+    i_str = doc['$numberInt']
+    if not isinstance(i_str, string_type):
+        raise InvalidJSON('$numberInt must be string')
+    return int(i_str)
+
+
+def _parse_canonical_int64(doc, dummy0):
+    """Decode a JSON int64 to bson.int64.Int64."""
+    l_str = doc['$numberLong']
+    if not isinstance(l_str, string_type):
+        raise InvalidJSON('$numberLong must be string')
+    return Int64(l_str)
+
+
+def _parse_canonical_double(doc, dummy0):
+    """Decode a JSON double to python float."""
+    d_str = doc['$numberDouble']
+    if not isinstance(d_str, string_type):
+        raise InvalidJSON('$numberDouble must be string')
+    return float(d_str)
+
+
+def _parse_canonical_decimal128(doc, dummy0):
+    """Decode a JSON decimal128 to bson.decimal128.Decimal128."""
+    d_str = doc['$numberDecimal']
+    if not isinstance(d_str, string_type):
+        raise InvalidJSON('$numberDecimal must be string')
+    return Decimal128(d_str)
+
+
+def _parse_canonical_minkey(doc, dummy0):
+    """Decode a JSON MinKey to bson.min_key.MinKey."""
+    if doc['$minKey'] is not 1:
+        raise InvalidJSON('$minKey value must be 1 %s', doc)
+    return MinKey()
+
+
+def _parse_canonical_maxkey(doc, dummy0):
+    """Decode a JSON MaxKey to bson.max_key.MaxKey."""
+    if doc['$maxKey'] is not 1:
+        raise InvalidJSON('$maxKey value must be 1 %s', doc)
+    return MaxKey()
 
 
 _CANONICAL_JSON_TABLE = {
-    frozenset(['$oid']): lambda d, _: ObjectId(d['$oid']),
-    frozenset(['$numberDecimal']): lambda d, _: Decimal128(d['$numberDecimal']),
+    frozenset(['$oid']): _parse_canonical_oid,
+    frozenset(['$numberDecimal']): _parse_canonical_decimal128,
     frozenset(['$symbol']): lambda d, _: text_type(d['$symbol']),
-    frozenset(['$numberInt']): lambda d, _: int(d['$numberInt']),
-    frozenset(['$numberDouble']): lambda d, _: float(d['$numberDouble']),
-    frozenset(['$numberLong']): lambda d, _: Int64(d['$numberLong']),
-    frozenset(['$date']): _get_date,
-    frozenset(['$minKey']): lambda dummy0, dummy1: MinKey(),
-    frozenset(['$maxKey']): lambda dummy0, dummy1: MaxKey(),
+    frozenset(['$numberInt']): _parse_canonical_int32,
+    frozenset(['$numberLong']): _parse_canonical_int64,
+    frozenset(['$numberDouble']): _parse_canonical_double,
+    frozenset(['$date']): _parse_canonical_date,
+    frozenset(['$minKey']): _parse_canonical_minkey,
+    frozenset(['$maxKey']): _parse_canonical_maxkey,
     frozenset(['$undefined']): lambda dummy0, dummy1: None,
-    frozenset(['$dbPointer']): _get_dbpointer,
-    frozenset(['$ref', '$id']): lambda d, _: DBRef(
-        d.pop('$ref'), d.pop('$id'), **d),
-    frozenset(['$ref', '$id', '$db']): lambda d, _: DBRef(
-        d.pop('$ref'), d.pop('$id'), d.pop('$db'), **d),
-    frozenset(['$regex', '$options']): lambda d, _: Regex(
-        d['$regex'], d['$options']),
-    frozenset(['$binary', '$type']): _get_binary,
-    frozenset(['$code']): lambda d, _: Code(d['$code']),
-    frozenset(['$code', '$scope']): lambda d, _: Code(
-        d['$code'], d['$scope']),
-    frozenset(['$timestamp']): lambda d, _: Timestamp(
-        int(d['$timestamp']) >> 32, int(d['$timestamp']) & 0xffffffff)
+    frozenset(['$dbPointer']): _parse_canonical_dbpointer,
+    frozenset(['$ref', '$id']): _parse_canonical_dbref,
+    frozenset(['$ref', '$id', '$db']): _parse_canonical_dbref,
+    frozenset(['$regularExpression']): _parse_canonical_regex,
+    frozenset(['$binary']): _parse_canonical_binary,
+    frozenset(['$code']): _parse_canonical_code,
+    frozenset(['$code', '$scope']): _parse_canonical_code,
+    frozenset(['$timestamp']): _parse_canonical_timestamp
 }
+_CANONICAL_JSON_KEYS = set(key for keyset in _CANONICAL_JSON_TABLE
+                           for key in keyset)
 
 
 def canonical_object_hook(dct, json_options=CANONICAL_JSON_OPTIONS):
-    keyset = frozenset(key for key in dct if key.startswith('$'))
+    keyset = frozenset(key for key in dct)
     converter = _CANONICAL_JSON_TABLE.get(keyset)
     if converter:
         return converter(dct, json_options)
-    elif '$ref' in dct and '$id' in dct:
+    if '$ref' in keyset and '$id' in keyset:
         # DBRef may contain other keys that don't start with $.
         if keyset - _DBREF_KEYS:
             # Other keys start with $, so dct cannot be parsed as a DBRef.
             return dct
         else:
-            return DBRef(dct.pop('$ref'), dct.pop('$id'),
-                         dct.pop('$db', None), **dct)
+            return _parse_canonical_dbref(dct, json_options)
+    if keyset & _CANONICAL_JSON_KEYS:
+        raise InvalidJSON('Invalid json document %s' % (dct,))
     return dct
+
+
+def _encode_binary(data, subtype, json_options):
+    if json_options.canonical_extended_json:
+        return {'$binary': SON([
+            ('base64', base64.b64encode(data).decode()),
+            ('subType', "%02x" % subtype)])}
+    else:
+        return SON([
+            ('$binary', base64.b64encode(data).decode()),
+            ('$type', "%02x" % subtype)])
 
 
 def default(obj, json_options=DEFAULT_JSON_OPTIONS):
@@ -544,10 +711,10 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
                     tz_string = 'Z'
                 else:
                     tz_string = obj.strftime('%z')
-                return {"$date": "%s.%03d%s" % (
-                    obj.strftime("%Y-%m-%dT%H:%M:%S"),
-                    int(obj.microsecond / 1000),
-                    tz_string)}
+                millis = int(obj.microsecond / 1000)
+                fracsecs = ".%03d" % (millis,) if millis else ""
+                return {"$date": "%s%s%s" % (
+                    obj.strftime("%Y-%m-%dT%H:%M:%S"), fracsecs, tz_string)}
 
         millis = bson._datetime_to_millis(obj)
         if (json_options.datetime_representation ==
@@ -574,29 +741,26 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
             pattern = obj.pattern
         else:
             pattern = obj.pattern.decode('utf-8')
+        if json_options.canonical_extended_json:
+            return {'$regularExpression': SON([
+                ("pattern", pattern), ("options", flags)])}
         return SON([("$regex", pattern), ("$options", flags)])
     if isinstance(obj, MinKey):
         return {"$minKey": 1}
     if isinstance(obj, MaxKey):
         return {"$maxKey": 1}
     if isinstance(obj, Timestamp):
-        if json_options.canonical_extended_json:
-            return {'$timestamp': str((obj.time << 32) + obj.inc)}
         return {"$timestamp": SON([("t", obj.time), ("i", obj.inc)])}
     if isinstance(obj, Code):
         if obj.scope is None:
-            return SON([('$code', str(obj))])
+            return {'$code': str(obj)}
         return SON([
             ('$code', str(obj)),
             ('$scope', _json_convert(obj.scope, json_options))])
     if isinstance(obj, Binary):
-        return SON([
-            ('$binary', base64.b64encode(obj).decode()),
-            ('$type', "%02x" % obj.subtype)])
+        return _encode_binary(obj, obj.subtype, json_options)
     if PY3 and isinstance(obj, bytes):
-        return SON([
-            ('$binary', base64.b64encode(obj).decode()),
-            ('$type', "00")])
+        return _encode_binary(obj, 0, json_options)
     if isinstance(obj, uuid.UUID):
         if json_options.strict_uuid:
             data = obj.bytes
@@ -607,28 +771,26 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
                 data = data[7::-1] + data[:7:-1]
             elif json_options.uuid_representation == UUID_SUBTYPE:
                 subtype = UUID_SUBTYPE
-            return SON([
-                ('$binary', base64.b64encode(data).decode()),
-                ('$type', "%02x" % subtype)])
+            return _encode_binary(data, subtype, json_options)
         else:
             return {"$uuid": obj.hex}
     if isinstance(obj, Decimal128):
         return {"$numberDecimal": str(obj)}
     if isinstance(obj, bool):
         return obj
-    if json_options.canonical_extended_json and isinstance(obj, integer_types):
+    if json_options.strict_number_long and isinstance(obj, integer_types):
         if -2 ** 31 <= obj < 2 ** 31:
             return {'$numberInt': text_type(obj)}
         return {'$numberLong': text_type(obj)}
     if json_options.canonical_extended_json and isinstance(obj, float):
         if math.isnan(obj):
-            representation = 'NaN'
+            return {'$numberDouble': 'NaN'}
         elif math.isinf(obj):
             representation = 'Infinity' if obj > 0 else '-Infinity'
-        else:
+            return {'$numberDouble': representation}
+        elif json_options.strict_number_long:
             # repr() will return the shortest string guaranteed to produce the
             # original value, when float() is called on it. str produces a
             # shorter string in Python 2.
-            representation = text_type(repr(obj))
-        return {'$numberDouble': representation}
+            return {'$numberDouble': text_type(repr(obj))}
     raise TypeError("%r is not JSON serializable" % obj)

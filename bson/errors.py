@@ -38,3 +38,8 @@ class InvalidDocument(BSONError):
 class InvalidId(BSONError):
     """Raised when trying to create an ObjectId from invalid data.
     """
+
+
+class InvalidJSON(BSONError):
+    """Raised when trying to create a BSON object from invalid JSON data.
+    """
