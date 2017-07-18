@@ -51,9 +51,6 @@ _TEST_PATH = os.path.join(
 _TESTS_TO_SKIP = set([
     # Python cannot decode dates after year 9999.
     'Y10K',
-    # Python rounds these to 1.2345678901234568E+18.
-    '1.23456789012345677E+18',
-    '-1.23456789012345677E+18'
 ])
 
 _DEPRECATED_BSON_TYPES = {
