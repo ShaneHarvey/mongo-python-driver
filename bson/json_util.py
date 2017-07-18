@@ -573,13 +573,17 @@ def _parse_canonical_dbpointer(doc, dummy0):
     """Decode a JSON (deprecated) DBPointer to bson.dbref.DBRef."""
     dbref = doc['$dbPointer']
     if isinstance(dbref, DBRef):
+        dbref_doc = dbref.as_doc()
         # DBPointer must not contain $db in its value.
         if dbref.database is not None:
             raise TypeError(
-                '$dbPointer cannot contain a $db: %s' % (dbref.as_doc(),))
+                '$dbPointer cannot contain a $db: %s' % (dbref_doc,))
         if not isinstance(dbref.id, ObjectId):
             raise TypeError(
-                '$dbPointer must have an ObjectId id: %s' % (dbref.as_doc(),))
+                '$dbPointer must have an ObjectId id: %s' % (dbref_doc,))
+        if len(dbref_doc) != 2:
+            raise TypeError(
+                '$dbPointer must contain only $ref and $id: %s' % (dbref_doc,))
         return dbref
     else:
         raise TypeError('$dbPointer expected a DBRef: %s' % (doc,))
@@ -674,7 +678,7 @@ def canonical_object_hook(dct, json_options=CANONICAL_JSON_OPTIONS):
         return converter(dct, json_options)
     if '$ref' in keyset and '$id' in keyset:
         # DBRef may contain other keys that don't start with $.
-        if keyset - _DBREF_KEYS:
+        if any(key.startswith('$') for key in keyset - _DBREF_KEYS):
             # Other keys start with $, so dct cannot be parsed as a DBRef.
             return dct
         else:
