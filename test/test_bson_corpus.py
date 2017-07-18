@@ -38,7 +38,7 @@ from bson.binary import STANDARD
 from bson.decimal128 import Decimal128
 from bson.codec_options import CodecOptions
 from bson.dbref import DBRef
-from bson.errors import InvalidBSON, InvalidJSON
+from bson.errors import InvalidBSON
 from bson.json_util import JSONMode
 from bson.py3compat import text_type, b
 from bson.son import SON
@@ -204,7 +204,7 @@ def create_test(case_spec):
                     raise AssertionError(
                         'exception not raised for test case: ' +
                         parse_error_case['description'])
-                except (ValueError, InvalidJSON, KeyError, TypeError):
+                except (ValueError, KeyError, TypeError):
                     pass
             else:
                 raise AssertionError('cannot test parseErrors for type ' +

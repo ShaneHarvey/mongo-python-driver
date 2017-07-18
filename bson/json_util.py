@@ -120,7 +120,6 @@ from bson.code import Code
 from bson.codec_options import CodecOptions
 from bson.dbref import DBRef
 from bson.decimal128 import Decimal128
-from bson.errors import InvalidJSON
 from bson.int64 import Int64
 from bson.max_key import MaxKey
 from bson.min_key import MinKey
@@ -469,13 +468,13 @@ def _parse_canonical_binary(doc, json_options):
     b64 = binary["base64"]
     subtype = binary["subType"]
     if not isinstance(b64, string_type):
-        raise InvalidJSON('$binary base64 must be a string: %s', doc)
+        raise TypeError('$binary base64 must be a string: %s' % (doc,))
     if not isinstance(subtype, string_type) or len(subtype) > 2:
-        raise InvalidJSON(
-            '$binary subType must be a string at most 2 characters: %s', doc)
+        raise TypeError('$binary subType must be a string at most 2 '
+                        'characters: %s' % (doc,))
     if len(binary) != 2:
-        raise InvalidJSON(
-            '$binary must include only "base64" and "subType" components: %s', doc)
+        raise TypeError('$binary must include only "base64" and "subType" '
+                        'components: %s' % (doc,))
 
     data = base64.b64decode(b64.encode())
     return _binary_or_uuid(data, int(subtype, 16), json_options)
@@ -536,7 +535,8 @@ def _get_date(doc, json_options):
             return aware.replace(tzinfo=None)
     if json_options.canonical_extended_json:
         if not isinstance(dtm, Int64):
-            raise TypeError('$date should be Int64 or ISO-8601 string: %s', doc)
+            raise TypeError(
+                '$date should be Int64 or ISO-8601 string: %s' % (doc,))
         return bson._millis_to_datetime(dtm, json_options)
     # mongoexport before 2.6
     return bson._millis_to_datetime(int(dtm), json_options)
@@ -575,12 +575,14 @@ def _parse_canonical_dbpointer(doc, dummy0):
     if isinstance(dbref, DBRef):
         # DBPointer must not contain $db in its value.
         if dbref.database is not None:
-            raise InvalidJSON('$dbPointer cannot contain a $db: %s', dbref.as_doc())
+            raise TypeError(
+                '$dbPointer cannot contain a $db: %s' % (dbref.as_doc(),))
         if not isinstance(dbref.id, ObjectId):
-            raise InvalidJSON('$dbPointer must have an ObjectId id: %s', dbref.as_doc())
+            raise TypeError(
+                '$dbPointer must have an ObjectId id: %s' % (dbref.as_doc(),))
         return dbref
     else:
-        raise InvalidJSON('$dbPointer expected a DBRef: %s', doc)
+        raise TypeError('$dbPointer expected a DBRef: %s' % (doc,))
 
 
 def _parse_canonical_timestamp(doc, dummy0):
@@ -590,8 +592,8 @@ def _parse_canonical_timestamp(doc, dummy0):
     inc = timestamp['i']
 
     if len(timestamp) != 2:
-        raise InvalidJSON(
-            '$timestamp must include only "t" and "i" components: %s', doc)
+        raise TypeError(
+            '$timestamp must include only "t" and "i" components: %s' % (doc,))
     return Timestamp(time, inc)
 
 
@@ -599,7 +601,7 @@ def _parse_canonical_int32(doc, dummy0):
     """Decode a JSON int32 to python int."""
     i_str = doc['$numberInt']
     if not isinstance(i_str, string_type):
-        raise InvalidJSON('$numberInt must be string')
+        raise TypeError('$numberInt must be string: %s' % (doc,))
     return int(i_str)
 
 
@@ -607,7 +609,7 @@ def _parse_canonical_int64(doc, dummy0):
     """Decode a JSON int64 to bson.int64.Int64."""
     l_str = doc['$numberLong']
     if not isinstance(l_str, string_type):
-        raise InvalidJSON('$numberLong must be string')
+        raise TypeError('$numberLong must be string: %s' % (doc,))
     return Int64(l_str)
 
 
@@ -615,7 +617,7 @@ def _parse_canonical_double(doc, dummy0):
     """Decode a JSON double to python float."""
     d_str = doc['$numberDouble']
     if not isinstance(d_str, string_type):
-        raise InvalidJSON('$numberDouble must be string')
+        raise TypeError('$numberDouble must be string: %s' % (doc,))
     return float(d_str)
 
 
@@ -623,21 +625,21 @@ def _parse_canonical_decimal128(doc, dummy0):
     """Decode a JSON decimal128 to bson.decimal128.Decimal128."""
     d_str = doc['$numberDecimal']
     if not isinstance(d_str, string_type):
-        raise InvalidJSON('$numberDecimal must be string')
+        raise TypeError('$numberDecimal must be string: %s' % (doc,))
     return Decimal128(d_str)
 
 
 def _parse_canonical_minkey(doc, dummy0):
     """Decode a JSON MinKey to bson.min_key.MinKey."""
     if doc['$minKey'] is not 1:
-        raise InvalidJSON('$minKey value must be 1 %s', doc)
+        raise TypeError('$minKey value must be 1: %s' % (doc,))
     return MinKey()
 
 
 def _parse_canonical_maxkey(doc, dummy0):
     """Decode a JSON MaxKey to bson.max_key.MaxKey."""
     if doc['$maxKey'] is not 1:
-        raise InvalidJSON('$maxKey value must be 1 %s', doc)
+        raise TypeError('$maxKey value must be 1: %s', (doc,))
     return MaxKey()
 
 
@@ -678,7 +680,7 @@ def canonical_object_hook(dct, json_options=CANONICAL_JSON_OPTIONS):
         else:
             return _parse_canonical_dbref(dct, json_options)
     if keyset & _CANONICAL_JSON_KEYS:
-        raise InvalidJSON('Invalid json document %s' % (dct,))
+        raise TypeError('Invalid Extended JSON document %s' % (dct,))
     return dct
 
 
