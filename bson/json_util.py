@@ -280,7 +280,7 @@ class JSONOptions(CodecOptions):
                 "JSONOptions.json_mode must be one of LEGACY, RELAXED, "
                 "or CANONICAL from JSONMode.")
         self.json_mode = json_mode
-        self.canonical_extended_json = json_mode != JSONMode.LEGACY
+        self.parse_canonical_json = json_mode != JSONMode.LEGACY
         if self.json_mode == JSONMode.RELAXED:
             self.strict_number_long = False
             self.datetime_representation = DatetimeRepresentation.ISO8601
@@ -376,7 +376,7 @@ def loads(s, *args, **kwargs):
     else:
         kwargs["object_hook"] = lambda obj: (
             canonical_object_hook(obj, json_options)
-            if json_options.canonical_extended_json
+            if json_options.parse_canonical_json
             else object_hook(obj, json_options))
     return json.loads(s, *args, **kwargs)
 
@@ -398,7 +398,7 @@ def _json_convert(obj, json_options=DEFAULT_JSON_OPTIONS):
 
 def object_pairs_hook(pairs, json_options=DEFAULT_JSON_OPTIONS):
     document = json_options.document_class(pairs)
-    if json_options.canonical_extended_json:
+    if json_options.parse_canonical_json:
         return canonical_object_hook(document, json_options)
     return object_hook(document, json_options)
 
@@ -533,7 +533,7 @@ def _get_date(doc, json_options):
             return aware
         else:
             return aware.replace(tzinfo=None)
-    if json_options.canonical_extended_json:
+    if json_options.parse_canonical_json:
         if not isinstance(dtm, Int64):
             raise TypeError(
                 '$date should be Int64 or ISO-8601 string: %s' % (doc,))
@@ -689,7 +689,7 @@ def canonical_object_hook(dct, json_options=CANONICAL_JSON_OPTIONS):
 
 
 def _encode_binary(data, subtype, json_options):
-    if json_options.canonical_extended_json:
+    if json_options.parse_canonical_json:
         return {'$binary': SON([
             ('base64', base64.b64encode(data).decode()),
             ('subType', "%02x" % subtype)])}
@@ -747,7 +747,7 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
             pattern = obj.pattern
         else:
             pattern = obj.pattern.decode('utf-8')
-        if json_options.canonical_extended_json:
+        if json_options.parse_canonical_json:
             return {'$regularExpression': SON([
                 ("pattern", pattern), ("options", flags)])}
         return SON([("$regex", pattern), ("$options", flags)])
@@ -788,7 +788,7 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
         if -2 ** 31 <= obj < 2 ** 31:
             return {'$numberInt': text_type(obj)}
         return {'$numberLong': text_type(obj)}
-    if json_options.canonical_extended_json and isinstance(obj, float):
+    if json_options.parse_canonical_json and isinstance(obj, float):
         if math.isnan(obj):
             return {'$numberDouble': 'NaN'}
         elif math.isinf(obj):
