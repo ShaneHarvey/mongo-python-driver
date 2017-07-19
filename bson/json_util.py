@@ -411,11 +411,7 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
     if "$date" in dct:
         return _get_date(dct, json_options)
     if "$regex" in dct:
-        flags = 0
-        # PyMongo always adds $options but some other tools may not.
-        for opt in dct.get("$options", ""):
-            flags |= _RE_OPT_TABLE.get(opt, 0)
-        return Regex(dct["$regex"], flags)
+        return _parse_legacy_regex(dct, json_options)
     if "$minKey" in dct:
         return MinKey()
     if "$maxKey" in dct:
@@ -436,6 +432,18 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
     if "$numberDecimal" in dct:
         return Decimal128(dct["$numberDecimal"])
     return dct
+
+
+def _parse_legacy_regex(doc, dummy0):
+    pattern = doc["$regex"]
+    # Check if this is the $regex query operator.
+    if isinstance(pattern, Regex):
+        return doc
+    flags = 0
+    # PyMongo always adds $options but some other tools may not.
+    for opt in doc.get("$options", ""):
+        flags |= _RE_OPT_TABLE.get(opt, 0)
+    return Regex(pattern, flags)
 
 
 def _binary_or_uuid(data, subtype, json_options):
@@ -553,8 +561,11 @@ def _parse_canonical_code(doc, dummy0):
 
 def _parse_canonical_regex(doc, dummy0):
     """Decode a JSON regex to bson.regex.Regex."""
-    r = doc['$regularExpression']
-    return Regex(r['pattern'], r['options'])
+    regex = doc['$regularExpression']
+    if len(regex) != 2:
+        raise TypeError('$timestamp must include only "pattern" and '
+                        '"options" components: %s' % (doc,))
+    return Regex(regex['pattern'], regex['options'])
 
 
 def _parse_canonical_dbref(doc, dummy0):
@@ -656,6 +667,8 @@ _CANONICAL_JSON_TABLE = {
     frozenset(['$ref', '$id']): _parse_canonical_dbref,
     frozenset(['$ref', '$id', '$db']): _parse_canonical_dbref,
     frozenset(['$regularExpression']): _parse_canonical_regex,
+    frozenset(['$regex']): _parse_legacy_regex,
+    frozenset(['$regex', '$options']): _parse_legacy_regex,
     frozenset(['$binary']): _parse_canonical_binary,
     frozenset(['$code']): _parse_canonical_code,
     frozenset(['$code', '$scope']): _parse_canonical_code,
