@@ -533,12 +533,6 @@ def _get_date(doc, json_options):
             return aware
         else:
             return aware.replace(tzinfo=None)
-    if json_options.parse_canonical_json:
-        if not isinstance(dtm, Int64):
-            raise TypeError(
-                '$date should be Int64 or ISO-8601 string: %s' % (doc,))
-        return bson._millis_to_datetime(dtm, json_options)
-    # mongoexport before 2.6
     return bson._millis_to_datetime(int(dtm), json_options)
 
 

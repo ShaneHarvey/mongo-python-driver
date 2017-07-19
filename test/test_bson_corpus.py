@@ -53,6 +53,11 @@ _TESTS_TO_SKIP = set([
     'Y10K',
 ])
 
+_PARSE_ERRORS_TO_SKIP = set([
+    # {"$date": <number>} is our legacy format which we still need to parse.
+    'Bad $date (number, not string or hash)'
+])
+
 _DEPRECATED_BSON_TYPES = {
     # Symbol
     '0x0E': text_type,
@@ -137,6 +142,10 @@ def create_test(case_spec):
                      not json_util._HAS_OBJECT_PAIRS_HOOK)
 
             decoded_bson = decode_bson(cB)
+            if not lossy:
+                # Make sure we can parse the legacy (default) JSON format.
+                self.assertEqual(decode_extjson(json_util.dumps(decoded_bson)),
+                                 decoded_bson)
             if deprecated:
                 if 'converted_bson' in valid_case:
                     converted_bson = binascii.unhexlify(
@@ -196,11 +205,13 @@ def create_test(case_spec):
                 self.assertRaises(
                     DecimalException, Decimal128, parse_error_case['string'])
             elif bson_type == '0x00':
+                description = parse_error_case['description']
+                if description in _PARSE_ERRORS_TO_SKIP:
+                    continue
                 try:
                     decode_extjson(parse_error_case['string'])
                     raise AssertionError(
-                        'exception not raised for test case: ' +
-                        parse_error_case['description'])
+                        'exception not raised for test case: ' + description)
                 except (ValueError, KeyError, TypeError):
                     pass
             else:
