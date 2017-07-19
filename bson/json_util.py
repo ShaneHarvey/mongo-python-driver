@@ -421,7 +421,7 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
     if "$code" in dct:
         return Code(dct["$code"], dct.get("$scope"))
     if "$uuid" in dct:
-        return uuid.UUID(dct["$uuid"])
+        return _parse_legacy_uuid(dct, json_options)
     if "$undefined" in dct:
         return None
     if "$numberLong" in dct:
@@ -432,6 +432,10 @@ def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
     if "$numberDecimal" in dct:
         return Decimal128(dct["$numberDecimal"])
     return dct
+
+
+def _parse_legacy_uuid(doc, dummy0):
+    return uuid.UUID(doc["$uuid"])
 
 
 def _parse_legacy_regex(doc, dummy0):
@@ -673,7 +677,8 @@ _CANONICAL_JSON_TABLE = {
     frozenset(['$binary', '$type']): _parse_legacy_binary,
     frozenset(['$code']): _parse_canonical_code,
     frozenset(['$code', '$scope']): _parse_canonical_code,
-    frozenset(['$timestamp']): _parse_canonical_timestamp
+    frozenset(['$timestamp']): _parse_canonical_timestamp,
+    frozenset(['$uuid']): _parse_legacy_uuid,
 }
 _CANONICAL_JSON_KEYS = set([
     '$numberDecimal', '$oid', '$numberInt', '$symbol', '$id', '$maxKey',
