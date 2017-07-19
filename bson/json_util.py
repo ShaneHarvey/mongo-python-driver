@@ -670,12 +670,17 @@ _CANONICAL_JSON_TABLE = {
     frozenset(['$regex']): _parse_legacy_regex,
     frozenset(['$regex', '$options']): _parse_legacy_regex,
     frozenset(['$binary']): _parse_canonical_binary,
+    frozenset(['$binary', '$type']): _parse_legacy_binary,
     frozenset(['$code']): _parse_canonical_code,
     frozenset(['$code', '$scope']): _parse_canonical_code,
     frozenset(['$timestamp']): _parse_canonical_timestamp
 }
-_CANONICAL_JSON_KEYS = set(key for keyset in _CANONICAL_JSON_TABLE
-                           for key in keyset)
+_CANONICAL_JSON_KEYS = set([
+    '$numberDecimal', '$oid', '$numberInt', '$symbol', '$id', '$maxKey',
+    '$numberLong', '$code', '$dbPointer', '$ref', '$date',
+    '$regularExpression', '$minKey', '$db', '$numberDouble', '$binary',
+    '$undefined', '$timestamp', '$scope'
+])
 
 
 def canonical_object_hook(dct, json_options=CANONICAL_JSON_OPTIONS):
