@@ -14,14 +14,15 @@
 
 """Tools for using Python's :mod:`json` module with BSON documents.
 
-This module provides two helper methods `dumps` and `loads` that wrap the native
-:mod:`json` methods and provide explicit BSON conversion to and from
-JSON. :class:`~bson.json_util.JSONOptions` provides a way to control how JSON is
-emitted and parsed, with the default being the legacy PyMongo format.
-:mod:`~bson.json_util` can also generate and parse `canonical extended JSON`_ when
-:data:`~bson.json_util.CANONICAL_JSON_OPTIONS` is provided.
+This module provides two helper methods `dumps` and `loads` that wrap the
+native :mod:`json` methods and provide explicit BSON conversion to and from
+JSON. :class:`~bson.json_util.JSONOptions` provides a way to control how JSON
+is emitted and parsed, with the default being the legacy PyMongo format.
+:mod:`~bson.json_util` can also generate Canonical or Relaxed `Extended JSON`_
+when :const:`CANONICAL_JSON_OPTIONS` or :const:`RELAXED_JSON_OPTIONS` is
+provided, respectively.
 
-.. _canonical extended JSON: https://github.com/mongodb/specifications/blob/master/source/extended-json.rst
+.. _Extended JSON: https://github.com/mongodb/specifications/blob/master/source/extended-json.rst
 
 Example usage (serialization):
 
@@ -189,8 +190,7 @@ class JSONMode:
     RELAXED = 1
     """Relaxed Extended JSON representation.
 
-    .. seealso:: The documentation for the `Extended JSON Specification
-       <https://github.com/mongodb/specifications/blob/master/source/extended-json.rst>`_.
+    .. seealso:: The specification for Relaxed `Extended JSON`_.
 
     .. versionadded:: 3.5
     """
@@ -198,8 +198,7 @@ class JSONMode:
     CANONICAL = 2
     """Canonical Extended JSON representation.
 
-    .. seealso:: The documentation for the `Extended JSON Specification
-       <https://github.com/mongodb/specifications/blob/master/source/extended-json.rst>`_.
+    .. seealso:: The specification for Canonical `Extended JSON`_.
 
     .. versionadded:: 3.5
     """
@@ -241,8 +240,7 @@ class JSONOptions(CodecOptions):
       - `args`: arguments to :class:`~bson.codec_options.CodecOptions`
       - `kwargs`: arguments to :class:`~bson.codec_options.CodecOptions`
 
-    .. seealso:: The documentation for the `Extended JSON Specification
-       <https://github.com/mongodb/specifications/blob/master/source/extended-json.rst>`_.
+    .. seealso:: The `Extended JSON`_ specification.
 
     .. seealso:: The documentation for `MongoDB Extended JSON
        <http://www.mongodb.org/display/DOCS/Mongo+Extended+JSON>`_.
@@ -306,8 +304,16 @@ class JSONOptions(CodecOptions):
                     super(JSONOptions, self)._arguments_repr()))
 
 
-DEFAULT_JSON_OPTIONS = JSONOptions()
+LEGACY_JSON_OPTIONS = JSONOptions()
+""":class:`JSONOptions` for encoding to PyMongo's legacy JSON format.
+
+.. versionadded:: 3.5
+"""
+
+DEFAULT_JSON_OPTIONS = LEGACY_JSON_OPTIONS
 """The default :class:`JSONOptions` for JSON encoding/decoding.
+
+The same as :const:`LEGACY_JSON_OPTIONS`.
 
 .. versionadded:: 3.4
 """
@@ -316,19 +322,24 @@ STRICT_JSON_OPTIONS = JSONOptions(
     strict_number_long=True,
     datetime_representation=DatetimeRepresentation.ISO8601,
     strict_uuid=True)
-""":class:`JSONOptions` for MongoDB Extended JSON's *Strict mode* encoding.
+"""DEPRECATED :class:`JSONOptions` for MongoDB Extended JSON's *Strict mode*
+encoding.
 
 .. versionadded:: 3.4
+
+.. versionchanged:: 3.5
+   Deprecated. Use :const:`RELAXED_JSON_OPTIONS` or
+   :const:`CANONICAL_JSON_OPTIONS` instead.
 """
 
 CANONICAL_JSON_OPTIONS = JSONOptions(json_mode=JSONMode.CANONICAL)
-""":class:`JSONOptions` for `canonical extended JSON`_.
+""":class:`JSONOptions` for Canonical `Extended JSON`_.
 
 .. versionadded:: 3.5
 """
 
 RELAXED_JSON_OPTIONS = JSONOptions(json_mode=JSONMode.RELAXED)
-""":class:`JSONOptions` for `relaxed extended JSON`_.
+""":class:`JSONOptions` for Relaxed `Extended JSON`_.
 
 .. versionadded:: 3.5
 """
