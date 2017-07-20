@@ -385,10 +385,7 @@ def loads(s, *args, **kwargs):
         kwargs["object_pairs_hook"] = lambda pairs: object_pairs_hook(
             pairs, json_options)
     else:
-        kwargs["object_hook"] = lambda obj: (
-            canonical_object_hook(obj, json_options)
-            if json_options.parse_canonical_json
-            else object_hook(obj, json_options))
+        kwargs["object_hook"] = lambda obj: object_hook(obj, json_options)
     return json.loads(s, *args, **kwargs)
 
 
@@ -408,48 +405,54 @@ def _json_convert(obj, json_options=DEFAULT_JSON_OPTIONS):
 
 
 def object_pairs_hook(pairs, json_options=DEFAULT_JSON_OPTIONS):
-    document = json_options.document_class(pairs)
-    if json_options.parse_canonical_json:
-        return canonical_object_hook(document, json_options)
-    return object_hook(document, json_options)
+    return object_hook(json_options.document_class(pairs), json_options)
 
 
 def object_hook(dct, json_options=DEFAULT_JSON_OPTIONS):
     if "$oid" in dct:
-        return ObjectId(str(dct["$oid"]))
+        return _parse_canonical_oid(dct)
     if "$ref" in dct:
-        return DBRef(dct["$ref"], dct["$id"], dct.get("$db", None))
+        return _parse_canonical_dbref(dct)
     if "$date" in dct:
-        return _get_date(dct, json_options)
+        return _parse_canonical_date(dct, json_options)
     if "$regex" in dct:
-        return _parse_legacy_regex(dct, json_options)
+        return _parse_legacy_regex(dct)
     if "$minKey" in dct:
-        return MinKey()
+        return _parse_canonical_minkey(dct)
     if "$maxKey" in dct:
-        return MaxKey()
+        return _parse_canonical_maxkey(dct)
     if "$binary" in dct:
-        return _parse_legacy_binary(dct, json_options)
+        if "$type" in dct:
+            return _parse_legacy_binary(dct, json_options)
+        else:
+            return _parse_canonical_binary(dct, json_options)
     if "$code" in dct:
-        return Code(dct["$code"], dct.get("$scope"))
+        return _parse_canonical_code(dct)
     if "$uuid" in dct:
-        return _parse_legacy_uuid(dct, json_options)
+        return _parse_legacy_uuid(dct)
     if "$undefined" in dct:
         return None
     if "$numberLong" in dct:
-        return Int64(dct["$numberLong"])
+        return _parse_canonical_int64(dct)
     if "$timestamp" in dct:
         tsp = dct["$timestamp"]
         return Timestamp(tsp["t"], tsp["i"])
     if "$numberDecimal" in dct:
-        return Decimal128(dct["$numberDecimal"])
+        return _parse_canonical_decimal128(dct)
+    if "$dbPointer" in dct:
+        return _parse_canonical_dbpointer(dct)
+    if "$regularExpression" in dct:
+        return _parse_canonical_regex(dct)
+    if "$symbol" in dct:
+        return _parse_canonical_symbol(dct)
+    if "$numberInt" in dct:
+        return _parse_canonical_int32(dct)
+    if "$numberDouble" in dct:
+        return _parse_canonical_double(dct)
     return dct
 
 
-def _parse_legacy_uuid(doc, dummy0):
-    return uuid.UUID(doc["$uuid"])
-
-
-def _parse_legacy_regex(doc, dummy0):
+def _parse_legacy_regex(doc):
     pattern = doc["$regex"]
     # Check if this is the $regex query operator.
     if isinstance(pattern, Regex):
@@ -459,6 +462,13 @@ def _parse_legacy_regex(doc, dummy0):
     for opt in doc.get("$options", ""):
         flags |= _RE_OPT_TABLE.get(opt, 0)
     return Regex(pattern, flags)
+
+
+def _parse_legacy_uuid(doc):
+    """Decode a JSON legacy $uuid to Python UUID."""
+    if len(doc) != 1:
+        raise TypeError('Bad $uuid, extra field(s): %s' % (doc,))
+    return uuid.UUID(doc["$uuid"])
 
 
 def _binary_or_uuid(data, subtype, json_options):
@@ -503,8 +513,11 @@ def _parse_canonical_binary(doc, json_options):
     return _binary_or_uuid(data, int(subtype, 16), json_options)
 
 
-def _get_date(doc, json_options):
+def _parse_canonical_date(doc, json_options):
+    """Decode a JSON datetime to python datetime.datetime."""
     dtm = doc["$date"]
+    if len(doc) != 1:
+        raise TypeError('Bad $date, extra field(s): %s' % (doc,))
     # mongoexport 2.6 and newer
     if isinstance(dtm, string_type):
         # Parse offset
@@ -559,161 +572,126 @@ def _get_date(doc, json_options):
     return bson._millis_to_datetime(int(dtm), json_options)
 
 
-def _parse_canonical_oid(doc, dummy0):
+def _parse_canonical_oid(doc):
     """Decode a JSON ObjectId to bson.objectid.ObjectId."""
+    if len(doc) != 1:
+        raise TypeError('Bad $oid, extra field(s): %s' % (doc,))
     return ObjectId(doc['$oid'])
 
 
-def _parse_canonical_date(doc, json_options):
-    """Decode a JSON datetime to python datetime.datetime."""
-    return _get_date(doc, json_options)
+def _parse_canonical_symbol(doc):
+    """Decode a JSON symbol to Python string."""
+    symbol = doc['$symbol']
+    if len(doc) != 1:
+        raise TypeError('Bad $symbol, extra field(s): %s' % (doc,))
+    return text_type(symbol)
 
 
-def _parse_canonical_code(doc, dummy0):
+def _parse_canonical_code(doc):
     """Decode a JSON code to bson.code.Code."""
+    for key in doc:
+        if key not in ('$code', '$scope'):
+            raise TypeError('Bad $code, extra field(s): %s' % (doc,))
     return Code(doc['$code'], scope=doc.get('$scope'))
 
 
-def _parse_canonical_regex(doc, dummy0):
+def _parse_canonical_regex(doc):
     """Decode a JSON regex to bson.regex.Regex."""
     regex = doc['$regularExpression']
+    if len(doc) != 1:
+        raise TypeError('Bad $regularExpression, extra field(s): %s' % (doc,))
     if len(regex) != 2:
-        raise TypeError('$timestamp must include only "pattern" and '
-                        '"options" components: %s' % (doc,))
+        raise TypeError('Bad $regularExpression must include only "pattern"'
+                        'and "options" components: %s' % (doc,))
     return Regex(regex['pattern'], regex['options'])
 
 
-def _parse_canonical_dbref(doc, dummy0):
+def _parse_canonical_dbref(doc):
     """Decode a JSON DBRef to bson.dbref.DBRef."""
+    for key in doc:
+        if key.startswith('$') and key not in _DBREF_KEYS:
+            # Other keys start with $, so dct cannot be parsed as a DBRef.
+            return doc
     return DBRef(doc.pop('$ref'), doc.pop('$id'),
                  database=doc.pop('$db', None), **doc)
 
 
-def _parse_canonical_dbpointer(doc, dummy0):
+def _parse_canonical_dbpointer(doc):
     """Decode a JSON (deprecated) DBPointer to bson.dbref.DBRef."""
     dbref = doc['$dbPointer']
+    if len(doc) != 1:
+        raise TypeError('Bad $dbPointer, extra field(s): %s' % (doc,))
     if isinstance(dbref, DBRef):
         dbref_doc = dbref.as_doc()
         # DBPointer must not contain $db in its value.
         if dbref.database is not None:
             raise TypeError(
-                '$dbPointer cannot contain a $db: %s' % (dbref_doc,))
+                'Bad $dbPointer, extra field $db: %s' % (dbref_doc,))
         if not isinstance(dbref.id, ObjectId):
             raise TypeError(
-                '$dbPointer must have an ObjectId id: %s' % (dbref_doc,))
+                'Bad $dbPointer, $id must be an ObjectId: %s' % (dbref_doc,))
         if len(dbref_doc) != 2:
             raise TypeError(
-                '$dbPointer must contain only $ref and $id: %s' % (dbref_doc,))
+                'Bad $dbPointer, extra field(s) in DBRef: %s' % (dbref_doc,))
         return dbref
     else:
-        raise TypeError('$dbPointer expected a DBRef: %s' % (doc,))
+        raise TypeError('Bad $dbPointer, expected a DBRef: %s' % (doc,))
 
 
-def _parse_canonical_timestamp(doc, dummy0):
-    """Decode a JSON timestamp to bson.timestamp.Timestamp."""
-    timestamp = doc['$timestamp']
-    time = timestamp['t']
-    inc = timestamp['i']
-
-    if len(timestamp) != 2:
-        raise TypeError(
-            '$timestamp must include only "t" and "i" components: %s' % (doc,))
-    return Timestamp(time, inc)
-
-
-def _parse_canonical_int32(doc, dummy0):
+def _parse_canonical_int32(doc):
     """Decode a JSON int32 to python int."""
     i_str = doc['$numberInt']
+    if len(doc) != 1:
+        raise TypeError('Bad $numberInt, extra field(s): %s' % (doc,))
     if not isinstance(i_str, string_type):
         raise TypeError('$numberInt must be string: %s' % (doc,))
     return int(i_str)
 
 
-def _parse_canonical_int64(doc, dummy0):
+def _parse_canonical_int64(doc):
     """Decode a JSON int64 to bson.int64.Int64."""
     l_str = doc['$numberLong']
-    if not isinstance(l_str, string_type):
-        raise TypeError('$numberLong must be string: %s' % (doc,))
+    if len(doc) != 1:
+        raise TypeError('Bad $numberLong, extra field(s): %s' % (doc,))
     return Int64(l_str)
 
 
-def _parse_canonical_double(doc, dummy0):
+def _parse_canonical_double(doc):
     """Decode a JSON double to python float."""
     d_str = doc['$numberDouble']
+    if len(doc) != 1:
+        raise TypeError('Bad $numberDouble, extra field(s): %s' % (doc,))
     if not isinstance(d_str, string_type):
         raise TypeError('$numberDouble must be string: %s' % (doc,))
     return float(d_str)
 
 
-def _parse_canonical_decimal128(doc, dummy0):
+def _parse_canonical_decimal128(doc):
     """Decode a JSON decimal128 to bson.decimal128.Decimal128."""
     d_str = doc['$numberDecimal']
+    if len(doc) != 1:
+        raise TypeError('Bad $numberDecimal, extra field(s): %s' % (doc,))
     if not isinstance(d_str, string_type):
         raise TypeError('$numberDecimal must be string: %s' % (doc,))
     return Decimal128(d_str)
 
 
-def _parse_canonical_minkey(doc, dummy0):
+def _parse_canonical_minkey(doc):
     """Decode a JSON MinKey to bson.min_key.MinKey."""
     if doc['$minKey'] is not 1:
         raise TypeError('$minKey value must be 1: %s' % (doc,))
+    if len(doc) != 1:
+        raise TypeError('Bad $minKey, extra field(s): %s' % (doc,))
     return MinKey()
 
 
-def _parse_canonical_maxkey(doc, dummy0):
+def _parse_canonical_maxkey(doc):
     """Decode a JSON MaxKey to bson.max_key.MaxKey."""
     if doc['$maxKey'] is not 1:
         raise TypeError('$maxKey value must be 1: %s', (doc,))
+    if len(doc) != 1:
+        raise TypeError('Bad $minKey, extra field(s): %s' % (doc,))
     return MaxKey()
-
-
-_CANONICAL_JSON_TABLE = {
-    frozenset(['$oid']): _parse_canonical_oid,
-    frozenset(['$numberDecimal']): _parse_canonical_decimal128,
-    frozenset(['$symbol']): lambda d, _: text_type(d['$symbol']),
-    frozenset(['$numberInt']): _parse_canonical_int32,
-    frozenset(['$numberLong']): _parse_canonical_int64,
-    frozenset(['$numberDouble']): _parse_canonical_double,
-    frozenset(['$date']): _parse_canonical_date,
-    frozenset(['$minKey']): _parse_canonical_minkey,
-    frozenset(['$maxKey']): _parse_canonical_maxkey,
-    frozenset(['$undefined']): lambda dummy0, dummy1: None,
-    frozenset(['$dbPointer']): _parse_canonical_dbpointer,
-    frozenset(['$ref', '$id']): _parse_canonical_dbref,
-    frozenset(['$ref', '$id', '$db']): _parse_canonical_dbref,
-    frozenset(['$regularExpression']): _parse_canonical_regex,
-    frozenset(['$regex']): _parse_legacy_regex,
-    frozenset(['$regex', '$options']): _parse_legacy_regex,
-    frozenset(['$binary']): _parse_canonical_binary,
-    frozenset(['$binary', '$type']): _parse_legacy_binary,
-    frozenset(['$code']): _parse_canonical_code,
-    frozenset(['$code', '$scope']): _parse_canonical_code,
-    frozenset(['$timestamp']): _parse_canonical_timestamp,
-    frozenset(['$uuid']): _parse_legacy_uuid,
-}
-_CANONICAL_JSON_KEYS = set([
-    '$numberDecimal', '$oid', '$numberInt', '$symbol', '$id', '$maxKey',
-    '$numberLong', '$code', '$dbPointer', '$ref', '$date',
-    '$regularExpression', '$minKey', '$db', '$numberDouble', '$binary',
-    '$undefined', '$timestamp', '$scope'
-])
-
-
-def canonical_object_hook(dct, json_options=CANONICAL_JSON_OPTIONS):
-    keyset = frozenset(key for key in dct)
-    converter = _CANONICAL_JSON_TABLE.get(keyset)
-    if converter:
-        return converter(dct, json_options)
-    if '$ref' in keyset and '$id' in keyset:
-        # DBRef may contain other keys that don't start with $.
-        if any(key.startswith('$') for key in keyset - _DBREF_KEYS):
-            # Other keys start with $, so dct cannot be parsed as a DBRef.
-            return dct
-        else:
-            return _parse_canonical_dbref(dct, json_options)
-    if keyset & _CANONICAL_JSON_KEYS:
-        raise TypeError('Invalid Extended JSON document %s' % (dct,))
-    return dct
 
 
 def _encode_binary(data, subtype, json_options):

@@ -35,10 +35,10 @@ sys.path[0:0] = [""]
 
 from bson import BSON, json_util
 from bson.binary import STANDARD
-from bson.decimal128 import Decimal128
 from bson.codec_options import CodecOptions
+from bson.decimal128 import Decimal128
 from bson.dbref import DBRef
-from bson.errors import InvalidBSON
+from bson.errors import InvalidBSON, InvalidId
 from bson.json_util import JSONMode
 from bson.py3compat import text_type, b
 from bson.son import SON
@@ -53,9 +53,11 @@ _TESTS_TO_SKIP = set([
     'Y10K',
 ])
 
-_PARSE_ERRORS_TO_SKIP = set([
+_NON_PARSE_ERRORS = set([
     # {"$date": <number>} is our legacy format which we still need to parse.
-    'Bad $date (number, not string or hash)'
+    'Bad $date (number, not string or hash)',
+    # This variant of $numberLong may have been ger.
+    'Bad $numberLong (number, not string)',
 ])
 
 _DEPRECATED_BSON_TYPES = {
@@ -206,14 +208,15 @@ def create_test(case_spec):
                     DecimalException, Decimal128, parse_error_case['string'])
             elif bson_type == '0x00':
                 description = parse_error_case['description']
-                if description in _PARSE_ERRORS_TO_SKIP:
-                    continue
-                try:
+                if description in _NON_PARSE_ERRORS:
                     decode_extjson(parse_error_case['string'])
-                    raise AssertionError(
-                        'exception not raised for test case: ' + description)
-                except (ValueError, KeyError, TypeError):
-                    pass
+                else:
+                    try:
+                        decode_extjson(parse_error_case['string'])
+                        raise AssertionError('exception not raised for test '
+                                             'case: ' + description)
+                    except (ValueError, KeyError, TypeError, InvalidId):
+                        pass
             else:
                 raise AssertionError('cannot test parseErrors for type ' +
                                      bson_type)
