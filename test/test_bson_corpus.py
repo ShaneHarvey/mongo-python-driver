@@ -40,7 +40,7 @@ from bson.decimal128 import Decimal128
 from bson.dbref import DBRef
 from bson.errors import InvalidBSON, InvalidId
 from bson.json_util import JSONMode
-from bson.py3compat import text_type, b
+from bson.py3compat import text_type, b, PY3
 from bson.son import SON
 
 from test import unittest
@@ -141,10 +141,16 @@ def create_test(case_spec):
             lossy = valid_case.get('lossy')
 
             decoded_bson = decode_bson(cB)
+
             if not lossy:
                 # Make sure we can parse the legacy (default) JSON format.
-                self.assertEqual(decode_extjson(json_util.dumps(decoded_bson)),
-                                 decoded_bson)
+                legacy_json = json_util.dumps(
+                    decoded_bson, json_options=json_util.LEGACY_JSON_OPTIONS)
+                # Remove after PYTHON-1330.
+                if not (PY3 and bson_type == '0x05' and
+                        'subtype 0x00' in description):
+                    self.assertEqual(decode_extjson(legacy_json), decoded_bson)
+
             if deprecated:
                 if 'converted_bson' in valid_case:
                     converted_bson = binascii.unhexlify(
