@@ -278,7 +278,6 @@ class JSONOptions(CodecOptions):
                 "JSONOptions.json_mode must be one of LEGACY, RELAXED, "
                 "or CANONICAL from JSONMode.")
         self.json_mode = json_mode
-        self.parse_canonical_json = json_mode != JSONMode.LEGACY
         if self.json_mode == JSONMode.RELAXED:
             self.strict_number_long = False
             self.datetime_representation = DatetimeRepresentation.ISO8601
@@ -695,14 +694,13 @@ def _parse_canonical_maxkey(doc):
 
 
 def _encode_binary(data, subtype, json_options):
-    if json_options.parse_canonical_json:
-        return {'$binary': SON([
-            ('base64', base64.b64encode(data).decode()),
-            ('subType', "%02x" % subtype)])}
-    else:
+    if json_options.json_mode == JSONMode.LEGACY:
         return SON([
             ('$binary', base64.b64encode(data).decode()),
             ('$type', "%02x" % subtype)])
+    return {'$binary': SON([
+        ('base64', base64.b64encode(data).decode()),
+        ('subType', "%02x" % subtype)])}
 
 
 def default(obj, json_options=DEFAULT_JSON_OPTIONS):
@@ -753,10 +751,10 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
             pattern = obj.pattern
         else:
             pattern = obj.pattern.decode('utf-8')
-        if json_options.parse_canonical_json:
-            return {'$regularExpression': SON([
-                ("pattern", pattern), ("options", flags)])}
-        return SON([("$regex", pattern), ("$options", flags)])
+        if json_options.json_mode == JSONMode.LEGACY:
+            return SON([("$regex", pattern), ("$options", flags)])
+        return {'$regularExpression': SON([("pattern", pattern),
+                                           ("options", flags)])}
     if isinstance(obj, MinKey):
         return {"$minKey": 1}
     if isinstance(obj, MaxKey):
@@ -790,17 +788,18 @@ def default(obj, json_options=DEFAULT_JSON_OPTIONS):
         return {"$numberDecimal": str(obj)}
     if isinstance(obj, bool):
         return obj
-    if json_options.strict_number_long and isinstance(obj, integer_types):
+    if (json_options.json_mode == JSONMode.CANONICAL and
+            isinstance(obj, integer_types)):
         if -2 ** 31 <= obj < 2 ** 31:
             return {'$numberInt': text_type(obj)}
         return {'$numberLong': text_type(obj)}
-    if json_options.parse_canonical_json and isinstance(obj, float):
+    if json_options.json_mode != JSONMode.LEGACY and isinstance(obj, float):
         if math.isnan(obj):
             return {'$numberDouble': 'NaN'}
         elif math.isinf(obj):
             representation = 'Infinity' if obj > 0 else '-Infinity'
             return {'$numberDouble': representation}
-        elif json_options.strict_number_long:
+        elif json_options.json_mode == JSONMode.CANONICAL:
             # repr() will return the shortest string guaranteed to produce the
             # original value, when float() is called on it. str produces a
             # shorter string in Python 2.
