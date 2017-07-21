@@ -138,10 +138,7 @@ def create_test(case_spec):
             cEJ = valid_case['canonical_extjson']
             rEJ = valid_case.get('relaxed_extjson')
             dEJ = valid_case.get('degenerate_extjson')
-            # A test is lossy if the test itself is lossy or we cannot
-            # preserve key order from json to bson.
-            lossy = (valid_case.get('lossy') or
-                     not json_util._HAS_OBJECT_PAIRS_HOOK)
+            lossy = valid_case.get('lossy')
 
             decoded_bson = decode_bson(cB)
             if not lossy:
@@ -176,7 +173,7 @@ def create_test(case_spec):
             # Test round-tripping canonical extended json.
             decoded_json = decode_extjson(cEJ)
             self.assertJsonEqual(encode_extjson(decoded_json), cEJ)
-            if not lossy:
+            if not lossy and json_util._HAS_OBJECT_PAIRS_HOOK:
                 self.assertEqual(encode_bson(decoded_json), cB)
 
             # Test round-tripping degenerate bson.
@@ -189,6 +186,9 @@ def create_test(case_spec):
                 decoded_json = decode_extjson(dEJ)
                 self.assertJsonEqual(encode_extjson(decoded_json), cEJ)
                 if not lossy:
+                    # We don't need to check json_util._HAS_OBJECT_PAIRS_HOOK
+                    # because degenerate_extjson is always a single key so
+                    # the order cannot be changed.
                     self.assertEqual(encode_bson(decoded_json), cB)
 
             # Test round-tripping relaxed extended json.
