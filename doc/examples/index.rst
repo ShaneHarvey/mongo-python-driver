@@ -26,6 +26,7 @@ MongoDB, you can start it like so:
    gevent
    gridfs
    high_availability
+   json
    mod_wsgi
    tailable
    tls

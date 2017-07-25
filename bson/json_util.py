@@ -24,6 +24,14 @@ provided, respectively.
 
 .. _Extended JSON: https://github.com/mongodb/specifications/blob/master/source/extended-json.rst
 
+Example usage (deserialization):
+
+.. doctest::
+
+   >>> from bson.json_util import loads
+   >>> loads('[{"foo": [1, 2]}, {"bar": {"hello": "world"}}, {"code": {"$scope": {}, "$code": "function x() { return 1; }"}}, {"bin": {"$type": "80", "$binary": "AQIDBA=="}}]')
+   [{u'foo': [1, 2]}, {u'bar': {u'hello': u'world'}}, {u'code': Code('function x() { return 1; }', {})}, {u'bin': Binary('...', 128)}]
+
 Example usage (serialization):
 
 .. doctest::
@@ -36,15 +44,7 @@ Example usage (serialization):
    ...        {'bin': Binary(b"\x01\x02\x03\x04")}])
    '[{"foo": [1, 2]}, {"bar": {"hello": "world"}}, {"code": {"$code": "function x() { return 1; }", "$scope": {}}}, {"bin": {"$binary": "AQIDBA==", "$type": "00"}}]'
 
-Example usage (deserialization):
-
-.. doctest::
-
-   >>> from bson.json_util import loads
-   >>> loads('[{"foo": [1, 2]}, {"bar": {"hello": "world"}}, {"code": {"$scope": {}, "$code": "function x() { return 1; }"}}, {"bin": {"$type": "80", "$binary": "AQIDBA=="}}]')
-   [{u'foo': [1, 2]}, {u'bar': {u'hello': u'world'}}, {u'code': Code('function x() { return 1; }', {})}, {u'bin': Binary('...', 128)}]
-
-Example usage (with a :class:`~bson.json_util.JSONOptions` given):
+Example usage (with :const:`CANONICAL_JSON_OPTIONS`):
 
 .. doctest::
 
@@ -55,7 +55,20 @@ Example usage (with a :class:`~bson.json_util.JSONOptions` given):
    ...        {'code': Code("function x() { return 1; }")},
    ...        {'bin': Binary(b"\x01\x02\x03\x04")}],
    ...       json_options=CANONICAL_JSON_OPTIONS)
-   '[{"foo": [{"$numberInt": "1"}, {"$numberInt": "2"}]}, {"bar": {"hello": "world"}}, {"code": {"$code": "function x() { return 1; }"}}, {"bin": {"$binary": "AQIDBA==", "$type": "00"}}]'
+   '[{"foo": [{"$numberInt": "1"}, {"$numberInt": "2"}]}, {"bar": {"hello": "world"}}, {"code": {"$code": "function x() { return 1; }"}}, {"bin": {"$binary": {"base64": "AQIDBA==", "subType": "00"}}}]'
+
+Example usage (with :const:`RELAXED_JSON_OPTIONS`):
+
+.. doctest::
+
+   >>> from bson import Binary, Code
+   >>> from bson.json_util import dumps, RELAXED_JSON_OPTIONS
+   >>> dumps([{'foo': [1, 2]},
+   ...        {'bar': {'hello': 'world'}},
+   ...        {'code': Code("function x() { return 1; }")},
+   ...        {'bin': Binary(b"\x01\x02\x03\x04")}],
+   ...       json_options=RELAXED_JSON_OPTIONS)
+   '[{"foo": [1, 2]}, {"bar": {"hello": "world"}}, {"code": {"$code": "function x() { return 1; }"}}, {"bin": {"$binary": {"base64": "AQIDBA==", "subType": "00"}}}]'
 
 Alternatively, you can manually pass the `default` to :func:`json.dumps`.
 It won't handle :class:`~bson.binary.Binary` and :class:`~bson.code.Code`
