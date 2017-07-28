@@ -23,6 +23,8 @@ class MaxKey(object):
        ``MaxKey`` now implements comparison operators.
     """
 
+    __slots__ = ()
+
     _type_marker = 127
 
     def __eq__(self, other):

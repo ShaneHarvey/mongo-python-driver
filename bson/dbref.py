@@ -27,6 +27,8 @@ class DBRef(object):
     # DBRef isn't actually a BSON "type" so this number was arbitrarily chosen.
     _type_marker = 100
 
+    __slots__ = ("__collection", "__id", "__database", "__kwargs")
+
     def __init__(self, collection, id, database=None, _extra={}, **kwargs):
         """Initialize a new :class:`DBRef`.
 
@@ -88,7 +90,10 @@ class DBRef(object):
     # infinite recursion since we override
     # __getattr__.
     def __setstate__(self, state):
-        self.__dict__.update(state)
+        self.__collection, self.__id, self.__database, self.__kwargs = state
+
+    def __getstate__(self):
+        return self.__collection, self.__id, self.__database, self.__kwargs
 
     def as_doc(self):
         """Get the SON document representation of this DBRef.

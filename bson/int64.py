@@ -31,4 +31,6 @@ class Int64(long):
       - `value`: the numeric value to represent
     """
 
+    __slots__ = ()
+
     _type_marker = 18

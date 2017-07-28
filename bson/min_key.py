@@ -23,6 +23,8 @@ class MinKey(object):
        ``MinKey`` now implements comparison operators.
     """
 
+    __slots__ = ()
+
     _type_marker = 255
 
     def __eq__(self, other):

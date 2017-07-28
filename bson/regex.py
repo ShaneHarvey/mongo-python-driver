@@ -43,6 +43,8 @@ class Regex(object):
     """BSON regular expression data."""
     _type_marker = 11
 
+    __slots__ = ("pattern", "flags")
+
     @classmethod
     def from_native(cls, regex):
         """Convert a Python regular expression into a ``Regex`` instance.

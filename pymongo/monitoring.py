@@ -568,6 +568,7 @@ class TopologyOpenedEvent(TopologyEvent):
 
     .. versionadded:: 3.3
     """
+    __slots__ = ()
 
 
 class TopologyClosedEvent(TopologyEvent):
@@ -575,6 +576,7 @@ class TopologyClosedEvent(TopologyEvent):
 
     .. versionadded:: 3.3
     """
+    __slots__ = ()
 
 
 class _ServerHeartbeatEvent(object):
@@ -597,6 +599,7 @@ class ServerHeartbeatStartedEvent(_ServerHeartbeatEvent):
 
     .. versionadded:: 3.3
     """
+    __slots__ = ()
 
 
 class ServerHeartbeatSucceededEvent(_ServerHeartbeatEvent):

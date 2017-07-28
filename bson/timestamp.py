@@ -30,6 +30,8 @@ class Timestamp(object):
 
     _type_marker = 17
 
+    __slots__ = ("__time", "__inc")
+
     def __init__(self, time, inc):
         """Create a new :class:`Timestamp`.
 
