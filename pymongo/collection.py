@@ -1,4 +1,4 @@
-# Copyright 2009-2015 MongoDB, Inc.
+# Copyright 2009-2017 MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ from pymongo import (common,
 from pymongo.bulk import BulkOperationBuilder, _Bulk
 from pymongo.command_cursor import CommandCursor
 from pymongo.collation import validate_collation_or_none
+from pymongo.change_stream import ChangeStream
 from pymongo.cursor import Cursor
 from pymongo.errors import ConfigurationError, InvalidName, OperationFailure
 from pymongo.helpers import _check_write_command_response
@@ -1801,12 +1802,61 @@ class Collection(common.BaseObject):
 
         return options
 
+    def watch(self, pipeline=None, full_document=None, resume_after=None,
+              max_await_time_ms=None, **kwargs):
+        """Watch changes on this collection.
+
+        .. code-block::
+
+            >>> for change in db.collection.watch():
+            ...     print(change)
+
+        TODO: clear this up:
+
+        "Implementers MUST document that helper method is preferred to running
+        a raw aggregation with a $changeStream stage, for the purpose of
+        supporting resumability"
+
+        Not all pipeline stages are valid in a changeStream see the
+        changeStream stage documentation
+
+
+        Note it's possible but discouraged to use the $changeStream stage
+        directly via :meth:`~pymongo.collection.Collection.aggregate`. Using
+        this helper is preferable because it automatically supports
+        resumability.
+
+        :Parameters:
+          - `pipeline` (optional): A list of aggregation pipeline stages to
+            append to an initial `$changeStream` aggregation stage.
+          - `options` (optional): The
+            :class:`~pymongo.change_stream.ChangeStreamOptions`
+            to provide to the initial `$changeStream` aggregation stage.
+
+        :Returns:
+          A :class:`~pymongo.change_stream.ChangeStream` on this collection.
+
+        .. versionadded:: 3.6
+
+        .. _changeStream stage:
+            https://docs.mongodb.com/manual/reference/operator/aggregation/changeStream/
+        """
+        if pipeline is None:
+            pipeline = []
+        else:
+            if not isinstance(pipeline, list):
+                raise TypeError("pipeline must be a list")
+
+        return ChangeStream(self, pipeline, full_document, resume_after,
+                            max_await_time_ms, **kwargs)
+
     def aggregate(self, pipeline, **kwargs):
         """Perform an aggregation using the aggregation framework on this
         collection.
 
-        All optional aggregate parameters should be passed as keyword arguments
-        to this method. Valid options include, but are not limited to:
+        All optional `aggregate command`_ parameters should be passed as
+        keyword arguments to this method. Valid options include, but are not
+        limited to:
 
           - `allowDiskUse` (bool): Enables writing to temporary files. When set
             to True, aggregation stages can write data to the _tmp subdirectory
@@ -1870,7 +1920,7 @@ class Collection(common.BaseObject):
         .. seealso:: :doc:`/examples/aggregation`
 
         .. _aggregate command:
-            http://docs.mongodb.org/manual/applications/aggregation
+            https://docs.mongodb.com/manual/reference/command/aggregate
         """
         if not isinstance(pipeline, list):
             raise TypeError("pipeline must be a list")
