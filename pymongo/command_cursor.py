@@ -44,6 +44,7 @@ class CommandCursor(object):
         self.__address = address
         self.__data = deque(cursor_info['firstBatch'])
         self.__batch_size = 0
+        self.__max_await_time_ms = None
         self.__killed = (self.__id == 0)
 
         if "ns" in cursor_info:
@@ -96,6 +97,27 @@ class CommandCursor(object):
             raise ValueError("batch_size must be >= 0")
 
         self.__batch_size = batch_size == 1 and 2 or batch_size
+        return self
+
+    def max_await_time_ms(self, max_await_time_ms):
+        """Specifies a time limit for a getMore operation.
+
+        Raises :exc:`TypeError` if `max_await_time_ms` is not an integer or
+        ``None``.
+
+        .. note:: `max_await_time_ms` requires server version **>= 3.2**
+
+        :Parameters:
+          - `max_await_time_ms`: the time limit after which the operation is
+            aborted.
+
+        .. versionadded:: 3.6
+        """
+        if (not isinstance(max_await_time_ms, integer_types)
+                and max_await_time_ms is not None):
+            raise TypeError("max_await_time_ms must be an integer or None")
+
+        self.__max_await_time_ms = max_await_time_ms
         return self
 
     def __send_message(self, operation):
@@ -199,8 +221,8 @@ class CommandCursor(object):
                                     collname,
                                     self.__batch_size,
                                     self.__id,
-                                    self.__collection.codec_options))
-
+                                    self.__collection.codec_options,
+                                    self.__max_await_time_ms))
         else:  # Cursor id is zero nothing else to return
             self.__killed = True
 
@@ -245,7 +267,10 @@ class CommandCursor(object):
 
     def next(self):
         """Advance the cursor."""
-        if len(self.__data) or self._refresh():
+        # Block until a document is returnable.
+        while not len(self.__data) and not self.__killed:
+            self._refresh()
+        if len(self.__data):
             coll = self.__collection
             return coll.database._fix_outgoing(self.__data.popleft(), coll)
         else:
