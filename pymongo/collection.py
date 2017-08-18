@@ -1806,23 +1806,24 @@ class Collection(common.BaseObject):
 
         .. code-block::
 
-            >>> for change in db.collection.watch():
-            ...     print(change)
+            >>> with db.collection.watch() as change_stream:
+            ...    while change_stream.alive:
+            ...        for change in change_stream:
+            ...            print(change)
 
-        TODO: clear this up:
+        TODO: clean up this doc string:
 
         "Implementers MUST document that helper method is preferred to running
         a raw aggregation with a $changeStream stage, for the purpose of
         supporting resumability"
 
-        Not all pipeline stages are valid in a changeStream see the
-        changeStream stage documentation
-
-
         Note it's possible but discouraged to use the $changeStream stage
         directly via :meth:`~pymongo.collection.Collection.aggregate`. Using
         this helper is preferable because it automatically supports
         resumability.
+
+        Not all pipeline stages are valid in a changeStream see the
+        `changeStream stage`_ documentation
 
         :Parameters:
           - `pipeline` (optional): A list of aggregation pipeline stages to

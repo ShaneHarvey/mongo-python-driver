@@ -99,7 +99,6 @@ class ChangeStream(object):
 
         Raises StopIteration if this ChangeStream is closed, or there are no
         current changes.
-
         """
         if self._killed:
             raise StopIteration
