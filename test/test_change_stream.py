@@ -88,7 +88,8 @@ class TestChangeStream(IntegrationTest):
                          command.command['pipeline'])
 
     def test_iteration(self):
-        with self.coll.watch(max_await_time_ms=10) as change_stream:
+        # Use a short await time to speed up the test.
+        with self.coll.watch(max_await_time_ms=50) as change_stream:
             self.assertTrue(change_stream.alive)
             with self.assertRaises(StopIteration):
                 change_stream.next()
