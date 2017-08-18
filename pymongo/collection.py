@@ -1738,11 +1738,9 @@ class Collection(common.BaseObject):
                     "firstBatch": data,
                     "ns": namespace,
                 }
-                # Note that a collection can only have 64 indexes, so we don't
-                # technically have to pass len(data) here. There will never be
-                # an OP_GET_MORE call.
-                return CommandCursor(
-                    coll, cursor, sock_info.address, len(data))
+                # Note that a collection can only have 64 indexes, so there
+                # will never be a getMore call.
+                return CommandCursor(coll, cursor, sock_info.address)
 
     def index_information(self):
         """Get information on this collection's indexes.
