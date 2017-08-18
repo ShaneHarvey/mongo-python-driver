@@ -35,7 +35,7 @@ class CommandCursor(object):
         self.__id = cursor_info['id']
         self.__address = address
         self.__data = deque(cursor_info['firstBatch'])
-        self.__retrieved = retrieved
+        self.__retrieved = len(cursor_info['firstBatch'])
         self.__batch_size = 0
         self.__max_await_time_ms = None
         self.__killed = (self.__id == 0)
@@ -243,6 +243,14 @@ class CommandCursor(object):
     def cursor_id(self):
         """Returns the id of the cursor."""
         return self.__id
+
+    @property
+    def retrieved(self):
+        """The number of documents retrieved so far.
+
+        .. versionadded:: 3.6
+        """
+        return self.__retrieved
 
     @property
     def address(self):

@@ -14,6 +14,8 @@
 
 """Change Stream cursor."""
 
+import copy
+
 
 from pymongo.errors import (ConnectionFailure, CursorNotFound,
                             InvalidOperation, PyMongoError)
@@ -46,17 +48,17 @@ class ChangeStream(object):
             to provide to the `$changeStream` aggregation.
         """
         self._collection = collection
-        self._pipeline = pipeline
+        self._pipeline = copy.deepcopy(pipeline)
         self._full_document = full_document
-        self._resume_token = resume_after
+        self._resume_token = copy.deepcopy(resume_after)
         self._max_await_time_ms = max_await_time_ms
-        self._aggregate_kwargs = kwargs
-        self._read_preference = collection.read_preference
+        self._aggregate_kwargs = copy.deepcopy(kwargs)
         self._killed = False
         self._cursor = self._create_cursor()
 
-    def _create_cursor(self):
-        """Initialize the cursor or raise a fatal error"""
+    @property
+    def full_pipeline(self):
+        """Return the full aggregation pipeline for this ChangeStream."""
         options = {}
         if self._full_document is not None:
             options['fullDocument'] = self._full_document
@@ -64,8 +66,12 @@ class ChangeStream(object):
             options['resumeAfter'] = self._resume_token
         full_pipeline = [{'$changeStream': options}]
         full_pipeline.extend(self._pipeline)
+        return full_pipeline
+
+    def _create_cursor(self):
+        """Initialize the cursor or raise a fatal error"""
         try:
-            cursor = self._collection.aggregate(full_pipeline,
+            cursor = self._collection.aggregate(self.full_pipeline,
                                                 **self._aggregate_kwargs)
             if self._max_await_time_ms is not None:
                 cursor.max_await_time_ms(self._max_await_time_ms)
@@ -87,8 +93,6 @@ class ChangeStream(object):
         """Advance the cursor."""
         if self._killed:
             raise StopIteration
-        if not self._cursor.alive:
-            self._cursor = self._create_cursor()
         while True:
             try:
                 next_change = self._cursor.next()
