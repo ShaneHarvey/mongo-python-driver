@@ -53,15 +53,17 @@ class TestChangeStream(IntegrationTest):
     def test_constructor(self):
         with self.coll.watch(
                 [{'$project': {'foo': 0}}], full_document='updateLookup',
-                max_await_time_ms=1000, batchSize=100) as change_stream:
+                max_await_time_ms=1000, batch_size=100) as change_stream:
             self.assertIs(self.coll, change_stream._collection)
             self.assertEqual([{'$project': {'foo': 0}}],
                              change_stream._pipeline)
             self.assertEqual('updateLookup', change_stream._full_document)
             self.assertIsNone(change_stream._resume_token)
-            self.assertEqual({'batchSize': 100},
-                             change_stream._aggregate_kwargs)
+            self.assertEqual(1000, change_stream._max_await_time_ms)
+            self.assertEqual(100, change_stream._batch_size)
             self.assertIsInstance(change_stream._cursor, CommandCursor)
+            self.assertEqual(
+                1000, change_stream._cursor._CommandCursor__max_await_time_ms)
             self.assertFalse(change_stream._killed)
             self.assertTrue(change_stream.alive)
 

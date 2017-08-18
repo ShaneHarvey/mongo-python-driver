@@ -1801,7 +1801,7 @@ class Collection(common.BaseObject):
         return options
 
     def watch(self, pipeline=None, full_document=None, resume_after=None,
-              max_await_time_ms=None, **kwargs):
+              max_await_time_ms=None, batch_size=None, collation=None):
         """Watch changes on this collection.
 
         .. code-block::
@@ -1827,9 +1827,22 @@ class Collection(common.BaseObject):
         :Parameters:
           - `pipeline` (optional): A list of aggregation pipeline stages to
             append to an initial `$changeStream` aggregation stage.
-          - `options` (optional): The
-            :class:`~pymongo.change_stream.ChangeStreamOptions`
-            to provide to the initial `$changeStream` aggregation stage.
+          - `full_document` (optional): The fullDocument to pass as an option
+            to the $changeStream pipeline stage. Allowed values: 'default',
+            'updateLookup'.  Defaults to 'default'.
+            When set to 'updateLookup', the change notification for partial
+            updates will include both a delta describing the changes to the
+            document, as well as a copy of the entire document that was
+            changed from some time after the change occurred.
+          - `resume_after` (optional): The logical starting point for this
+            change stream.
+          - `max_await_time_ms` (optional): The maximum time in milliseconds
+            for the server to wait for changes before responding to a getMore
+            operation.
+          - `batch_size` (optional): The maximum number of documents to return
+            per batch.
+          - `collation` (optional): The :class:`~pymongo.collation.Collation`
+            to use for the aggregation.
 
         :Returns:
           A :class:`~pymongo.change_stream.ChangeStream` on this collection.
@@ -1845,8 +1858,10 @@ class Collection(common.BaseObject):
             if not isinstance(pipeline, list):
                 raise TypeError("pipeline must be a list")
 
+        common.validate_string_or_none('full_document', full_document)
+
         return ChangeStream(self, pipeline, full_document, resume_after,
-                            max_await_time_ms, **kwargs)
+                            max_await_time_ms, batch_size, collation)
 
     def aggregate(self, pipeline, **kwargs):
         """Perform an aggregation using the aggregation framework on this
