@@ -18,6 +18,10 @@ import sys
 
 sys.path[0:0] = ['']
 
+from bson import BSON, ObjectId
+
+from bson.raw_bson import DEFAULT_RAW_BSON_OPTIONS, RawBSONDocument
+
 from pymongo.command_cursor import CommandCursor
 from pymongo.errors import (InvalidOperation, OperationFailure,
                             ServerSelectionTimeoutError)
@@ -64,7 +68,6 @@ class TestChangeStream(IntegrationTest):
             self.assertIsInstance(change_stream._cursor, CommandCursor)
             self.assertEqual(
                 1000, change_stream._cursor._CommandCursor__max_await_time_ms)
-            self.assertFalse(change_stream._killed)
             self.assertTrue(change_stream.alive)
 
     def test_full_pipeline(self):
@@ -78,13 +81,15 @@ class TestChangeStream(IntegrationTest):
         coll = client[self.db.name][self.coll.name]
 
         with coll.watch([{'$project': {'foo': 0}}]) as change_stream:
-            self.assertEqual([{'$changeStream': {}}, {'$project': {'foo': 0}}],
-                             change_stream.full_pipeline)
+            self.assertEqual([{'$changeStream': {'fullDocument': 'default'}},
+                              {'$project': {'foo': 0}}],
+                             change_stream._full_pipeline())
 
         self.assertEqual(1, len(results['started']))
         command = results['started'][0]
         self.assertEqual('aggregate', command.command_name)
-        self.assertEqual([{'$changeStream': {}}, {'$project': {'foo': 0}}],
+        self.assertEqual([{'$changeStream':  {'fullDocument': 'default'}},
+                          {'$project': {'foo': 0}}],
                          command.command['pipeline'])
 
     def test_iteration(self):
@@ -133,15 +138,22 @@ class TestChangeStream(IntegrationTest):
 
     def test_does_not_resume_on_server_error(self):
         """ChangeStream will not attempt to resume on a server error."""
-        def mock_server_error():
+        def mock_next(self, *args, **kwargs):
+            self._CommandCursor__killed = True
             raise OperationFailure('Mock server error')
 
-        with self.coll.watch() as change_stream:
-            change_stream._cursor.next = mock_server_error
-            with self.assertRaises(OperationFailure):
-                next(change_stream)
-            with self.assertRaises(StopIteration):
-                next(change_stream)
+        original_next = CommandCursor.next
+        CommandCursor.next = mock_next
+        try:
+            with self.coll.watch() as change_stream:
+                with self.assertRaises(OperationFailure):
+                    next(change_stream)
+                CommandCursor.next = original_next
+                with self.assertRaises(StopIteration):
+                    next(change_stream)
+                self.assertFalse(change_stream.alive)
+        finally:
+            CommandCursor.next = original_next
 
     def test_resume_server_selection_read_preference(self):
         """ChangeStream will perform server selection before attempting to
@@ -187,6 +199,68 @@ class TestChangeStream(IntegrationTest):
                 pass
         except OperationFailure:
             pass
+
+    def test_change_operations(self):
+        """Test each operation type."""
+        expected_ns = {'db': self.coll.database.name, 'coll': self.coll.name}
+        with self.coll.watch() as change_stream:
+            # Insert.
+            inserted_doc = {'_id': ObjectId(), 'foo': 'bar'}
+            self.coll.insert_one(inserted_doc)
+            change = change_stream.next()
+            self.assertTrue(change['_id'])
+            self.assertEqual(change['operationType'], 'insert')
+            self.assertEqual(change['ns'], expected_ns)
+            self.assertEqual(change['fullDocument'], inserted_doc)
+            # Update.
+            update_spec = {'$set': {'new': 1}, '$unset': {'foo': 1}}
+            self.coll.update_one(inserted_doc, update_spec)
+            change = change_stream.next()
+            self.assertTrue(change['_id'])
+            self.assertEqual(change['operationType'], 'update')
+            self.assertEqual(change['ns'], expected_ns)
+            self.assertNotIn('fullDocument', change)
+            self.assertEqual({'updatedFields': {'new': 1},
+                              'removedFields': ['foo']},
+                             change['updateDescription'])
+            # Replace.
+            self.coll.replace_one({'new': 1}, {'foo': 'bar'})
+            change = change_stream.next()
+            self.assertTrue(change['_id'])
+            self.assertEqual(change['operationType'], 'replace')
+            self.assertEqual(change['ns'], expected_ns)
+            self.assertEqual(change['fullDocument'], inserted_doc)
+            # Delete.
+            self.coll.delete_one({'foo': 'bar'})
+            change = change_stream.next()
+            self.assertTrue(change['_id'])
+            self.assertEqual(change['operationType'], 'delete')
+            self.assertEqual(change['ns'], expected_ns)
+            self.assertNotIn('fullDocument', change)
+            # Invalidate.
+            self.coll.drop()
+            change = change_stream.next()
+            self.assertTrue(change['_id'])
+            self.assertEqual(change['operationType'], 'invalidate')
+            self.assertNotIn('ns', change)
+            self.assertNotIn('fullDocument', change)
+            # The ChangeStream should be dead.
+            self.assertFalse(change_stream.alive)
+
+    def test_raw(self):
+        """Test with RawBSONDocument."""
+        raw_coll = self.coll.with_options(
+            codec_options=DEFAULT_RAW_BSON_OPTIONS)
+        with raw_coll.watch() as change_stream:
+            raw_doc = RawBSONDocument(BSON.encode({'_id': 1}))
+            self.coll.insert_one(raw_doc)
+            change = next(change_stream)
+            self.assertIsInstance(change, RawBSONDocument)
+            self.assertEqual(change['operationType'], 'insert')
+            self.assertEqual(change['ns']['db'], self.coll.database.name)
+            self.assertEqual(change['ns']['coll'], self.coll.name)
+            self.assertEqual(change['fullDocument'], raw_doc)
+            self.assertEqual(change['_id'], change_stream._resume_token)
 
 
 if __name__ == '__main__':

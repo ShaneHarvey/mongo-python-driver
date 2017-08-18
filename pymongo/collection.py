@@ -1800,7 +1800,7 @@ class Collection(common.BaseObject):
 
         return options
 
-    def watch(self, pipeline=None, full_document=None, resume_after=None,
+    def watch(self, pipeline=None, full_document='default', resume_after=None,
               max_await_time_ms=None, batch_size=None, collation=None):
         """Watch changes on this collection.
 
