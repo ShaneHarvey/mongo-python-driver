@@ -82,37 +82,44 @@ class ChangeStream(object):
 
     def close(self):
         """Close this ChangeStream."""
-        if self._cursor:
-            self._cursor.close()
+        self._cursor.close()
         self._killed = True
 
     def __iter__(self):
         return self
 
     def next(self):
-        """Advance the cursor."""
+        """Advance the cursor.
+
+        Raises StopIteration if this ChangeStream is closed, or there are no
+        current changes.
+
+        """
         if self._killed:
             raise StopIteration
-        while True:
+        try:
+            next_change = self._cursor.next()
+        except (ConnectionFailure, CursorNotFound):
             try:
-                next_change = self._cursor.next()
-            except (ConnectionFailure, CursorNotFound):
-                try:
-                    self._cursor.close()
-                except PyMongoError:
-                    pass
-                self._cursor = self._create_cursor()
-            except Exception:
-                self._killed = True
-                raise
-            else:
-                try:
-                    self._resume_token = next_change['_id']
-                except KeyError:
-                    raise InvalidOperation(
-                        "Cannot provide resume functionality when the resume "
-                        "token is missing.")
-                return next_change
+                self._cursor.close()
+            except PyMongoError:
+                pass
+            self._cursor = self._create_cursor()
+            if not self._cursor.retrieved:
+                raise StopIteration
+            next_change = self._cursor.next()
+        except StopIteration:
+            raise
+        except:
+            self._killed = True
+            raise
+        try:
+            self._resume_token = next_change['_id']
+        except KeyError:
+            raise InvalidOperation(
+                "Cannot provide resume functionality when the resume "
+                "token is missing.")
+        return next_change
 
     __next__ = next
 
@@ -129,12 +136,9 @@ class ChangeStream(object):
         Even if :attr:`alive` is ``True``, :meth:`next` can raise
         :exc:`StopIteration`. Best to use a for loop::
 
-            for doc in collection.aggregate(pipeline):
-                print(doc)
-
-        .. note:: :attr:`alive` can be True while iterating a cursor from
-          a failed server. In this case :attr:`alive` will return False after
-          :meth:`next` fails to retrieve the next batch of results from the
-          server.
+            with collection.watch(pipeline) as change_stream:
+                while change_stream.alive:
+                    for change in change_stream:
+                        print(change)
         """
         return self._cursor.alive or (not self._killed)

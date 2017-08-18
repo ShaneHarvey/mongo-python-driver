@@ -86,9 +86,17 @@ class TestChangeStream(IntegrationTest):
                          command.command['pipeline'])
 
     def test_iteration(self):
-        with self.coll.watch() as change_stream:
+        with self.coll.watch(max_await_time_ms=10) as change_stream:
+            self.assertTrue(change_stream.alive)
+            with self.assertRaises(StopIteration):
+                change_stream.next()
             for i in range(5):
                 self.insert_and_check(change_stream, {'_id': i, 'a': i})
+            self.assertTrue(change_stream.alive)
+            with self.assertRaises(StopIteration):
+                change_stream.next()
+            self.assertTrue(change_stream.alive)
+            self.insert_and_check(change_stream, {'_id': 6, 'a': 6})
 
     def test_update_resume_token(self):
         """ChangeStream must continuously track the last seen resumeToken."""
