@@ -21,19 +21,6 @@ from pymongo.errors import (ConnectionFailure, CursorNotFound,
                             InvalidOperation, PyMongoError)
 
 
-class ChangeStreamOptions(object):
-
-    def __init__(self, full_document=None, resume_after=None,
-                 max_await_time_ms=None, **kwargs):
-        if full_document is None:
-            self.full_document = 'default'
-        else:
-            self.full_document = full_document
-        self.resume_after = resume_after
-        self.max_await_time_ms = max_await_time_ms
-        self.aggregate_kwargs = kwargs
-
-
 class ChangeStream(object):
 
     def __init__(self, collection, pipeline, full_document=None,
