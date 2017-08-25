@@ -1807,9 +1807,8 @@ class Collection(common.BaseObject):
         .. code-block::
 
             >>> with db.collection.watch() as change_stream:
-            ...    while change_stream.alive:
-            ...        for change in change_stream:
-            ...            print(change)
+            ...    for change in change_stream:
+            ...        print(change)
 
         TODO: clean up this doc string:
 

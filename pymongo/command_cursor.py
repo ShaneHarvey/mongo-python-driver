@@ -265,7 +265,10 @@ class CommandCursor(object):
 
     def next(self):
         """Advance the cursor."""
-        if len(self.__data) or self._refresh():
+        # Block until a document is returnable.
+        while not len(self.__data) and not self.__killed:
+            self._refresh()
+        if len(self.__data):
             coll = self.__collection
             return coll.database._fix_outgoing(self.__data.popleft(), coll)
         else:

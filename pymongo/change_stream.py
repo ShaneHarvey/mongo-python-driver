@@ -89,27 +89,28 @@ class ChangeStream(object):
     def next(self):
         """Advance the cursor.
 
-        Raises StopIteration if this ChangeStream is closed, or there are no
-        current changes.
+        Raises StopIteration if this ChangeStream is closed.
+
+        Returns the next change in this ChangeStream. If there are no current
+        changes, this call will block until a change is received.
         """
-        try:
-            next_change = self._cursor.next()
-        except (ConnectionFailure, CursorNotFound):
+        while True:
             try:
-                self._cursor.close()
-            except PyMongoError:
-                pass
-            self._cursor = self._create_cursor()
-            if not self._cursor.retrieved:
-                raise StopIteration
-            next_change = self._cursor.next()
-        try:
-            self._resume_token = next_change['_id']
-        except KeyError:
-            raise InvalidOperation(
-                "Cannot provide resume functionality when the resume "
-                "token is missing.")
-        return next_change
+                next_change = self._cursor.next()
+            except (ConnectionFailure, CursorNotFound):
+                try:
+                    self._cursor.close()
+                except PyMongoError:
+                    pass
+                self._cursor = self._create_cursor()
+                continue
+            try:
+                self._resume_token = next_change['_id']
+            except KeyError:
+                raise InvalidOperation(
+                    "Cannot provide resume functionality when the resume "
+                    "token is missing.")
+            return next_change
 
     __next__ = next
 

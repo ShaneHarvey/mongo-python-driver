@@ -15,6 +15,8 @@
 """Test the change_stream module."""
 
 import sys
+import threading
+import time
 
 sys.path[0:0] = ['']
 
@@ -93,18 +95,54 @@ class TestChangeStream(IntegrationTest):
                          command.command['pipeline'])
 
     def test_iteration(self):
+        with self.coll.watch(batch_size=2) as change_stream:
+            num_inserted = 10
+            self.coll.insert_many([{} for _ in range(num_inserted)])
+            self.coll.drop()
+            received = 0
+            for change in change_stream:
+                received += 1
+                if change['operationType'] != 'invalidate':
+                    self.assertEqual(change['operationType'], 'insert')
+            self.assertEqual(num_inserted + 1, received)
+            self.assertFalse(change_stream.alive)
+            with self.assertRaises(StopIteration):
+                change_stream.next()
+            with self.assertRaises(StopIteration):
+                next(change_stream)
+
+    def test_next_blocks(self):
+        """Test that next blocks until a change is readable"""
+        inserted_doc = {'_id': ObjectId()}
         # Use a short await time to speed up the test.
         with self.coll.watch(max_await_time_ms=50) as change_stream:
-            self.assertTrue(change_stream.alive)
-            with self.assertRaises(StopIteration):
-                change_stream.next()
-            for i in range(5):
-                self.insert_and_check(change_stream, {'_id': i, 'a': i})
-            self.assertTrue(change_stream.alive)
-            with self.assertRaises(StopIteration):
-                change_stream.next()
-            self.assertTrue(change_stream.alive)
-            self.insert_and_check(change_stream, {'_id': 6, 'a': 6})
+            changes = []
+            t = threading.Thread(
+                target=lambda: changes.append(change_stream.next()))
+            t.start()
+            time.sleep(1)
+            self.coll.insert_one(inserted_doc)
+            t.join(2)
+            self.assertFalse(t.is_alive())
+            self.assertEqual(1, len(changes))
+            self.assertEqual(changes[0]['operationType'], 'insert')
+            self.assertEqual(changes[0]['fullDocument'], inserted_doc)
+
+    def test_aggregate_cursor_blocks(self):
+        """Test that an aggregate cursor blocks until a change is readable."""
+        inserted_doc = {'_id': ObjectId()}
+        with self.coll.aggregate([{'$changeStream': {}}]) as change_stream:
+            changes = []
+            t = threading.Thread(
+                target=lambda: changes.append(change_stream.next()))
+            t.start()
+            time.sleep(1)
+            self.coll.insert_one(inserted_doc)
+            t.join(2)
+            self.assertFalse(t.is_alive())
+            self.assertEqual(1, len(changes))
+            self.assertEqual(changes[0]['operationType'], 'insert')
+            self.assertEqual(changes[0]['fullDocument'], inserted_doc)
 
     def test_update_resume_token(self):
         """ChangeStream must continuously track the last seen resumeToken."""
@@ -246,6 +284,8 @@ class TestChangeStream(IntegrationTest):
             self.assertNotIn('fullDocument', change)
             # The ChangeStream should be dead.
             self.assertFalse(change_stream.alive)
+            with self.assertRaises(StopIteration):
+                change_stream.next()
 
     def test_raw(self):
         """Test with RawBSONDocument."""
