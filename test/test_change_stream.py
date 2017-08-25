@@ -70,7 +70,6 @@ class TestChangeStream(IntegrationTest):
             self.assertIsInstance(change_stream._cursor, CommandCursor)
             self.assertEqual(
                 1000, change_stream._cursor._CommandCursor__max_await_time_ms)
-            self.assertTrue(change_stream.alive)
 
     def test_full_pipeline(self):
         """$changeStream must be the first stage in a change stream pipeline
@@ -105,7 +104,6 @@ class TestChangeStream(IntegrationTest):
                 if change['operationType'] != 'invalidate':
                     self.assertEqual(change['operationType'], 'insert')
             self.assertEqual(num_inserted + 1, received)
-            self.assertFalse(change_stream.alive)
             with self.assertRaises(StopIteration):
                 change_stream.next()
             with self.assertRaises(StopIteration):
@@ -122,7 +120,7 @@ class TestChangeStream(IntegrationTest):
             t.start()
             time.sleep(1)
             self.coll.insert_one(inserted_doc)
-            t.join(2)
+            t.join(3)
             self.assertFalse(t.is_alive())
             self.assertEqual(1, len(changes))
             self.assertEqual(changes[0]['operationType'], 'insert')
@@ -138,7 +136,7 @@ class TestChangeStream(IntegrationTest):
             t.start()
             time.sleep(1)
             self.coll.insert_one(inserted_doc)
-            t.join(2)
+            t.join(3)
             self.assertFalse(t.is_alive())
             self.assertEqual(1, len(changes))
             self.assertEqual(changes[0]['operationType'], 'insert')
@@ -189,7 +187,6 @@ class TestChangeStream(IntegrationTest):
                 CommandCursor.next = original_next
                 with self.assertRaises(StopIteration):
                     next(change_stream)
-                self.assertFalse(change_stream.alive)
         finally:
             CommandCursor.next = original_next
 
@@ -283,7 +280,6 @@ class TestChangeStream(IntegrationTest):
             self.assertNotIn('ns', change)
             self.assertNotIn('fullDocument', change)
             # The ChangeStream should be dead.
-            self.assertFalse(change_stream.alive)
             with self.assertRaises(StopIteration):
                 change_stream.next()
 

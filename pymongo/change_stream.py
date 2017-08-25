@@ -28,6 +28,9 @@ class ChangeStream(object):
                  collation=None):
         """A change stream cursor.
 
+        Should not be called directly by application developers. Use
+        :meth:`~pymongo.collection.Collection.watch` instead.
+
         :Parameters:
           - `collection`: The watched :class:`~pymongo.collection.Collection`.
           - `pipeline`: A list of aggregation pipeline stages to append to an
@@ -49,6 +52,8 @@ class ChangeStream(object):
             to use for the aggregation.
 
         ..versionadded: 3.6
+
+        .. mongodoc:: cursors
         """
         self._collection = collection
         self._pipeline = copy.deepcopy(pipeline)
@@ -119,17 +124,3 @@ class ChangeStream(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-
-    @property
-    def alive(self):
-        """Does this cursor have the potential to return more data?
-
-        Even if :attr:`alive` is ``True``, :meth:`next` can raise
-        :exc:`StopIteration`. Best to use a for loop::
-
-            with collection.watch(pipeline) as change_stream:
-                while change_stream.alive:
-                    for change in change_stream:
-                        print(change)
-        """
-        return self._cursor.alive
