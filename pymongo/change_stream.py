@@ -12,67 +12,7 @@
 # implied.  See the License for the specific language governing
 # permissions and limitations under the License.
 
-"""ChangeStream cursor to iterate over changes on a collection.
-
-MongoDB 3.6 introduces a new `$changeStream aggregation stage`_ to watch
-changes to documents in a collection.
-
-To improve the usability of this stage, :class:`~pymongo.collection.Collection`
-offers the :meth:`~pymongo.collection.Collection.watch` helper method which
-returns a :class:`~pymongo.change_stream.ChangeStream`.
-
-Change Stream Documents
-~~~~~~~~~~~~~~~~~~~~~~~
-
-To see the structure of documents delivered by a change stream:
-
-.. code-block:: python
-
-    with collection.watch() as change_stream:
-        collection.insert_one({'_id': 1, 'foo': 'bar'})
-        print('Insert change document: %s' % change_stream.next())
-        collection.update_one({'_id': 1}, {'$set': {'new': 1}, '$unset': {'foo': 1}})
-        print('Update change document: %s' % change_stream.next())
-        collection.replace_one({'new': 1}, {'foo': 'bar'})
-        print('Replace change document: %s' % change_stream.next())
-        collection.delete_one({'_id': 1})
-        print('Delete change document: %s' % change_stream.next())
-        collection.drop()
-        print('Invalidate change document: %s' % change_stream.next())
-
-
-Resume Process
-~~~~~~~~~~~~~~
-
-A ChangeStream cursor automatically resumes when it encounters a recoverable
-error during iteration. For example, when a getMore command fails with a
-network error the cursor is recreated with the proper resume token. The resume
-process is transparent to the application and ensures no change documents are
-lost; the call to :meth:`~pymongo.change_stream.ChangeStream.next` blocks until
-the next change document is returned or an unrecoverable error is raised.
-
-.. code-block:: python
-
-    try:
-        for change in db.collection.watch():
-            print(change)
-    except pymongo.errors.PyMongoError:
-        # We know for sure it's unrecoverable:
-        log.error("...")
-
-For a precise description of the resume process see the
-`Change Streams specification`_.
-
-Change streams are valid until the underlying collection is dropped at which
-point the change stream cursor receives one final change document with an
-operationType of "invalidate" and the cursor is closed.
-
-.. _$changeStream aggregation stage:
-    https://docs.mongodb.com/manual/reference/operator/aggregation/changeStream/
-
-.. _Change Streams specification:
-    https://github.com/mongodb/specifications/blob/master/source/change-streams.rst
-"""
+"""ChangeStream cursor to iterate over changes on a collection."""
 
 import copy
 
