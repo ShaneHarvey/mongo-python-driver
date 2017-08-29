@@ -32,6 +32,7 @@ Sub-modules:
    :maxdepth: 2
 
    database
+   change_stream
    collation
    collection
    command_cursor

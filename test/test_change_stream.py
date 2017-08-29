@@ -27,6 +27,7 @@ from bson.raw_bson import DEFAULT_RAW_BSON_OPTIONS, RawBSONDocument
 from pymongo.command_cursor import CommandCursor
 from pymongo.errors import (InvalidOperation, OperationFailure,
                             ServerSelectionTimeoutError)
+from pymongo.read_concern import ReadConcern
 
 from test import client_context, unittest, IntegrationTest
 from test.utils import WhiteListEventListener, rs_or_single_client
@@ -39,6 +40,9 @@ class TestChangeStream(IntegrationTest):
     @client_context.require_replica_set
     def setUpClass(cls):
         super(TestChangeStream, cls).setUpClass()
+        # $changeStream requires read concern majority.
+        cls.db = cls.client.get_database(
+            cls.db.name, read_concern=ReadConcern('majority'))
         cls.coll = cls.db.change_stream_test
 
     def setUp(self):
@@ -189,14 +193,6 @@ class TestChangeStream(IntegrationTest):
                     next(change_stream)
         finally:
             CommandCursor.next = original_next
-
-    def test_resume_server_selection_read_preference(self):
-        """ChangeStream will perform server selection before attempting to
-        resume, using initial readPreference
-        """
-        # TODO: ChangeStream uses the original collection whose read
-        # preference is immutable. I don't think this test is necessary.
-        pass
 
     def test_initial_empty_batch(self):
         """Ensure that a cursor returned from an aggregate command with a

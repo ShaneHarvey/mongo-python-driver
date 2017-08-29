@@ -1804,29 +1804,51 @@ class Collection(common.BaseObject):
               max_await_time_ms=None, batch_size=None, collation=None):
         """Watch changes on this collection.
 
-        .. code-block::
+        Performs an aggregation with an implicit initial
+        `$changeStream aggregation stage`_ and returns a
+        :class:`~pymongo.change_stream.ChangeStream` cursor that iterates over
+        changes on this collection. Introduced in MongoDB 3.6.
 
-            >>> with db.collection.watch() as change_stream:
-            ...    for change in change_stream:
-            ...        print(change)
+        .. code-block:: python
 
-        TODO: clean up this doc string:
+           for change in db.collection.watch():
+               print(change)
 
-        "Implementers MUST document that helper method is preferred to running
-        a raw aggregation with a $changeStream stage, for the purpose of
-        supporting resumability"
+        The ChangeStream returned automatically resumes when it
+        encounters a potentially recoverable error during iteration. The resume
+        process is transparent to the application and ensures no change stream
+        documents are lost; the call to
+        :meth:`~pymongo.change_stream.ChangeStream.next` blocks until the next
+        change document is returned or an unrecoverable error is raised.
 
-        Note it's possible but discouraged to use the $changeStream stage
-        directly via :meth:`~pymongo.collection.Collection.aggregate`. Using
-        this helper is preferable because it automatically supports
-        resumability.
+        .. code-block:: python
 
-        Not all pipeline stages are valid in a changeStream see the
-        `changeStream stage`_ documentation
+            try:
+                for insert_change in db.collection.watch(
+                        [{'$match': {'operationType': 'insert'}}]):
+                    print(insert_change)
+            except pymongo.errors.PyMongoError:
+                # We know for sure it's unrecoverable:
+                log.error('...')
+
+        For a precise description of the resume process see the
+        `Change Streams specification`_.
+
+        .. note:: Using this helper method is preferred to directly calling
+            :meth:`~pymongo.collection.Collection.aggregate` with a
+            ``$changeStream`` aggregation stage, for the purpose of supporting
+            resumability.
+
+        .. warning:: This Collection's :attr:`read_concern` must be
+            ``ReadConcern("majority")`` in order to use the ``$changeStream``
+            aggregation stage.
 
         :Parameters:
           - `pipeline` (optional): A list of aggregation pipeline stages to
-            append to an initial `$changeStream` aggregation stage.
+            append to an initial `$changeStream` aggregation stage. Not all
+            pipeline stages are valid after a `$changeStream` stage, see the
+            `$changeStream aggregation stage`_ documentation for the supported
+            stages.
           - `full_document` (optional): The fullDocument to pass as an option
             to the $changeStream pipeline stage. Allowed values: 'default',
             'updateLookup'.  Defaults to 'default'.
@@ -1845,12 +1867,15 @@ class Collection(common.BaseObject):
             to use for the aggregation.
 
         :Returns:
-          A :class:`~pymongo.change_stream.ChangeStream` on this collection.
+          A :class:`~pymongo.change_stream.ChangeStream` cursor.
 
         .. versionadded:: 3.6
 
-        .. _changeStream stage:
+        .. _$changeStream aggregation stage:
             https://docs.mongodb.com/manual/reference/operator/aggregation/changeStream/
+
+        .. _Change Streams specification:
+            https://github.com/mongodb/specifications/blob/master/source/change-streams.rst
         """
         if pipeline is None:
             pipeline = []
