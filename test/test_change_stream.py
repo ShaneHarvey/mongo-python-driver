@@ -14,14 +14,17 @@
 
 """Test the change_stream module."""
 
+import random
 import sys
+import string
 import threading
 import time
+import uuid
 
 sys.path[0:0] = ['']
 
-from bson import BSON, ObjectId
-
+from bson import BSON, ObjectId, SON
+from bson.binary import Binary, STANDARD, PYTHON_LEGACY
 from bson.raw_bson import DEFAULT_RAW_BSON_OPTIONS, RawBSONDocument
 
 from pymongo.command_cursor import CommandCursor
@@ -64,7 +67,6 @@ class TestChangeStream(IntegrationTest):
         with self.coll.watch(
                 [{'$project': {'foo': 0}}], full_document='updateLookup',
                 max_await_time_ms=1000, batch_size=100) as change_stream:
-            self.assertIs(self.coll, change_stream._collection)
             self.assertEqual([{'$project': {'foo': 0}}],
                              change_stream._pipeline)
             self.assertEqual('updateLookup', change_stream._full_document)
@@ -295,6 +297,41 @@ class TestChangeStream(IntegrationTest):
             self.assertEqual(change['ns']['coll'], self.coll.name)
             self.assertEqual(change['fullDocument'], raw_doc)
             self.assertEqual(change['_id'], change_stream._resume_token)
+
+    def test_uuid_representations(self):
+        """Test with uuid document _ids and different uuid_representation."""
+        for uuid_representation in (STANDARD, PYTHON_LEGACY):
+            for id_subtype in (STANDARD, PYTHON_LEGACY):
+                resume_token = None
+                options = self.coll.codec_options.with_options(
+                    uuid_representation=uuid_representation)
+                coll = self.coll.with_options(codec_options=options)
+                with coll.watch() as change_stream:
+                    coll.insert_one(
+                        {'_id': Binary(uuid.uuid4().bytes, id_subtype)})
+                    resume_token = change_stream.next()['_id']
+
+                # Should not error.
+                coll.watch(resume_after=resume_token)
+
+    def test_document_id_order(self):
+        """Test with document _ids that need their order preserved."""
+        random_keys = random.sample(string.ascii_letters,
+                                    len(string.ascii_letters))
+        random_doc = {'_id': SON([(key, key) for key in random_keys])}
+        for document_class in (dict, SON, RawBSONDocument):
+            options = self.coll.codec_options.with_options(
+                document_class=document_class)
+            coll = self.coll.with_options(codec_options=options)
+            with coll.watch() as change_stream:
+                coll.insert_one(random_doc)
+                resume_token = change_stream.next()['_id']
+
+            # The resume token is always a RawBSONDocument.
+            self.assertIsInstance(resume_token, RawBSONDocument)
+            # Should not error.
+            coll.watch(resume_after=resume_token)
+            coll.delete_many({})
 
 
 if __name__ == '__main__':
