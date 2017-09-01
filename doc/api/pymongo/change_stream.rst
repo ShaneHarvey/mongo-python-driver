@@ -3,6 +3,3 @@
 
 .. automodule:: pymongo.change_stream
    :members:
-
-   .. autoclass:: ChangeStream
-      :members:
