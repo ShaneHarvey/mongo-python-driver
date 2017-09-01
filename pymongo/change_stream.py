@@ -74,12 +74,9 @@ class ChangeStream(object):
 
     def _create_cursor(self):
         """Initialize the cursor or raise a fatal error"""
-        cursor = self._collection.aggregate(
+        return self._collection.aggregate(
             self._full_pipeline(), batchSize=self._batch_size,
-            collation=self._collation)
-        if self._max_await_time_ms is not None:
-            cursor.max_await_time_ms(self._max_await_time_ms)
-        return cursor
+            collation=self._collation, maxAwaitTimeMS=self._max_await_time_ms)
 
     def close(self):
         """Close this ChangeStream."""

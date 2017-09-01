@@ -133,7 +133,8 @@ class TestChangeStream(IntegrationTest):
     def test_aggregate_cursor_blocks(self):
         """Test that an aggregate cursor blocks until a change is readable."""
         inserted_doc = {'_id': ObjectId()}
-        with self.coll.aggregate([{'$changeStream': {}}]) as change_stream:
+        with self.coll.aggregate([{'$changeStream': {}}],
+                                 maxAwaitTimeMS=50) as change_stream:
             changes = []
             t = threading.Thread(
                 target=lambda: changes.append(change_stream.next()))

@@ -1828,6 +1828,7 @@ class Collection(common.BaseObject):
             raise ConfigurationError("The explain option is not supported. "
                                      "Use Database.command instead.")
         collation = validate_collation_or_none(kwargs.pop('collation', None))
+        max_await_time_ms = kwargs.pop('maxAwaitTimeMS', None)
 
         cmd = SON([("aggregate", self.__name),
                    ("pipeline", pipeline)])
@@ -1881,7 +1882,9 @@ class Collection(common.BaseObject):
                 }
 
             return cursor_class(
-                self, cursor, sock_info.address).batch_size(batch_size or 0)
+                self, cursor, sock_info.address,
+                batch_size=batch_size or 0,
+                max_await_time_ms=max_await_time_ms)
 
     def aggregate(self, pipeline, **kwargs):
         """Perform an aggregation using the aggregation framework on this
@@ -1936,6 +1939,8 @@ class Collection(common.BaseObject):
           A :class:`~pymongo.command_cursor.CommandCursor` over the result
           set.
 
+        .. versionchanged:: 3.6
+           Added the `maxAwaitTimeMS` option.
         .. versionchanged:: 3.4
            Apply this collection's write concern automatically to this operation
            when connected to MongoDB >= 3.4. Support the `collation` option.
