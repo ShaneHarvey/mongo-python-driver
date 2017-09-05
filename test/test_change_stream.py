@@ -123,7 +123,7 @@ class TestChangeStream(IntegrationTest):
         """Test that next blocks until a change is readable"""
         inserted_doc = {'_id': ObjectId()}
         # Use a short await time to speed up the test.
-        with self.coll.watch(max_await_time_ms=50) as change_stream:
+        with self.coll.watch(max_await_time_ms=250) as change_stream:
             changes = []
             t = threading.Thread(
                 target=lambda: changes.append(change_stream.next()))
@@ -140,7 +140,7 @@ class TestChangeStream(IntegrationTest):
         """Test that an aggregate cursor blocks until a change is readable."""
         inserted_doc = {'_id': ObjectId()}
         with self.coll.aggregate([{'$changeStream': {}}],
-                                 maxAwaitTimeMS=50) as change_stream:
+                                 maxAwaitTimeMS=250) as change_stream:
             changes = []
             t = threading.Thread(
                 target=lambda: changes.append(change_stream.next()))
