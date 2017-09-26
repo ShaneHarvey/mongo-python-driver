@@ -117,7 +117,7 @@ class Server(object):
 
             try:
                 sock_info.send_message(data, max_doc_size)
-                response_data = sock_info.receive_message(1, request_id)
+                reply = sock_info.receive_message(request_id)
             except Exception as exc:
                 if publish:
                     duration = (datetime.now() - start) + encoding_duration
@@ -132,7 +132,7 @@ class Server(object):
 
             if exhaust:
                 return ExhaustResponse(
-                    data=response_data,
+                    data=reply,
                     address=self._description.address,
                     socket_info=sock_info,
                     pool=self._pool,
@@ -141,7 +141,7 @@ class Server(object):
                     from_command=use_find_cmd)
             else:
                 return Response(
-                    data=response_data,
+                    data=reply,
                     address=self._description.address,
                     duration=duration,
                     request_id=request_id,
