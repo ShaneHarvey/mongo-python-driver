@@ -41,7 +41,7 @@ from pymongo.errors import (AutoReconnect,
                             NotMasterError,
                             OperationFailure,
                             ProtocolError)
-from pymongo.message import _OpReply
+from pymongo.message import _UNPACK_REPLY
 from pymongo.read_concern import DEFAULT_READ_CONCERN
 
 
@@ -149,9 +149,11 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
     # Ignore the response's request id.
     length, _, response_to, op_code = _UNPACK_HEADER(
         _receive_data_on_socket(sock, 16))
-    if op_code != _OpReply.OP_CODE:
+    try:
+        unpack_reply = _UNPACK_REPLY[op_code]
+    except KeyError:
         raise ProtocolError("Got opcode %r but expected "
-                            "%r" % (op_code, _OpReply.OP_CODE))
+                            "%r" % (op_code, _UNPACK_REPLY.keys()))
     # No request_id for exhaust cursor "getMore".
     if request_id is not None:
         if request_id != response_to:
@@ -164,7 +166,7 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
         raise ProtocolError("Message length (%r) is larger than server max "
                             "message size (%r)" % (length, max_message_size))
 
-    return _OpReply.unpack(_receive_data_on_socket(sock, length - 16))
+    return unpack_reply(_receive_data_on_socket(sock, length - 16))
 
 
 def _receive_data_on_socket(sock, length):
