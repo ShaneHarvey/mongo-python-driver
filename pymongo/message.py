@@ -1189,6 +1189,67 @@ class _OpReply(object):
         return cls(flags, cursor_id, number_returned, documents)
 
 
+class _OpMsg(object):
+    """A MongoDB OP_MSG response message."""
+
+    __slots__ = ("flags", "cursor_id", "number_returned", "documents")
+
+    UNPACK = struct.Struct("<Ibi").unpack
+    OP_CODE = 2013
+
+    def __init__(self, flags, documents):
+        self.flags = flags
+        self.cursor_id = 0
+        self.number_returned = 1
+        self.documents = documents
+
+    def raw_response(self, cursor_id=None):
+        raise NotImplemented
+
+    def unpack_response(self, cursor_id=None,
+                        codec_options=_UNICODE_REPLACE_CODEC_OPTIONS):
+        """Unpack a response from the database and decode the BSON document(s).
+
+        Check the response for errors and unpack, returning a dictionary
+        containing the response data.
+
+        Can raise CursorNotFound, NotMasterError, ExecutionTimeout, or
+        OperationFailure.
+
+        :Parameters:
+          - `cursor_id` (optional): cursor_id we sent to get this response -
+            used for raising an informative exception when we get cursor id not
+            valid at server response
+          - `codec_options` (optional): an instance of
+            :class:`~bson.codec_options.CodecOptions`
+        """
+        return bson.decode_all(self.documents, codec_options)
+
+    def command_response(self):
+        """Unpack a command response."""
+        return self.unpack_response()[0]
+
+    @classmethod
+    def unpack(cls, msg):
+        """Construct an _OpMsg from raw bytes."""
+        flags, first_payload_type, first_payload_size = cls.UNPACK(msg[:9])
+        if flags != 0:
+            raise ProtocolError("Unsupported OP_MSG flags (%r)" % (flags,))
+        if first_payload_type != 0:
+            raise ProtocolError(
+                "Unsupported OP_MSG payload type (%r)" % (first_payload_type,))
+
+        if len(msg) != first_payload_size + 5:
+            raise ProtocolError("Unsupported OP_MSG reply: >1 section")
+        return cls(flags, msg[5:])
+
+
+_UNPACK_REPLY = {
+    _OpReply.OP_CODE: _OpReply.unpack,
+    _OpMsg.OP_CODE: _OpMsg.unpack,
+}
+
+
 def _first_batch(sock_info, db, coll, query, ntoreturn,
                  slave_ok, codec_options, read_preference, cmd, listeners):
     """Simple query helper for retrieving a first (and possibly only) batch."""

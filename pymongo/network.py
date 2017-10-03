@@ -43,7 +43,7 @@ from pymongo.errors import (AutoReconnect,
                             NotMasterError,
                             OperationFailure,
                             ProtocolError)
-from pymongo.message import _OpReply
+from pymongo.message import _UNPACK_REPLY
 
 
 _UNPACK_HEADER = struct.Struct("<iiii").unpack
@@ -173,11 +173,13 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
             _receive_data_on_socket(sock, length - 25), compressor_id)
     else:
         data = _receive_data_on_socket(sock, length - 16)
-    if op_code != _OpReply.OP_CODE:
-        raise ProtocolError("Got opcode %r but expected "
-                            "%r" % (op_code, _OpReply.OP_CODE))
 
-    return _OpReply.unpack(data)
+    try:
+        unpack_reply = _UNPACK_REPLY[op_code]
+    except KeyError:
+        raise ProtocolError("Got opcode %r but expected "
+                            "%r" % (op_code, _UNPACK_REPLY.keys()))
+    return unpack_reply(data)
 
 
 # memoryview was introduced in Python 2.7 but we only use it on Python 3
