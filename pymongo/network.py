@@ -56,7 +56,8 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
             read_concern=None,
             parse_write_concern_error=False,
             collation=None,
-            compression_ctx=None):
+            compression_ctx=None,
+            use_op_msg=False):
     """Execute a command over the socket, or raise socket.error.
 
     :Parameters:
@@ -86,7 +87,7 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
 
     # Publish the original command document, perhaps with lsid and $clusterTime.
     orig = spec
-    if is_mongos:
+    if is_mongos and not use_op_msg:
         spec = message._maybe_add_read_preference(spec, read_preference)
     if read_concern:
         if read_concern.level:
@@ -103,12 +104,17 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
     if publish:
         start = datetime.datetime.now()
 
-    if name.lower() not in _NO_COMPRESSION and compression_ctx:
-        request_id, msg, size = message.query(
-            flags, ns, 0, -1, spec, None, codec_options, check_keys, compression_ctx)
+    if compression_ctx and name.lower() in _NO_COMPRESSION:
+        compression_ctx = None
+
+    if use_op_msg:
+        request_id, msg, size = message.op_msg(
+            0, spec, dbname, read_preference, slave_ok, codec_options,
+            check_keys)
     else:
         request_id, msg, size = message.query(
-            flags, ns, 0, -1, spec, None, codec_options, check_keys)
+            flags, ns, 0, -1, spec, None, codec_options, check_keys,
+            compression_ctx)
 
     if (max_bson_size is not None
             and size > max_bson_size + message._COMMAND_OVERHEAD):

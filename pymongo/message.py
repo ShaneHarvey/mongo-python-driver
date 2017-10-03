@@ -306,8 +306,11 @@ class _Query(object):
         spec = self.spec
 
         if use_cmd:
-            ns = _UJOIN % (self.db, "$cmd")
             spec = self.as_command(sock_info)[0]
+            if sock_info.op_msg_enabled:
+                return op_msg(0, spec, self.db, self.read_preference,
+                              set_slave_ok, self.codec_options)
+            ns = _UJOIN % (self.db, "$cmd")
             ntoreturn = -1  # All DB commands return 1 document
         else:
             # OP_QUERY treats ntoreturn of -1 and 1 the same, return
@@ -378,9 +381,11 @@ class _GetMore(object):
         ctx = sock_info.compression_context
 
         if use_cmd:
-            ns = _UJOIN % (self.db, "$cmd")
             spec = self.as_command(sock_info)[0]
-
+            if sock_info.op_msg_enabled:
+                return op_msg(0, spec, self.db, ReadPreference.PRIMARY,
+                              False, self.codec_options)
+            ns = _UJOIN % (self.db, "$cmd")
             return query(0, ns, 0, -1, spec, None, self.codec_options, ctx=ctx)
 
         return get_more(ns, self.ntoreturn, self.cursor_id, ctx)
@@ -395,6 +400,7 @@ class _RawBatchQuery(_Query):
 
     def get_message(self, set_slave_ok, sock_info, use_cmd=False):
         # Always pass False for use_cmd.
+        # TODO: use OP_MSG when available.
         return super(_RawBatchQuery, self).get_message(
             set_slave_ok, sock_info, False)
 
@@ -405,6 +411,7 @@ class _RawBatchGetMore(_GetMore):
 
     def get_message(self, set_slave_ok, sock_info, use_cmd=False):
         # Always pass False for use_cmd.
+        # TODO: use OP_MSG when available.
         return super(_RawBatchGetMore, self).get_message(
             set_slave_ok, sock_info, False)
 
@@ -582,6 +589,30 @@ def update(collection_name, upsert, multi, spec,
             collection_name, upsert, multi, spec, doc, check_keys, opts, ctx)
     return _update_uncompressed(collection_name, upsert, multi, spec,
                                 doc, safe, last_error_args, check_keys, opts)
+
+
+# TODO: Write C extension version.
+def op_msg(flags, command, dbname, read_preference, slave_ok, opts,
+           check_keys=False):
+    """Get a **OP_MSG** message.
+    """
+    data = struct.pack("<IB", flags, 0)
+    encoded = bson.BSON.encode(command, check_keys, opts)
+    extra = bson._element_to_bson("$db", dbname, False, opts)
+    if read_preference.mode and "$readPreference" not in command:
+        extra += bson._element_to_bson("$readPreference",
+                                       read_preference.document, False, opts)
+    elif slave_ok and "$readPreference" not in command:
+        extra += bson._element_to_bson(
+            "$readPreference", ReadPreference.PRIMARY_PREFERRED.document,
+            False, opts)
+
+    encoded = (bson._PACK_INT(len(encoded)+len(extra)) + encoded[4:-1] +
+               extra + b'\x00')
+    data += encoded
+    max_bson_size = len(encoded)
+    request_id, query_message = __pack_message(2013, data)
+    return request_id, query_message, max_bson_size
 
 
 def _query(options, collection_name, num_to_skip,
