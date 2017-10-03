@@ -18,8 +18,7 @@ import contextlib
 
 from datetime import datetime
 
-from pymongo.errors import ConfigurationError
-from pymongo.message import _Query, _convert_exception
+from pymongo.message import _convert_exception
 from pymongo.response import Response, ExhaustResponse
 from pymongo.server_type import SERVER_TYPE
 
@@ -64,19 +63,6 @@ class Server(object):
         """Check the server's state soon."""
         self._monitor.request_check()
 
-    def send_message(self, message, all_credentials):
-        """Send an unacknowledged message to MongoDB.
-
-        Can raise ConnectionFailure.
-
-        :Parameters:
-          - `message`: (request_id, data).
-          - `all_credentials`: dict, maps auth source to MongoCredential.
-        """
-        _, data, max_doc_size = self._split_message(message)
-        with self.get_socket(all_credentials) as sock_info:
-            sock_info.send_message(data, max_doc_size)
-
     def send_message_with_response(
             self,
             operation,
@@ -105,7 +91,7 @@ class Server(object):
 
             use_find_cmd = operation.use_command(sock_info, exhaust)
             message = operation.get_message(
-                set_slave_okay, sock_info.is_mongos, use_find_cmd)
+                set_slave_okay, sock_info, use_find_cmd)
             request_id, data, max_doc_size = self._split_message(message)
 
             if publish:

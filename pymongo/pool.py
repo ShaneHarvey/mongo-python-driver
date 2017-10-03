@@ -417,6 +417,7 @@ class SocketInfo(object):
             ismaster.max_message_size if ismaster else MAX_MESSAGE_SIZE)
         self.max_write_batch_size = (
             ismaster.max_write_batch_size if ismaster else None)
+        self.op_msg_enabled = ismaster and ismaster.max_wire_version >= 6
 
         self.listeners = pool.opts.event_listeners
 
@@ -478,7 +479,7 @@ class SocketInfo(object):
                            check_keys, self.listeners, self.max_bson_size,
                            read_concern,
                            parse_write_concern_error=parse_write_concern_error,
-                           collation=collation)
+                           collation=collation, use_op_msg=self.op_msg_enabled)
         except OperationFailure:
             raise
         # Catch socket.error, KeyboardInterrupt, etc. and close ourselves.
