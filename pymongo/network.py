@@ -54,7 +54,7 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
             check_keys=False, listeners=None, max_bson_size=None,
             read_concern=DEFAULT_READ_CONCERN,
             parse_write_concern_error=False,
-            collation=None):
+            collation=None, use_op_msg=False):
     """Execute a command over the socket, or raise socket.error.
 
     :Parameters:
@@ -91,7 +91,7 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
 
     # Publish the original command document, perhaps with lsid and $clusterTime.
     orig = spec
-    if is_mongos:
+    if is_mongos and not use_op_msg:
         spec = message._maybe_add_read_preference(spec, read_preference)
     if read_concern.level:
         spec['readConcern'] = read_concern.document
@@ -102,8 +102,13 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
     if publish:
         start = datetime.datetime.now()
 
-    request_id, msg, size = message.query(flags, ns, 0, -1, spec,
-                                          None, codec_options, check_keys)
+    if use_op_msg:
+        request_id, msg, size = message.op_msg(
+            0, spec, dbname, read_preference, slave_ok, codec_options,
+            check_keys)
+    else:
+        request_id, msg, size = message.query(
+            flags, ns, 0, -1, spec, None, codec_options, check_keys)
 
     if (max_bson_size is not None
             and size > max_bson_size + message._COMMAND_OVERHEAD):

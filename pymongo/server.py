@@ -91,7 +91,7 @@ class Server(object):
 
             use_find_cmd = operation.use_command(sock_info, exhaust)
             message = operation.get_message(
-                set_slave_okay, sock_info.is_mongos, use_find_cmd)
+                set_slave_okay, sock_info, use_find_cmd)
             request_id, data, max_doc_size = self._split_message(message)
 
             if publish:

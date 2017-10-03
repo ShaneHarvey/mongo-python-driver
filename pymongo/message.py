@@ -307,7 +307,7 @@ class _Query(object):
                                  self.flags, self.session, self.client,
                                  self.read_concern, self.collation), self.db
 
-    def get_message(self, set_slave_ok, is_mongos, use_cmd=False):
+    def get_message(self, set_slave_ok, sock_info, use_cmd=False):
         """Get a query message, possibly setting the slaveOk bit."""
         if set_slave_ok:
             # Set the slaveOk bit.
@@ -319,8 +319,11 @@ class _Query(object):
         spec = self.spec
 
         if use_cmd:
-            ns = _UJOIN % (self.db, "$cmd")
             spec = self.as_command()[0]
+            if sock_info.op_msg_enabled:
+                return op_msg(0, spec, self.db, self.read_preference,
+                              set_slave_ok, self.codec_options)
+            ns = _UJOIN % (self.db, "$cmd")
             ntoreturn = -1  # All DB commands return 1 document
         else:
             # OP_QUERY treats ntoreturn of -1 and 1 the same, return
@@ -333,7 +336,7 @@ class _Query(object):
                 else:
                     ntoreturn = self.limit
 
-        if is_mongos:
+        if sock_info.is_mongos:
             spec = _maybe_add_read_preference(spec,
                                               self.read_preference)
 
@@ -372,15 +375,17 @@ class _GetMore(object):
                                      self.session,
                                      self.client), self.db
 
-    def get_message(self, dummy0, dummy1, use_cmd=False):
+    def get_message(self, dummy0, sock_info, use_cmd=False):
         """Get a getmore message."""
 
         ns = _UJOIN % (self.db, self.coll)
 
         if use_cmd:
-            ns = _UJOIN % (self.db, "$cmd")
             spec = self.as_command()[0]
-
+            if sock_info.op_msg_enabled:
+                return op_msg(0, spec, self.db, ReadPreference.PRIMARY,
+                              False, self.codec_options)
+            ns = _UJOIN % (self.db, "$cmd")
             return query(0, ns, 0, -1, spec, None, self.codec_options)
 
         return get_more(ns, self.ntoreturn, self.cursor_id)
@@ -393,9 +398,9 @@ class _RawBatchQuery(_Query):
 
         return False
 
-    def get_message(self, set_slave_ok, is_mongos, use_cmd=False):
+    def get_message(self, set_slave_ok, sock_info, use_cmd=False):
         # Always pass False for use_cmd.
-        return super(_RawBatchQuery, self).get_message(set_slave_ok, is_mongos,
+        return super(_RawBatchQuery, self).get_message(set_slave_ok, sock_info,
                                                        False)
 
 
@@ -403,10 +408,10 @@ class _RawBatchGetMore(_GetMore):
     def use_command(self, socket_info, exhaust):
         return False
 
-    def get_message(self, set_slave_ok, is_mongos, use_cmd=False):
+    def get_message(self, set_slave_ok, sock_info, use_cmd=False):
         # Always pass False for use_cmd.
-        return super(_RawBatchGetMore, self).get_message(set_slave_ok, is_mongos,
-                                                         False)
+        return super(_RawBatchGetMore, self).get_message(
+            set_slave_ok, sock_info, False)
 
 
 class _CursorAddress(tuple):
@@ -511,6 +516,30 @@ def update(collection_name, upsert, multi,
         return (request_id, update_message, len(encoded))
 if _use_c:
     update = _cmessage._update_message
+
+
+# TODO: Write C extension version.
+def op_msg(flags, command, dbname, read_preference, slave_ok, opts,
+           check_keys=False):
+    """Get a **OP_MSG** message.
+    """
+    data = struct.pack("<IB", flags, 0)
+    encoded = bson.BSON.encode(command, check_keys, opts)
+    extra = bson._element_to_bson("$db", dbname, False, opts)
+    if read_preference.mode and "$readPreference" not in command:
+        extra += bson._element_to_bson("$readPreference",
+                                       read_preference.document, False, opts)
+    elif slave_ok and "$readPreference" not in command:
+        extra += bson._element_to_bson(
+            "$readPreference", ReadPreference.PRIMARY_PREFERRED.document,
+            False, opts)
+
+    encoded = (bson._PACK_INT(len(encoded)+len(extra)) + encoded[4:-1] +
+               extra + b'\x00')
+    data += encoded
+    max_bson_size = len(encoded)
+    request_id, query_message = __pack_message(2013, data)
+    return request_id, query_message, max_bson_size
 
 
 def query(options, collection_name, num_to_skip,
@@ -1076,8 +1105,7 @@ def _first_batch(sock_info, db, coll, query, ntoreturn,
     if publish:
         start = datetime.datetime.now()
 
-    request_id, msg, max_doc_size = query.get_message(slave_ok,
-                                                      sock_info.is_mongos)
+    request_id, msg, max_doc_size = query.get_message(slave_ok, sock_info)
 
     if publish:
         encoding_duration = datetime.datetime.now() - start
