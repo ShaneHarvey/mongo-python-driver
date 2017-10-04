@@ -207,6 +207,8 @@ class MongoClient(common.BaseObject):
             profile collections.
           - `event_listeners`: a list or tuple of event listeners. See
             :mod:`~pymongo.monitoring` for details.
+          - `retryWrites`: (boolean) Whether supported write operations
+            executed within this MongoClient will be retried. See also
           - `socketKeepAlive`: (boolean) **DEPRECATED** Whether to send
             periodic keep-alive packets on connected sockets. Defaults to
             ``True``. Disabling it is not recommended, see
@@ -337,6 +339,9 @@ class MongoClient(common.BaseObject):
             level is left unspecified, the server default will be used.
 
         .. mongodoc:: connections
+
+        .. versionchanged:: 3.6
+           Added ``retryWrites`` option.
 
         .. versionchanged:: 3.5
            Add ``username`` and ``password`` options. Document the
@@ -799,6 +804,11 @@ class MongoClient(common.BaseObject):
     def server_selection_timeout(self):
         """The server selection timeout for this instance in seconds."""
         return self.__options.server_selection_timeout
+
+    @property
+    def retry_writes(self):
+        """If this instance should retry supported write operations."""
+        return self.__options.retry_writes
 
     def _is_writable(self):
         """Attempt to connect to a writable server, or return False.
