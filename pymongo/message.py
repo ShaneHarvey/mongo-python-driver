@@ -40,7 +40,6 @@ from pymongo.errors import (ConfigurationError,
                             InvalidOperation,
                             OperationFailure, ProtocolError, CursorNotFound,
                             NotMasterError, ExecutionTimeout)
-from pymongo.helpers import _check_gle_response
 from pymongo.read_concern import DEFAULT_READ_CONCERN
 from pymongo.read_preferences import ReadPreference
 
@@ -524,15 +523,6 @@ def op_msg(flags, command, dbname, read_preference, slave_ok, opts,
     max_bson_size = len(encoded)
     request_id, query_message = __pack_message(2013, data)
     return request_id, query_message, max_bson_size
-
-
-def op_msg_reply(response, opts):
-    """Decode an **OP_MSG** reply -- without the request header.
-    """
-    flags, payload_type = struct.unpack("<IB", response[0:5])
-    assert flags == 0, "unsupported OP_MSG flag bits"
-    assert payload_type == 0,  "unsupported OP_MSG payload type"
-    return bson._bson_to_dict(response[5:], opts)
 
 
 def query(options, collection_name, num_to_skip,
