@@ -216,7 +216,6 @@ class _Bulk(object):
         self.bypass_doc_val = bypass_document_validation
         self.uses_collation = False
         self.uses_array_filters = False
-        self.retryable_write = self.collection._retry_writes
 
     def add_insert(self, document):
         """Add an insert document to the list of ops.
@@ -241,9 +240,6 @@ class _Bulk(object):
         if array_filters is not None:
             self.uses_array_filters = True
             cmd['arrayFilters'] = array_filters
-        if multi:
-            # A bulk_write containing an update_many is not retryable.
-            self.retryable_write = False
         self.ops.append((_UPDATE, cmd))
 
     def add_replace(self, selector, replacement, upsert=False,
@@ -267,9 +263,6 @@ class _Bulk(object):
         if collation is not None:
             self.uses_collation = True
             cmd['collation'] = collation
-        if limit == _DELETE_ALL:
-            # A bulk_write containing a delete_many is not retryable.
-            self.retryable_write = False
         self.ops.append((_DELETE, cmd))
 
     def gen_ordered(self):
@@ -329,8 +322,6 @@ class _Bulk(object):
                     cmd['bypassDocumentValidation'] = True
                 if s:
                     cmd['lsid'] = s._use_lsid()
-                    if self.retryable_write:
-                        cmd['txnNum'] = s._transaction_id()
                 client._send_cluster_time(cmd)
                 bwc = _BulkWriteContext(db_name, cmd, sock_info, op_id,
                                         listeners, s)
@@ -424,7 +415,8 @@ class _Bulk(object):
         else:
             generator = self.gen_unordered()
 
-        with self.collection._socket_for_retryable_writes() as sock_info:
+        client = self.collection.database.client
+        with client._socket_for_writes() as sock_info:
             if sock_info.max_wire_version < 5 and self.uses_collation:
                 raise ConfigurationError(
                     'Must be connected to MongoDB 3.4+ to use a collation.')

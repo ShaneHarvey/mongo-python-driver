@@ -593,10 +593,10 @@ class _BulkWriteContext(object):
 
     __slots__ = ('db_name', 'command', 'sock_info', 'op_id',
                  'name', 'field', 'publish', 'start_time', 'listeners',
-                 'session', 'retryable_write')
+                 'session')
 
     def __init__(self, database_name, command, sock_info, operation_id,
-                 listeners, session, retryable_write):
+                 listeners, session):
         self.db_name = database_name
         self.command = command
         self.sock_info = sock_info
@@ -607,7 +607,6 @@ class _BulkWriteContext(object):
         self.field = _FIELD_MAP[self.name]
         self.start_time = datetime.datetime.now() if self.publish else None
         self.session = session
-        self.retryable_write = retryable_write
 
     @property
     def max_bson_size(self):
@@ -661,8 +660,6 @@ class _BulkWriteContext(object):
         if self.session:
             # Update last_use time.
             self.session._use_lsid()
-            if self.retryable_write:
-                self.command['txnNum'] = self.session._transaction_id()
         if self.publish:
             duration = datetime.datetime.now() - self.start_time
             self._start(request_id, docs)
