@@ -15,6 +15,7 @@
 """Collection level utilities for Mongo."""
 
 import collections
+import contextlib
 import datetime
 import warnings
 
@@ -180,6 +181,10 @@ class Collection(common.BaseObject):
             unicode_decode_error_handler='replace',
             document_class=dict)
 
+    @property
+    def _retry_writes(self):
+        return self.__database.client.retry_writes
+
     def _socket_for_reads(self):
         return self.__database.client._socket_for_reads(self.read_preference)
 
@@ -188,6 +193,14 @@ class Collection(common.BaseObject):
 
     def _socket_for_writes(self):
         return self.__database.client._socket_for_writes()
+
+    @contextlib.contextmanager
+    def _socket_for_retryable_writes(self):
+        with self.__database.client._socket_for_writes() as sock_info:
+            if self._retry_writes and sock_info.max_wire_version < 6:
+                raise ConfigurationError(
+                    'Must be connected to MongoDB 3.6+ to use retryWrites')
+            yield sock_info
 
     def _command(self, sock_info, command, slave_ok=False,
                  read_preference=None,
@@ -690,7 +703,7 @@ class Collection(common.BaseObject):
         common.validate_is_document_type("document", document)
         if not (isinstance(document, RawBSONDocument) or "_id" in document):
             document["_id"] = ObjectId()
-        with self._socket_for_writes() as sock_info:
+        with self._socket_for_retryable_writes() as sock_info:
             return InsertOneResult(
                 self._insert(sock_info, document,
                              bypass_doc_val=bypass_document_validation,
@@ -896,7 +909,7 @@ class Collection(common.BaseObject):
         """
         common.validate_is_mapping("filter", filter)
         common.validate_ok_for_replace(replacement)
-        with self._socket_for_writes() as sock_info:
+        with self._socket_for_retryable_writes() as sock_info:
             result = self._update(sock_info, filter, replacement, upsert,
                                   bypass_doc_val=bypass_document_validation,
                                   collation=collation, session=session)
@@ -961,7 +974,7 @@ class Collection(common.BaseObject):
         common.validate_is_mapping("filter", filter)
         common.validate_ok_for_update(update)
         common.validate_list_or_none('array_filters', array_filters)
-        with self._socket_for_writes() as sock_info:
+        with self._socket_for_retryable_writes() as sock_info:
             result = self._update(sock_info, filter, update, upsert,
                                   check_keys=False,
                                   bypass_doc_val=bypass_document_validation,
@@ -1129,7 +1142,7 @@ class Collection(common.BaseObject):
 
         .. versionadded:: 3.0
         """
-        with self._socket_for_writes() as sock_info:
+        with self._socket_for_retryable_writes() as sock_info:
             return DeleteResult(self._delete(sock_info, filter, False,
                                              collation=collation,
                                              session=session),
@@ -2576,7 +2589,7 @@ class Collection(common.BaseObject):
         if upsert is not None:
             common.validate_boolean("upsert", upsert)
             cmd["upsert"] = upsert
-        with self._socket_for_writes() as sock_info:
+        with self._socket_for_retryable_writes() as sock_info:
             if array_filters is not None:
                 if sock_info.max_wire_version < 6:
                     raise ConfigurationError(

@@ -415,8 +415,7 @@ class _Bulk(object):
         else:
             generator = self.gen_unordered()
 
-        client = self.collection.database.client
-        with client._socket_for_writes() as sock_info:
+        with self.collection._socket_for_retryable_writes() as sock_info:
             if sock_info.max_wire_version < 5 and self.uses_collation:
                 raise ConfigurationError(
                     'Must be connected to MongoDB 3.4+ to use a collation.')
