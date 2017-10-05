@@ -233,10 +233,7 @@ class Collection(common.BaseObject):
             :class:`~pymongo.client_session.ClientSession`.
 
         :Returns:
-
-            # todo: don't return address
-
-          (result document, address of server the command was run on)
+          The result document.
         """
         with self.__database.client._tmp_session(session) as s:
             return sock_info.command(
