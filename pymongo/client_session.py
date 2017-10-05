@@ -44,7 +44,7 @@ Classes
 import collections
 import uuid
 
-from bson.binary import Binary
+from bson import Binary, Int64
 from pymongo import monotonic
 from pymongo.errors import InvalidOperation
 
@@ -127,12 +127,20 @@ class ClientSession(object):
 
         return self._server_session.use_lsid()
 
+    def _transaction_id(self):
+        # Internal function.
+        if self._server_session is None:
+            raise InvalidOperation("Cannot use ended session")
+
+        return self._server_session.transaction_id()
+
 
 class _ServerSession(object):
     def __init__(self):
         # Ensure id is type 4, regardless of CodecOptions.uuid_representation.
         self.session_id = {'id': Binary(uuid.uuid4().bytes, 4)}
         self.last_use = monotonic.time()
+        self._transaction_id = 0
 
     def timed_out(self, session_timeout_minutes):
         idle_seconds = monotonic.time() - self.last_use
@@ -143,6 +151,12 @@ class _ServerSession(object):
     def use_lsid(self):
         self.last_use = monotonic.time()
         return self.session_id
+
+    def transaction_id(self):
+        """Monotonically increasing positive 64-bit integer."""
+        self._transaction_id += 1
+        # SERVER-31453: The server only supports 64-bit integers.
+        return Int64(self._transaction_id)
 
 
 class _ServerSessionPool(collections.deque):
