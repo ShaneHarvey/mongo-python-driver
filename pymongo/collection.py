@@ -183,7 +183,8 @@ class Collection(common.BaseObject):
 
     @property
     def _retry_writes(self):
-        return self.__database.client.retry_writes
+        return (self.__database.client.retry_writes and
+                self.write_concern.acknowledged)
 
     def _socket_for_reads(self):
         return self.__database.client._socket_for_reads(self.read_preference)
@@ -1146,12 +1147,15 @@ class Collection(common.BaseObject):
 
         .. versionadded:: 3.0
         """
-        with self._socket_for_retryable_writes() as sock_info:
+        def _delete_one(session, sock_info):
             return DeleteResult(
                 self._delete(sock_info, filter, False, collation=collation,
                              session=session,
                              retryable_write=self._retry_writes),
                 self.write_concern.acknowledged)
+
+        return self.__database.client._retry_write_on_error(
+            _delete_one, session)
 
     def delete_many(self, filter, collation=None, session=None):
         """Delete one or more documents matching the filter.

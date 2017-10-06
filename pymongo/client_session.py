@@ -134,6 +134,13 @@ class ClientSession(object):
 
         return self._server_session.transaction_id()
 
+    def _retry_transaction_id(self):
+        # Internal function.
+        if self._server_session is None:
+            raise InvalidOperation("Cannot use ended session")
+
+        return self._server_session.retry_transaction_id()
+
 
 class _ServerSession(object):
     def __init__(self):
@@ -157,6 +164,9 @@ class _ServerSession(object):
         self._transaction_id += 1
         # SERVER-31453: The server only supports 64-bit integers.
         return Int64(self._transaction_id)
+
+    def retry_transaction_id(self):
+        self._transaction_id -= 1
 
 
 class _ServerSessionPool(collections.deque):

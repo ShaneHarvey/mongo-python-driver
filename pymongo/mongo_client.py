@@ -33,6 +33,7 @@ access:
 
 import contextlib
 import datetime
+import sys
 import threading
 import warnings
 import weakref
@@ -976,6 +977,33 @@ class MongoClient(common.BaseObject):
         except ConnectionFailure:
             self.__reset_server(server.description.address)
             raise
+
+    def _retry_write_on_error(self, func, session):
+        """Execute an operation possibly with one retry.
+
+        Returns fn()'s return value on success. On error retries once.
+
+        Re-raises any exception thrown by fn().
+        """
+        with self._tmp_session(session) as s:
+            try:
+                with self._socket_for_writes() as sock_info:
+                    if self.retry_writes and sock_info.max_wire_version < 6:
+                        raise ConfigurationError(
+                            'Must be connected to MongoDB 3.6+ to use '
+                            'retryWrites')
+                    return func(s, sock_info)
+            except ConnectionFailure:
+                if not self.retry_writes:
+                    raise
+                exc_info = sys.exc_info()
+            with self._socket_for_writes() as sock_info:
+                if sock_info.max_wire_version >= 6:
+                    # Reset the transaction id and retry the operation.
+                    s._retry_transaction_id()
+                    return func(s, sock_info)
+            # The new server was too old, raise the original error.
+            reraise(*exc_info)
 
     def __reset_server(self, address):
         """Clear our connection pool for a server and mark it Unknown."""
