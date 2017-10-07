@@ -102,8 +102,6 @@ def camel_to_snake_args(arguments):
 def run_operation(collection, test):
     # Convert command from CamelCase to pymongo.collection method.
     operation = camel_to_snake(test['operation']['name'])
-    if operation != 'delete_one':
-        raise SkipTest('Only delete_one is retryable!')
     cmd = getattr(collection, operation)
 
     # Convert arguments to snake_case and handle special cases.

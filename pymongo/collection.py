@@ -704,13 +704,17 @@ class Collection(common.BaseObject):
         common.validate_is_document_type("document", document)
         if not (isinstance(document, RawBSONDocument) or "_id" in document):
             document["_id"] = ObjectId()
-        with self._socket_for_retryable_writes() as sock_info:
+
+        def _insert_one(session, sock_info):
             return InsertOneResult(
                 self._insert(sock_info, document,
                              bypass_doc_val=bypass_document_validation,
                              session=session,
                              retryable_write=self._retry_writes),
                 self.write_concern.acknowledged)
+
+        return self.__database.client._retry_write_on_error(
+            _insert_one, session)
 
     def insert_many(self, documents, ordered=True,
                     bypass_document_validation=False, session=None):
@@ -911,12 +915,16 @@ class Collection(common.BaseObject):
         """
         common.validate_is_mapping("filter", filter)
         common.validate_ok_for_replace(replacement)
-        with self._socket_for_retryable_writes() as sock_info:
+
+        def _replace_one(session, sock_info):
             result = self._update(sock_info, filter, replacement, upsert,
                                   bypass_doc_val=bypass_document_validation,
                                   collation=collation, session=session,
                                   retryable_write=self._retry_writes)
-        return UpdateResult(result, self.write_concern.acknowledged)
+            return UpdateResult(result, self.write_concern.acknowledged)
+
+        return self.__database.client._retry_write_on_error(
+            _replace_one, session)
 
     def update_one(self, filter, update, upsert=False,
                    bypass_document_validation=False,
@@ -977,7 +985,8 @@ class Collection(common.BaseObject):
         common.validate_is_mapping("filter", filter)
         common.validate_ok_for_update(update)
         common.validate_list_or_none('array_filters', array_filters)
-        with self._socket_for_retryable_writes() as sock_info:
+
+        def _update_one(session, sock_info):
             result = self._update(sock_info, filter, update, upsert,
                                   check_keys=False,
                                   bypass_doc_val=bypass_document_validation,
@@ -985,7 +994,10 @@ class Collection(common.BaseObject):
                                   array_filters=array_filters,
                                   session=session,
                                   retryable_write=self._retry_writes)
-        return UpdateResult(result, self.write_concern.acknowledged)
+            return UpdateResult(result, self.write_concern.acknowledged)
+
+        return self.__database.client._retry_write_on_error(
+            _update_one, session)
 
     def update_many(self, filter, update, upsert=False, array_filters=None,
                     bypass_document_validation=False, collation=None,
@@ -2598,7 +2610,8 @@ class Collection(common.BaseObject):
         if upsert is not None:
             common.validate_boolean("upsert", upsert)
             cmd["upsert"] = upsert
-        with self._socket_for_retryable_writes() as sock_info:
+
+        def _find_and_modify(session, sock_info):
             if array_filters is not None:
                 if sock_info.max_wire_version < 6:
                     raise ConfigurationError(
@@ -2620,6 +2633,9 @@ class Collection(common.BaseObject):
                                 retryable_write=self._retry_writes)
             _check_write_command_response([(0, out)])
             return out.get("value")
+
+        return self.__database.client._retry_write_on_error(
+            _find_and_modify, session)
 
     def find_one_and_delete(self, filter,
                             projection=None, sort=None, session=None, **kwargs):
