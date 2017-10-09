@@ -948,7 +948,6 @@ class _OpReply(object):
         OperationFailure.
 
         :Parameters:
-          - `response`: byte string as returned from the database
           - `cursor_id` (optional): cursor_id we sent to get this response -
             used for raising an informative exception when we get cursor id not
             valid at server response
