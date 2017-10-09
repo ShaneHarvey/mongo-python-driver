@@ -36,11 +36,13 @@ try:
 except ImportError:
     _use_c = False
 from pymongo.errors import (ConfigurationError,
+                            CursorNotFound,
                             DocumentTooLarge,
+                            ExecutionTimeout,
                             InvalidOperation,
-                            OperationFailure, ProtocolError, CursorNotFound,
-                            NotMasterError, ExecutionTimeout)
-from pymongo.helpers import _check_gle_response
+                            NotMasterError,
+                            OperationFailure,
+                            ProtocolError)
 from pymongo.read_concern import DEFAULT_READ_CONCERN
 from pymongo.read_preferences import ReadPreference
 
