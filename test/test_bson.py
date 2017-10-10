@@ -898,6 +898,18 @@ class TestBSON(unittest.TestCase):
                           {"_id": {'$oid': "52d0b971b3ba219fdeb4170e"}}, True)
         BSON.encode({"_id": {'$oid': "52d0b971b3ba219fdeb4170e"}})
 
+    def test_cluster_time(self):
+        BSON.encode({"_id": {"$clusterTime": 1}}, False)
+        self.assertRaises(InvalidDocument, BSON.encode,
+                          {"_id": {"$clusterTime": 1}}, True)
+        BSON.encode({"x": {"$clusterTime": 1}}, False)
+        self.assertRaises(InvalidDocument, BSON.encode,
+                          {"x": {"$clusterTime": 1}}, True)
+        self.assertRaises(InvalidDocument, BSON.encode,
+                          {"x": {"y": {"$clusterTime": 1}}}, True)
+        BSON.encode({"x": 1, "$clusterTime": 1}, False)
+        BSON.encode({"x": 1, "$clusterTime": {"key": 1}}, False)
+
 
 class TestCodecOptions(unittest.TestCase):
     def test_document_class(self):
