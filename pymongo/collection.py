@@ -713,8 +713,8 @@ class Collection(common.BaseObject):
                              retryable_write=self._retry_writes),
                 self.write_concern.acknowledged)
 
-        return self.__database.client._retry_write_on_error(
-            _insert_one, session)
+        return self.__database.client._retryable_write(
+            self.write_concern.acknowledged, _insert_one, session)
 
     def insert_many(self, documents, ordered=True,
                     bypass_document_validation=False, session=None):
@@ -923,8 +923,8 @@ class Collection(common.BaseObject):
                                   retryable_write=self._retry_writes)
             return UpdateResult(result, self.write_concern.acknowledged)
 
-        return self.__database.client._retry_write_on_error(
-            _replace_one, session)
+        return self.__database.client._retryable_write(
+            self.write_concern.acknowledged, _replace_one, session)
 
     def update_one(self, filter, update, upsert=False,
                    bypass_document_validation=False,
@@ -996,8 +996,8 @@ class Collection(common.BaseObject):
                                   retryable_write=self._retry_writes)
             return UpdateResult(result, self.write_concern.acknowledged)
 
-        return self.__database.client._retry_write_on_error(
-            _update_one, session)
+        return self.__database.client._retryable_write(
+            self.write_concern.acknowledged, _update_one, session)
 
     def update_many(self, filter, update, upsert=False, array_filters=None,
                     bypass_document_validation=False, collation=None,
@@ -1166,8 +1166,8 @@ class Collection(common.BaseObject):
                              retryable_write=self._retry_writes),
                 self.write_concern.acknowledged)
 
-        return self.__database.client._retry_write_on_error(
-            _delete_one, session)
+        return self.__database.client._retryable_write(
+            self.write_concern.acknowledged, _delete_one, session)
 
     def delete_many(self, filter, collation=None, session=None):
         """Delete one or more documents matching the filter.
@@ -2611,6 +2611,12 @@ class Collection(common.BaseObject):
             common.validate_boolean("upsert", upsert)
             cmd["upsert"] = upsert
 
+        write_concern = cmd.get('writeConcern')
+        if write_concern is not None:
+            acknowledged = write_concern.get("w", 1) > 0
+        else:
+            acknowledged = self.write_concern.acknowledged
+
         def _find_and_modify(session, sock_info):
             if array_filters is not None:
                 if sock_info.max_wire_version < 6:
@@ -2634,8 +2640,8 @@ class Collection(common.BaseObject):
             _check_write_command_response([(0, out)])
             return out.get("value")
 
-        return self.__database.client._retry_write_on_error(
-            _find_and_modify, session)
+        return self.__database.client._retryable_write(
+            acknowledged, _find_and_modify, session)
 
     def find_one_and_delete(self, filter,
                             projection=None, sort=None, session=None, **kwargs):

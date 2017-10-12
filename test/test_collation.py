@@ -382,6 +382,10 @@ class TestCollation(unittest.TestCase):
             collection.update_one(
                 {'hello': 'world'}, {'$set': {'hello': 'moon'}},
                 collation=self.collation)
+        with self.assertRaises(ConfigurationError):
+            collection.find_one_and_delete(
+                {'hello': 'world'},
+                collation=self.collation)
         bulk = collection.initialize_ordered_bulk_op()
         bulk.find({'hello': 'world'}, collation=self.collation).update_one(
             {'$set': {'hello': 'moon'}})
