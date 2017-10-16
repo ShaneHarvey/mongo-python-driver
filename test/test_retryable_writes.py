@@ -23,7 +23,7 @@ sys.path[0:0] = [""]
 
 from bson import SON
 
-from pymongo.errors import ConfigurationError
+from pymongo.errors import ConfigurationError, ConnectionFailure
 from pymongo.monitoring import _SENSITIVE_COMMANDS
 from pymongo.write_concern import WriteConcern
 
@@ -67,10 +67,10 @@ class TestAllScenarios(IntegrationTest):
             ("configureFailPoint", "onPrimaryTransactionalWrite"),
             ("mode", "off")]))
 
-    def set_fail_point(self, mode):
-        self.client.admin.command(SON([
-            ("configureFailPoint", "onPrimaryTransactionalWrite"),
-            ("mode", mode)]))
+    def set_fail_point(self, command_args):
+        cmd = SON([("configureFailPoint", "onPrimaryTransactionalWrite")])
+        cmd.update(command_args)
+        self.client.admin.command(cmd)
 
 
 def create_test(scenario_def, test):
@@ -83,10 +83,21 @@ def create_test(scenario_def, test):
         # Set the failPoint
         self.set_fail_point(test['failPoint'])
 
-        result = run_operation(self.db.test, test)
+        test_outcome = test['outcome']
+        should_fail = test_outcome.get('error')
+        error = None
+        try:
+            result = run_operation(self.db.test, test)
+        except ConnectionFailure as error:
+            pass
+
+        if should_fail:
+            self.assertIsNotNone(error, 'should have raised an error')
+        else:
+            self.assertIsNone(error, 'should not have raised an error')
 
         # Assert final state is expected.
-        expected_c = test['outcome'].get('collection')
+        expected_c = test_outcome.get('collection')
         if expected_c is not None:
             expected_name = expected_c.get('name')
             if expected_name is not None:
@@ -94,7 +105,7 @@ def create_test(scenario_def, test):
             else:
                 db_coll = self.db.test
             self.assertEqual(list(db_coll.find()), expected_c['data'])
-        expected_result = test['outcome'].get('result')
+        expected_result = test_outcome.get('result')
         if expected_result is not None:
             self.assertTrue(result, expected_result)
 
