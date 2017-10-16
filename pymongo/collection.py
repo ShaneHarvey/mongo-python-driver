@@ -195,14 +195,6 @@ class Collection(common.BaseObject):
     def _socket_for_writes(self):
         return self.__database.client._socket_for_writes()
 
-    @contextlib.contextmanager
-    def _socket_for_retryable_writes(self):
-        with self.__database.client._socket_for_writes() as sock_info:
-            if self._retry_writes and sock_info.max_wire_version < 6:
-                raise ConfigurationError(
-                    'Must be connected to MongoDB 3.6+ to use retryWrites')
-            yield sock_info
-
     def _command(self, sock_info, command, slave_ok=False,
                  read_preference=None,
                  codec_options=None, check=True, allowable_errors=None,
@@ -2616,7 +2608,7 @@ class Collection(common.BaseObject):
             acknowledged = write_concern.get("w", 1) > 0
         else:
             acknowledged = self.write_concern.acknowledged
-
+        retryable_write = self.__database.client.retry_writes and acknowledged
         def _find_and_modify(session, sock_info):
             if array_filters is not None:
                 if sock_info.max_wire_version < 6:
@@ -2636,7 +2628,7 @@ class Collection(common.BaseObject):
                                 read_preference=ReadPreference.PRIMARY,
                                 allowable_errors=[_NO_OBJ_ERROR],
                                 collation=collation, session=session,
-                                retryable_write=self._retry_writes)
+                                retryable_write=retryable_write)
             _check_write_command_response([(0, out)])
             return out.get("value")
 

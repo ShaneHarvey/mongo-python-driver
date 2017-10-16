@@ -29,6 +29,8 @@ from pymongo.cursor import Cursor
 from pymongo.errors import ConnectionFailure
 from pymongo.results import _WriteResult, BulkWriteResult
 
+from pymongo.monitoring import _SENSITIVE_COMMANDS
+
 from test import unittest, client_context, IntegrationTest
 from test.utils import rs_or_single_client, EventListener
 from test.test_crud import run_operation
@@ -36,6 +38,23 @@ from test.test_crud import run_operation
 # Location of JSON test specifications.
 _TEST_PATH = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), 'retryable_writes')
+
+
+class CommandListener(EventListener):
+    def started(self, event):
+        if event.command_name.lower() in _SENSITIVE_COMMANDS:
+            return
+        super(CommandListener, self).started(event)
+
+    def succeeded(self, event):
+        if event.command_name.lower() in _SENSITIVE_COMMANDS:
+            return
+        super(CommandListener, self).succeeded(event)
+
+    def failed(self, event):
+        if event.command_name.lower() in _SENSITIVE_COMMANDS:
+            return
+        super(CommandListener, self).failed(event)
 
 
 class TestAllScenarios(IntegrationTest):
@@ -109,6 +128,109 @@ def create_tests():
 
 
 create_tests()
+
+
+class TestRetryableWrites(IntegrationTest):
+
+    @classmethod
+    @client_context.require_version_min(3, 5)
+    def setUpClass(cls):
+        super(TestRetryableWrites, cls).setUpClass()
+        cls.listener = CommandListener()
+        cls.client = rs_or_single_client(
+            retryWrites=True, event_listeners=[cls.listener])
+        cls.db = cls.client.pymongo_test
+
+    def setUp(self):
+        self.client.admin.command(SON([
+            ("configureFailPoint", "onPrimaryTransactionalWrite"),
+            ("mode", "alwaysOn")]))
+
+    def tearDown(self):
+        self.client.admin.command(SON([
+            ("configureFailPoint", "onPrimaryTransactionalWrite"),
+            ("mode", "off")]))
+
+    def retryable_single_statement_ops(self, coll):
+        return [
+            (coll.insert_one, [{}], {}),
+            (coll.replace_one, [{}, {}], {}),
+            (coll.update_one, [{}, {'$set': {'a': 1}}], {}),
+            (coll.delete_one, [{}], {}),
+            (coll.insert_one, [{}], {}),  # Insert another document.
+            (coll.find_one_and_replace, [{}, {'a': 3}], {}),
+            (coll.find_one_and_update, [{}, {'$set': {'a': 1}}], {}),
+            (coll.find_one_and_delete, [{}, {}], {})]
+
+    def test_supported_single_statement_no_retry(self):
+        listener = CommandListener()
+        client = rs_or_single_client(
+            retryWrites=False, event_listeners=[listener])
+        for method, args, kwargs in self.retryable_single_statement_ops(
+                client.db.retryable_write_test):
+            listener.results.clear()
+            method(*args, **kwargs)
+            for event in listener.results['started']:
+                self.assertFalse('txnNumber' in event.command,
+                                 "%s sent txnNumber with %s" % (
+                                     method.__name__, event.command_name))
+
+    def test_supported_single_statement(self):
+        for method, args, kwargs in self.retryable_single_statement_ops(
+                self.db.retryable_write_test):
+            self.listener.results.clear()
+            method(*args, **kwargs)
+            commands_started = self.listener.results['started']
+            self.assertEqual(len(self.listener.results['failed']), 1,
+                             method.__name__)
+            self.assertEqual(len(self.listener.results['succeeded']), 1,
+                             method.__name__)
+            self.assertEqual(len(commands_started), 2, method.__name__)
+            first_attempt = commands_started[0]
+            self.assertTrue(
+                'lsid' in first_attempt.command,
+                "%s sent no lsid with %s" % (
+                    method.__name__, first_attempt.command_name))
+            initial_session_id = first_attempt.command['lsid']
+            self.assertTrue(
+                'txnNumber' in first_attempt.command,
+                "%s sent no txnNumber with %s" % (
+                    method.__name__, first_attempt.command_name))
+            initial_transaction_id = first_attempt.command['txnNumber']
+            retry_attempt = commands_started[1]
+            self.assertTrue(
+                'lsid' in retry_attempt.command,
+                "%s sent no lsid with %s" % (
+                    method.__name__, first_attempt.command_name))
+            self.assertEqual(retry_attempt.command['lsid'], initial_session_id)
+            self.assertTrue(
+                'txnNumber' in retry_attempt.command,
+                "%s sent no txnNumber with %s" % (
+                    method.__name__, first_attempt.command_name))
+            self.assertEqual(retry_attempt.command['txnNumber'],
+                             initial_transaction_id)
+
+    def test_unsupported_single_statement(self):
+        coll = self.db.retryable_write_test
+        coll.insert_many([{}, {}])
+        for method, args, kwargs in [
+                (coll.update_many, [{}, {'$set': {'a': 1}}], {}),
+                (coll.delete_many, [{}], {})]:
+            self.listener.results.clear()
+            method(*args, **kwargs)
+            started_events = self.listener.results['started']
+            self.assertEqual(len(self.listener.results['succeeded']), 1,
+                             method.__name__)
+            self.assertEqual(len(started_events), 1, method.__name__)
+            event = started_events[0]
+            self.assertTrue(
+                'lsid' in event.command,
+                "%s sent no lsid with %s" % (
+                    method.__name__, event.command_name))
+            self.assertFalse(
+                'txnNumber' in event.command,
+                "%s sent txnNumber with %s" % (
+                    method.__name__, event.command_name))
 
 
 if __name__ == "__main__":
