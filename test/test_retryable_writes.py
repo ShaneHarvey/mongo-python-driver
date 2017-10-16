@@ -22,14 +22,10 @@ import sys
 sys.path[0:0] = [""]
 
 from bson import SON
-from bson.py3compat import iteritems
-from pymongo import operations
-from pymongo.command_cursor import CommandCursor
-from pymongo.cursor import Cursor
-from pymongo.errors import ConnectionFailure
-from pymongo.results import _WriteResult, BulkWriteResult
 
+from pymongo.errors import ConfigurationError
 from pymongo.monitoring import _SENSITIVE_COMMANDS
+from pymongo.write_concern import WriteConcern
 
 from test import unittest, client_context, IntegrationTest
 from test.utils import rs_or_single_client, EventListener
@@ -130,6 +126,26 @@ def create_tests():
 create_tests()
 
 
+def retryable_single_statement_ops(coll):
+    return [
+        (coll.insert_one, [{}], {}),
+        (coll.replace_one, [{}, {}], {}),
+        (coll.update_one, [{}, {'$set': {'a': 1}}], {}),
+        (coll.delete_one, [{}], {}),
+        (coll.insert_one, [{}], {}),  # Insert document for find_one.
+        (coll.find_one_and_replace, [{}, {'a': 3}], {}),
+        (coll.find_one_and_update, [{}, {'$set': {'a': 1}}], {}),
+        (coll.find_one_and_delete, [{}, {}], {}),
+    ]
+
+
+def non_retryable_single_statement_ops(coll):
+    return [
+        (coll.update_many, [{}, {'$set': {'a': 1}}], {}),
+        (coll.delete_many, [{}], {}),
+    ]
+
+
 class TestRetryableWrites(IntegrationTest):
 
     @classmethod
@@ -151,22 +167,11 @@ class TestRetryableWrites(IntegrationTest):
             ("configureFailPoint", "onPrimaryTransactionalWrite"),
             ("mode", "off")]))
 
-    def retryable_single_statement_ops(self, coll):
-        return [
-            (coll.insert_one, [{}], {}),
-            (coll.replace_one, [{}, {}], {}),
-            (coll.update_one, [{}, {'$set': {'a': 1}}], {}),
-            (coll.delete_one, [{}], {}),
-            (coll.insert_one, [{}], {}),  # Insert another document.
-            (coll.find_one_and_replace, [{}, {'a': 3}], {}),
-            (coll.find_one_and_update, [{}, {'$set': {'a': 1}}], {}),
-            (coll.find_one_and_delete, [{}, {}], {})]
-
     def test_supported_single_statement_no_retry(self):
         listener = CommandListener()
         client = rs_or_single_client(
             retryWrites=False, event_listeners=[listener])
-        for method, args, kwargs in self.retryable_single_statement_ops(
+        for method, args, kwargs in retryable_single_statement_ops(
                 client.db.retryable_write_test):
             listener.results.clear()
             method(*args, **kwargs)
@@ -176,7 +181,7 @@ class TestRetryableWrites(IntegrationTest):
                                      method.__name__, event.command_name))
 
     def test_supported_single_statement(self):
-        for method, args, kwargs in self.retryable_single_statement_ops(
+        for method, args, kwargs in retryable_single_statement_ops(
                 self.db.retryable_write_test):
             self.listener.results.clear()
             method(*args, **kwargs)
@@ -213,9 +218,9 @@ class TestRetryableWrites(IntegrationTest):
     def test_unsupported_single_statement(self):
         coll = self.db.retryable_write_test
         coll.insert_many([{}, {}])
-        for method, args, kwargs in [
-                (coll.update_many, [{}, {'$set': {'a': 1}}], {}),
-                (coll.delete_many, [{}], {})]:
+        coll_w0 = coll.with_options(write_concern=WriteConcern(w=0))
+        for method, args, kwargs in (non_retryable_single_statement_ops(coll) +
+                                     retryable_single_statement_ops(coll_w0)):
             self.listener.results.clear()
             method(*args, **kwargs)
             started_events = self.listener.results['started']
@@ -223,14 +228,28 @@ class TestRetryableWrites(IntegrationTest):
                              method.__name__)
             self.assertEqual(len(started_events), 1, method.__name__)
             event = started_events[0]
-            self.assertTrue(
-                'lsid' in event.command,
-                "%s sent no lsid with %s" % (
-                    method.__name__, event.command_name))
             self.assertFalse(
                 'txnNumber' in event.command,
                 "%s sent txnNumber with %s" % (
                     method.__name__, event.command_name))
+
+
+class TestRetryableWritesNotSupported(IntegrationTest):
+
+    @client_context.require_version_max(3, 4, 99)
+    def test_raises_error(self):
+        client = rs_or_single_client(retryWrites=True)
+        coll = client.pymongo_test.test
+        # No error running a non-retryable operation.
+        client.admin.command('isMaster')
+        for method, args, kwargs in non_retryable_single_statement_ops(coll):
+            method(*args, **kwargs)
+
+        for method, args, kwargs in retryable_single_statement_ops(coll):
+            with self.assertRaisesRegex(
+                    ConfigurationError,
+                    'Must be connected to MongoDB 3\.6\+ to use retryWrites'):
+                method(*args, **kwargs)
 
 
 if __name__ == "__main__":
