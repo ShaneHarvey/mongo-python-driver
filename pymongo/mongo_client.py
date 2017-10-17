@@ -59,7 +59,8 @@ from pymongo.errors import (AutoReconnect,
                             InvalidURI,
                             NetworkTimeout,
                             NotMasterError,
-                            OperationFailure)
+                            OperationFailure,
+                            ServerSelectionTimeoutError)
 from pymongo.read_preferences import ReadPreference
 from pymongo.server_selectors import (writable_preferred_server_selector,
                                       writable_server_selector)
@@ -993,6 +994,11 @@ class MongoClient(common.BaseObject):
                             'Must be connected to MongoDB 3.6+ to use '
                             'retryWrites')
                     return func(s, sock_info, retryable)
+            except ServerSelectionTimeoutError:
+                # A ServerSelectionTimeoutError error indicates that there may
+                # be a persistent outage. Attempting to retry in this case will
+                # most likely be a waste of time.
+                raise
             except ConnectionFailure:
                 if not retryable:
                     raise

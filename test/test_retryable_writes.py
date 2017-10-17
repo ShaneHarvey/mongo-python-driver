@@ -23,8 +23,11 @@ sys.path[0:0] = [""]
 
 from bson import SON
 
-from pymongo.errors import ConfigurationError, ConnectionFailure
+from pymongo.errors import (ConfigurationError,
+                            ConnectionFailure,
+                            ServerSelectionTimeoutError)
 from pymongo.monitoring import _SENSITIVE_COMMANDS
+from pymongo.mongo_client import MongoClient
 from pymongo.write_concern import WriteConcern
 
 from test import unittest, client_context, IntegrationTest
@@ -238,11 +241,24 @@ class TestRetryableWrites(IntegrationTest):
             self.assertEqual(len(self.listener.results['succeeded']), 1,
                              method.__name__)
             self.assertEqual(len(started_events), 1, method.__name__)
-            event = started_events[0]
-            self.assertFalse(
-                'txnNumber' in event.command,
-                "%s sent txnNumber with %s" % (
-                    method.__name__, event.command_name))
+            for event in started_events:
+                self.assertNotIn(
+                    'txnNumber', event.command,
+                    '%s sent txnNumber with %s' % (
+                        method.__name__, event.command_name))
+
+    def test_server_selection_timeout_not_retryed(self):
+        listener = CommandListener()
+        client = MongoClient(
+            'somedomainthatdoesntexist.org',
+            serverSelectionTimeoutMS=10,
+            retryWrites=True, event_listeners=[listener])
+        for method, args, kwargs in retryable_single_statement_ops(
+                client.db.retryable_write_test):
+            listener.results.clear()
+            with self.assertRaises(ServerSelectionTimeoutError):
+                method(*args, **kwargs)
+            self.assertEqual(len(listener.results['started']), 0)
 
 
 class TestRetryableWritesNotSupported(IntegrationTest):
