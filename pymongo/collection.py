@@ -181,11 +181,6 @@ class Collection(common.BaseObject):
             unicode_decode_error_handler='replace',
             document_class=dict)
 
-    @property
-    def _retry_writes(self):
-        return (self.__database.client.retry_writes and
-                self.write_concern.acknowledged)
-
     def _socket_for_reads(self):
         return self.__database.client._socket_for_reads(self.read_preference)
 
@@ -697,12 +692,12 @@ class Collection(common.BaseObject):
         if not (isinstance(document, RawBSONDocument) or "_id" in document):
             document["_id"] = ObjectId()
 
-        def _insert_one(session, sock_info):
+        def _insert_one(session, sock_info, retryable_write):
             return InsertOneResult(
                 self._insert(sock_info, document,
                              bypass_doc_val=bypass_document_validation,
                              session=session,
-                             retryable_write=self._retry_writes),
+                             retryable_write=retryable_write),
                 self.write_concern.acknowledged)
 
         return self.__database.client._retryable_write(
@@ -908,11 +903,11 @@ class Collection(common.BaseObject):
         common.validate_is_mapping("filter", filter)
         common.validate_ok_for_replace(replacement)
 
-        def _replace_one(session, sock_info):
+        def _replace_one(session, sock_info, retryable_write):
             result = self._update(sock_info, filter, replacement, upsert,
                                   bypass_doc_val=bypass_document_validation,
                                   collation=collation, session=session,
-                                  retryable_write=self._retry_writes)
+                                  retryable_write=retryable_write)
             return UpdateResult(result, self.write_concern.acknowledged)
 
         return self.__database.client._retryable_write(
@@ -978,14 +973,14 @@ class Collection(common.BaseObject):
         common.validate_ok_for_update(update)
         common.validate_list_or_none('array_filters', array_filters)
 
-        def _update_one(session, sock_info):
+        def _update_one(session, sock_info, retryable_write):
             result = self._update(sock_info, filter, update, upsert,
                                   check_keys=False,
                                   bypass_doc_val=bypass_document_validation,
                                   collation=collation,
                                   array_filters=array_filters,
                                   session=session,
-                                  retryable_write=self._retry_writes)
+                                  retryable_write=retryable_write)
             return UpdateResult(result, self.write_concern.acknowledged)
 
         return self.__database.client._retryable_write(
@@ -1151,11 +1146,11 @@ class Collection(common.BaseObject):
 
         .. versionadded:: 3.0
         """
-        def _delete_one(session, sock_info):
+        def _delete_one(session, sock_info, retryable_write):
             return DeleteResult(
                 self._delete(sock_info, filter, False, collation=collation,
                              session=session,
-                             retryable_write=self._retry_writes),
+                             retryable_write=retryable_write),
                 self.write_concern.acknowledged)
 
         return self.__database.client._retryable_write(
@@ -2608,8 +2603,8 @@ class Collection(common.BaseObject):
             acknowledged = write_concern.get("w", 1) > 0
         else:
             acknowledged = self.write_concern.acknowledged
-        retryable_write = self.__database.client.retry_writes and acknowledged
-        def _find_and_modify(session, sock_info):
+
+        def _find_and_modify(session, sock_info, retryable_write):
             if array_filters is not None:
                 if sock_info.max_wire_version < 6:
                     raise ConfigurationError(
