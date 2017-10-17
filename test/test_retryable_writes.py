@@ -1,4 +1,4 @@
-# Copyright 2015 MongoDB, Inc.
+# Copyright 2017-present MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -67,11 +67,11 @@ class TestAllScenarios(IntegrationTest):
 
     def tearDown(self):
         self.client.admin.command(SON([
-            ("configureFailPoint", "onPrimaryTransactionalWrite"),
-            ("mode", "off")]))
+            ('configureFailPoint', 'onPrimaryTransactionalWrite'),
+            ('mode', 'off')]))
 
     def set_fail_point(self, command_args):
-        cmd = SON([("configureFailPoint", "onPrimaryTransactionalWrite")])
+        cmd = SON([('configureFailPoint', 'onPrimaryTransactionalWrite')])
         cmd.update(command_args)
         self.client.admin.command(cmd)
 
@@ -173,13 +173,13 @@ class TestRetryableWrites(IntegrationTest):
 
     def setUp(self):
         self.client.admin.command(SON([
-            ("configureFailPoint", "onPrimaryTransactionalWrite"),
-            ("mode", "alwaysOn")]))
+            ('configureFailPoint', 'onPrimaryTransactionalWrite'),
+            ('mode', 'alwaysOn')]))
 
     def tearDown(self):
         self.client.admin.command(SON([
-            ("configureFailPoint", "onPrimaryTransactionalWrite"),
-            ("mode", "off")]))
+            ('configureFailPoint', 'onPrimaryTransactionalWrite'),
+            ('mode', 'off')]))
 
     def test_supported_single_statement_no_retry(self):
         listener = CommandListener()
@@ -190,9 +190,10 @@ class TestRetryableWrites(IntegrationTest):
             listener.results.clear()
             method(*args, **kwargs)
             for event in listener.results['started']:
-                self.assertFalse('txnNumber' in event.command,
-                                 "%s sent txnNumber with %s" % (
-                                     method.__name__, event.command_name))
+                self.assertNotIn(
+                    'txnNumber', event.command,
+                    '%s sent txnNumber with %s' % (
+                         method.__name__, event.command_name))
 
     def test_supported_single_statement(self):
         for method, args, kwargs in retryable_single_statement_ops(
@@ -206,25 +207,25 @@ class TestRetryableWrites(IntegrationTest):
                              method.__name__)
             self.assertEqual(len(commands_started), 2, method.__name__)
             first_attempt = commands_started[0]
-            self.assertTrue(
-                'lsid' in first_attempt.command,
-                "%s sent no lsid with %s" % (
+            self.assertIn(
+                'lsid', first_attempt.command,
+                '%s sent no lsid with %s' % (
                     method.__name__, first_attempt.command_name))
             initial_session_id = first_attempt.command['lsid']
-            self.assertTrue(
-                'txnNumber' in first_attempt.command,
-                "%s sent no txnNumber with %s" % (
+            self.assertIn(
+                'txnNumber', first_attempt.command,
+                '%s sent no txnNumber with %s' % (
                     method.__name__, first_attempt.command_name))
             initial_transaction_id = first_attempt.command['txnNumber']
             retry_attempt = commands_started[1]
-            self.assertTrue(
-                'lsid' in retry_attempt.command,
-                "%s sent no lsid with %s" % (
+            self.assertIn(
+                'lsid', retry_attempt.command,
+                '%s sent no lsid with %s' % (
                     method.__name__, first_attempt.command_name))
             self.assertEqual(retry_attempt.command['lsid'], initial_session_id)
-            self.assertTrue(
-                'txnNumber' in retry_attempt.command,
-                "%s sent no txnNumber with %s" % (
+            self.assertIn(
+                'txnNumber', retry_attempt.command,
+                '%s sent no txnNumber with %s' % (
                     method.__name__, first_attempt.command_name))
             self.assertEqual(retry_attempt.command['txnNumber'],
                              initial_transaction_id)
@@ -279,5 +280,5 @@ class TestRetryableWritesNotSupported(IntegrationTest):
                 method(*args, **kwargs)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
