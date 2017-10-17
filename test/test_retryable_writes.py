@@ -91,8 +91,8 @@ def create_test(scenario_def, test):
         error = None
         try:
             result = run_operation(self.db.test, test)
-        except ConnectionFailure as error:
-            pass
+        except ConnectionFailure as exc:
+            error = exc
 
         if should_fail:
             self.assertIsNotNone(error, 'should have raised an error')
