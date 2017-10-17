@@ -44,7 +44,9 @@ Classes
 import collections
 import uuid
 
-from bson import Binary, Int64
+from bson.binary import Binary
+from bson.int64 import Int64
+
 from pymongo import monotonic
 from pymongo.errors import InvalidOperation
 
