@@ -209,7 +209,8 @@ class MongoClient(common.BaseObject):
           - `event_listeners`: a list or tuple of event listeners. See
             :mod:`~pymongo.monitoring` for details.
           - `retryWrites`: (boolean) Whether supported write operations
-            executed within this MongoClient will be retried. See also
+            executed within this MongoClient will be retried. See
+            https://github.com/mongodb/specifications/blob/master/source/retryable-writes/retryable-writes.rst
           - `socketKeepAlive`: (boolean) **DEPRECATED** Whether to send
             periodic keep-alive packets on connected sockets. Defaults to
             ``True``. Disabling it is not recommended, see
@@ -983,7 +984,7 @@ class MongoClient(common.BaseObject):
 
         Returns func()'s return value on success. On error retries once.
 
-        Re-raises any exception thrown by fn().
+        Re-raises any exception thrown by func().
         """
         retryable = acknowledged and self.retry_writes
         with self._tmp_session(session) as s:

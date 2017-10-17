@@ -248,7 +248,7 @@ class TestRetryableWrites(IntegrationTest):
                     '%s sent txnNumber with %s' % (
                         method.__name__, event.command_name))
 
-    def test_server_selection_timeout_not_retryed(self):
+    def test_server_selection_timeout_not_retried(self):
         listener = CommandListener()
         client = MongoClient(
             'somedomainthatdoesntexist.org',
