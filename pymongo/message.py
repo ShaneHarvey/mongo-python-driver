@@ -518,13 +518,31 @@ if _use_c:
     update = _cmessage._update_message
 
 
+def _encode_with_cluster_time(doc, check_keys, opts):
+    """Encode a document possibly with $clusterTime."""
+    if check_keys:
+        # Temporarily remove $clusterTime to avoid an error from the $-prefix.
+        cluster_time = doc.pop('$clusterTime', None)
+        encoded = bson.BSON.encode(doc, True, opts)
+        if cluster_time is not None:
+            extra = bson._name_value_to_bson(
+                b"$clusterTime\x00", cluster_time, False, opts)
+            encoded = (
+                bson._PACK_INT(len(encoded) + len(extra))
+                + encoded[4:-1] + extra + b'\x00')
+            doc['$clusterTime'] = cluster_time
+    else:
+        encoded = bson.BSON.encode(doc, False, opts)
+    return encoded
+
+
 # TODO: Write C extension version.
 def op_msg(flags, command, dbname, read_preference, slave_ok, opts,
            check_keys=False):
     """Get a **OP_MSG** message.
     """
     data = struct.pack("<IB", flags, 0)
-    encoded = bson.BSON.encode(command, check_keys, opts)
+    encoded = _encode_with_cluster_time(command, check_keys, opts)
     extra = bson._element_to_bson("$db", dbname, False, opts)
     if read_preference.mode and "$readPreference" not in command:
         extra += bson._element_to_bson("$readPreference",
@@ -550,19 +568,7 @@ def query(options, collection_name, num_to_skip,
     data += bson._make_c_string(collection_name)
     data += struct.pack("<i", num_to_skip)
     data += struct.pack("<i", num_to_return)
-    if check_keys:
-        # Temporarily remove $clusterTime to avoid an error from the $-prefix.
-        cluster_time = query.pop('$clusterTime', None)
-        encoded = bson.BSON.encode(query, True, opts)
-        if cluster_time is not None:
-            extra = bson._name_value_to_bson(
-                b"$clusterTime\x00", cluster_time, False, opts)
-            encoded = (
-                bson._PACK_INT(len(encoded) + len(extra))
-                + encoded[4:-1] + extra + b'\x00')
-            query['$clusterTime'] = cluster_time
-    else:
-        encoded = bson.BSON.encode(query, False, opts)
+    encoded = _encode_with_cluster_time(query, False, opts)
     data += encoded
     max_bson_size = len(encoded)
     if field_selector is not None:
