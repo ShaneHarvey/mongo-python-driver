@@ -60,6 +60,7 @@ class TestAllScenarios(IntegrationTest):
 
     @classmethod
     @client_context.require_version_min(3, 5)
+    @client_context.require_replica_set
     def setUpClass(cls):
         super(TestAllScenarios, cls).setUpClass()
         cls.client = rs_or_single_client(retryWrites=True)
@@ -164,6 +165,7 @@ class TestRetryableWrites(IntegrationTest):
 
     @classmethod
     @client_context.require_version_min(3, 5)
+    @client_context.require_replica_set
     def setUpClass(cls):
         super(TestRetryableWrites, cls).setUpClass()
         cls.listener = CommandListener()
@@ -268,7 +270,7 @@ class TestRetryableWritesNotSupported(IntegrationTest):
     def test_raises_error(self):
         client = rs_or_single_client(retryWrites=True)
         coll = client.pymongo_test.test
-        # No error running a non-retryable operation.
+        # No error running non-retryable operations.
         client.admin.command('isMaster')
         for method, args, kwargs in non_retryable_single_statement_ops(coll):
             method(*args, **kwargs)
