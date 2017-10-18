@@ -568,7 +568,7 @@ def query(options, collection_name, num_to_skip,
     data += bson._make_c_string(collection_name)
     data += struct.pack("<i", num_to_skip)
     data += struct.pack("<i", num_to_return)
-    encoded = _encode_with_cluster_time(query, False, opts)
+    encoded = _encode_with_cluster_time(query, check_keys, opts)
     data += encoded
     max_bson_size = len(encoded)
     if field_selector is not None:
