@@ -623,7 +623,7 @@ class Collection(common.BaseObject):
         concern = (write_concern or self.write_concern).document
         blk = _Bulk(self, ordered, bypass_doc_val)
         blk.ops = [(message._INSERT, doc) for doc in gen()]
-        blk.execute(concern, session=session)
+        blk.execute(concern, session=session, from_insert=True)
         return ids
 
     def insert_one(self, document, bypass_document_validation=False,

@@ -31,6 +31,7 @@ from pymongo.errors import (BulkWriteError,
                             DocumentTooLarge,
                             InvalidOperation,
                             OperationFailure)
+from pymongo.helpers import _check_write_command_response
 from pymongo.message import (_INSERT, _UPDATE, _DELETE,
                              _do_batched_insert,
                              _do_batched_write_command,
@@ -293,7 +294,8 @@ class _Bulk(object):
             if run.ops:
                 yield run
 
-    def execute_command(self, sock_info, generator, write_concern, session):
+    def execute_command(self, sock_info, generator, write_concern, session,
+                        from_insert=False):
         """Execute using write commands.
         """
         # nModified is only reported for write commands, not legacy ops.
@@ -346,6 +348,9 @@ class _Bulk(object):
                     if self.ordered and "writeErrors" in result:
                         break
                     idx_offset += len(to_send)
+
+                if from_insert:
+                    _check_write_command_response(results)
 
                 _merge_command(run, full_result, results)
 
@@ -425,7 +430,7 @@ class _Bulk(object):
                 if self.ordered:
                     break
 
-    def execute(self, write_concern, session):
+    def execute(self, write_concern, session, from_insert=False):
         """Execute operations.
         """
         if not self.ops:
@@ -461,7 +466,8 @@ class _Bulk(object):
                 self.execute_no_results(sock_info, generator)
             else:
                 return self.execute_command(
-                    sock_info, generator, write_concern, session)
+                    sock_info, generator, write_concern, session,
+                    from_insert)
 
 
 class BulkUpsertOperation(object):
