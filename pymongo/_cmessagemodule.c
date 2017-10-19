@@ -934,7 +934,7 @@ static PyObject* _cbson_do_batched_insert(PyObject* self, PyObject* args) {
     /* Send the last (or only) batch */
     result = _send_insert(self, ctx, last_error_args, buffer,
                           collection_name, collection_name_length,
-                          request_id, safe, &options, to_publish);
+                          request_id, send_safe, &options, to_publish);
 
     Py_DECREF(to_publish);
     PyMem_Free(collection_name);
