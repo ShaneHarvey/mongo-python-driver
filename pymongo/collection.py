@@ -621,33 +621,9 @@ class Collection(common.BaseObject):
                     yield doc
 
         concern = (write_concern or self.write_concern).document
-        acknowledged = concern.get("w") != 0
-
-        command = SON([('insert', self.name),
-                       ('ordered', ordered)])
-        if concern:
-            command['writeConcern'] = concern
-        if op_id is None:
-            op_id = message._randint()
-        if bypass_doc_val and sock_info.max_wire_version >= 4:
-            command['bypassDocumentValidation'] = True
-        bwc = message._BulkWriteContext(
-            self.database.name, command, sock_info, op_id,
-            self.database.client._event_listeners, session=None)
-        if acknowledged:
-            # Batched insert command.
-            with self.__database.client._tmp_session(session) as s:
-                if s:
-                    command['lsid'] = s._use_lsid()
-                results = message._do_batched_write_command(
-                    self.database.name + ".$cmd", message._INSERT, command,
-                    gen(), check_keys, self.__write_response_codec_options, bwc)
-                _check_write_command_response(results)
-        else:
-            # Legacy batched OP_INSERT.
-            message._do_batched_insert(self.__full_name, gen(), check_keys,
-                                       False, concern, not ordered,
-                                       self.__write_response_codec_options, bwc)
+        blk = _Bulk(self, ordered, bypass_doc_val)
+        blk.ops = [(message._INSERT, doc) for doc in gen()]
+        blk.execute(concern, session=session)
         return ids
 
     def insert_one(self, document, bypass_document_validation=False,
