@@ -35,8 +35,12 @@ from pymongo.common import ORDERED_TYPES
 from pymongo.collation import validate_collation_or_none
 from pymongo.change_stream import ChangeStream
 from pymongo.cursor import Cursor, RawBatchCursor
-from pymongo.errors import ConfigurationError, InvalidName, OperationFailure
-from pymongo.helpers import _check_write_command_response
+from pymongo.errors import (ConfigurationError,
+                            BulkWriteError,
+                            InvalidName,
+                            OperationFailure)
+from pymongo.helpers import (_check_write_command_response,
+                             _raise_last_error)
 from pymongo.message import _UNICODE_REPLACE_CODEC_OPTIONS
 from pymongo.operations import IndexModel
 from pymongo.read_concern import DEFAULT_READ_CONCERN
@@ -571,7 +575,7 @@ class Collection(common.BaseObject):
                     check_keys=check_keys,
                     session=s,
                     client=self.__database.client)
-                _check_write_command_response([(0, result)])
+                _check_write_command_response(result)
         else:
             # Legacy OP_INSERT.
             self._legacy_write(
@@ -582,15 +586,15 @@ class Collection(common.BaseObject):
         if not isinstance(doc, RawBSONDocument):
             return doc.get('_id')
 
-    def _insert(self, sock_info, docs, ordered=True, check_keys=True,
+    def _insert(self, docs, ordered=True, check_keys=True,
                 manipulate=False, write_concern=None, op_id=None,
                 bypass_doc_val=False, session=None):
         """Internal insert helper."""
         if isinstance(docs, collections.Mapping):
-            return self._insert_one(
-                sock_info, docs, ordered,
-                check_keys, manipulate, write_concern, op_id, bypass_doc_val,
-                session)
+            with self._socket_for_writes() as sock_info:
+                return self._insert_one(
+                    sock_info, docs, ordered, check_keys, manipulate,
+                    write_concern, op_id, bypass_doc_val, session)
 
         ids = []
 
@@ -621,33 +625,12 @@ class Collection(common.BaseObject):
                     yield doc
 
         concern = (write_concern or self.write_concern).document
-        acknowledged = concern.get("w") != 0
-
-        command = SON([('insert', self.name),
-                       ('ordered', ordered)])
-        if concern:
-            command['writeConcern'] = concern
-        if op_id is None:
-            op_id = message._randint()
-        if bypass_doc_val and sock_info.max_wire_version >= 4:
-            command['bypassDocumentValidation'] = True
-        bwc = message._BulkWriteContext(
-            self.database.name, command, sock_info, op_id,
-            self.database.client._event_listeners, session=None)
-        if acknowledged:
-            # Batched insert command.
-            with self.__database.client._tmp_session(session) as s:
-                if s:
-                    command['lsid'] = s._use_lsid()
-                results = message._do_batched_write_command(
-                    self.database.name + ".$cmd", message._INSERT, command,
-                    gen(), check_keys, self.__write_response_codec_options, bwc)
-                _check_write_command_response(results)
-        else:
-            # Legacy batched OP_INSERT.
-            message._do_batched_insert(self.__full_name, gen(), check_keys,
-                                       False, concern, not ordered,
-                                       self.__write_response_codec_options, bwc)
+        blk = _Bulk(self, ordered, bypass_doc_val)
+        blk.ops = [(message._INSERT, doc) for doc in gen()]
+        try:
+            blk.execute(concern, session=session)
+        except BulkWriteError as bwe:
+            _raise_last_error(bwe.details)
         return ids
 
     def insert_one(self, document, bypass_document_validation=False,
@@ -691,12 +674,11 @@ class Collection(common.BaseObject):
         common.validate_is_document_type("document", document)
         if not (isinstance(document, RawBSONDocument) or "_id" in document):
             document["_id"] = ObjectId()
-        with self._socket_for_writes() as sock_info:
-            return InsertOneResult(
-                self._insert(sock_info, document,
-                             bypass_doc_val=bypass_document_validation,
-                             session=session),
-                self.write_concern.acknowledged)
+        return InsertOneResult(
+            self._insert(document,
+                         bypass_doc_val=bypass_document_validation,
+                         session=session),
+            self.write_concern.acknowledged)
 
     def insert_many(self, documents, ordered=True,
                     bypass_document_validation=False, session=None):
@@ -812,7 +794,7 @@ class Collection(common.BaseObject):
                     session=s,
                     client=self.__database.client).copy()
 
-            _check_write_command_response([(0, result)])
+            _check_write_command_response(result)
             # Add the updatedExisting field for compatibility.
             if result.get('n') and 'upserted' not in result:
                 result['updatedExisting'] = True
@@ -1091,7 +1073,7 @@ class Collection(common.BaseObject):
                     codec_options=self.__write_response_codec_options,
                     session=s,
                     client=self.__database.client)
-            _check_write_command_response([(0, result)])
+            _check_write_command_response(result)
             return result
         else:
             # Legacy OP_DELETE.
@@ -2597,7 +2579,7 @@ class Collection(common.BaseObject):
                                 read_preference=ReadPreference.PRIMARY,
                                 allowable_errors=[_NO_OBJ_ERROR],
                                 collation=collation, session=session)
-            _check_write_command_response([(0, out)])
+            _check_write_command_response(out)
         return out.get("value")
 
     def find_one_and_delete(self, filter,
@@ -2861,11 +2843,11 @@ class Collection(common.BaseObject):
         if kwargs:
             write_concern = WriteConcern(**kwargs)
 
-        with self._socket_for_writes() as sock_info:
-            if not (isinstance(to_save, RawBSONDocument) or "_id" in to_save):
-                return self._insert(sock_info, to_save, True,
-                                    check_keys, manipulate, write_concern)
-            else:
+        if not (isinstance(to_save, RawBSONDocument) or "_id" in to_save):
+            return self._insert(
+                to_save, True, check_keys, manipulate, write_concern)
+        else:
+            with self._socket_for_writes() as sock_info:
                 self._update(sock_info, {"_id": to_save["_id"]}, to_save, True,
                              check_keys, False, manipulate, write_concern,
                              collation=collation)
@@ -2886,9 +2868,8 @@ class Collection(common.BaseObject):
         write_concern = None
         if kwargs:
             write_concern = WriteConcern(**kwargs)
-        with self._socket_for_writes() as sock_info:
-            return self._insert(sock_info, doc_or_docs, not continue_on_error,
-                                check_keys, manipulate, write_concern)
+        return self._insert(doc_or_docs, not continue_on_error,
+                            check_keys, manipulate, write_concern)
 
     def update(self, spec, document, upsert=False, manipulate=False,
                multi=False, check_keys=True, **kwargs):
@@ -3006,7 +2987,7 @@ class Collection(common.BaseObject):
                                 read_preference=ReadPreference.PRIMARY,
                                 allowable_errors=[_NO_OBJ_ERROR],
                                 collation=collation)
-            _check_write_command_response([(0, out)])
+            _check_write_command_response(out)
 
         if not out['ok']:
             if out["errmsg"] == _NO_OBJ_ERROR:
