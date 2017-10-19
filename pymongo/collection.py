@@ -582,15 +582,15 @@ class Collection(common.BaseObject):
         if not isinstance(doc, RawBSONDocument):
             return doc.get('_id')
 
-    def _insert(self, sock_info, docs, ordered=True, check_keys=True,
+    def _insert(self, docs, ordered=True, check_keys=True,
                 manipulate=False, write_concern=None, op_id=None,
                 bypass_doc_val=False, session=None):
         """Internal insert helper."""
         if isinstance(docs, collections.Mapping):
-            return self._insert_one(
-                sock_info, docs, ordered,
-                check_keys, manipulate, write_concern, op_id, bypass_doc_val,
-                session)
+            with self._socket_for_writes() as sock_info:
+                return self._insert_one(
+                    sock_info, docs, ordered, check_keys, manipulate,
+                    write_concern, op_id, bypass_doc_val, session)
 
         ids = []
 
@@ -667,12 +667,11 @@ class Collection(common.BaseObject):
         common.validate_is_document_type("document", document)
         if not (isinstance(document, RawBSONDocument) or "_id" in document):
             document["_id"] = ObjectId()
-        with self._socket_for_writes() as sock_info:
-            return InsertOneResult(
-                self._insert(sock_info, document,
-                             bypass_doc_val=bypass_document_validation,
-                             session=session),
-                self.write_concern.acknowledged)
+        return InsertOneResult(
+            self._insert(document,
+                         bypass_doc_val=bypass_document_validation,
+                         session=session),
+            self.write_concern.acknowledged)
 
     def insert_many(self, documents, ordered=True,
                     bypass_document_validation=False, session=None):
@@ -2837,11 +2836,11 @@ class Collection(common.BaseObject):
         if kwargs:
             write_concern = WriteConcern(**kwargs)
 
-        with self._socket_for_writes() as sock_info:
-            if not (isinstance(to_save, RawBSONDocument) or "_id" in to_save):
-                return self._insert(sock_info, to_save, True,
-                                    check_keys, manipulate, write_concern)
-            else:
+        if not (isinstance(to_save, RawBSONDocument) or "_id" in to_save):
+            return self._insert(
+                to_save, True, check_keys, manipulate, write_concern)
+        else:
+            with self._socket_for_writes() as sock_info:
                 self._update(sock_info, {"_id": to_save["_id"]}, to_save, True,
                              check_keys, False, manipulate, write_concern,
                              collation=collation)
@@ -2862,9 +2861,8 @@ class Collection(common.BaseObject):
         write_concern = None
         if kwargs:
             write_concern = WriteConcern(**kwargs)
-        with self._socket_for_writes() as sock_info:
-            return self._insert(sock_info, doc_or_docs, not continue_on_error,
-                                check_keys, manipulate, write_concern)
+        return self._insert(doc_or_docs, not continue_on_error,
+                            check_keys, manipulate, write_concern)
 
     def update(self, spec, document, upsert=False, manipulate=False,
                multi=False, check_keys=True, **kwargs):
