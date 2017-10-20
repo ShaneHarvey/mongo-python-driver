@@ -366,8 +366,8 @@ class _Bulk(object):
             raise BulkWriteError(full_result)
         return full_result
 
-    def execute_unacknowledged_insert(self, sock_info, run, op_id):
-        """Execute insert, returning no results (w=0).
+    def execute_insert_no_results(self, sock_info, run, op_id, acknowledged):
+        """Execute insert, returning no results.
         """
         command = SON([('insert', self.collection.name),
                        ('ordered', self.ordered)])
@@ -381,7 +381,7 @@ class _Bulk(object):
             session=None)
         # Legacy batched OP_INSERT.
         _do_batched_insert(
-            self.collection.full_name, run.ops, True, False, concern,
+            self.collection.full_name, run.ops, True, acknowledged, concern,
             not self.ordered, self.collection.codec_options, bwc)
 
     def execute_no_results(self, sock_info, generator):
@@ -397,10 +397,19 @@ class _Bulk(object):
         write_concern = WriteConcern(w=int(self.ordered))
         op_id = _randint()
 
-        for run in generator:
+        run = next(generator)
+        while run:
+            # An ordered bulk write needs to send acknowledged writes to short
+            # circuit the next run.
+            try:
+                next_run = next(generator)
+            except StopIteration:
+                next_run = None
+            needs_ack = self.ordered and next_run is not None
             try:
                 if run.op_type == _INSERT:
-                    self.execute_unacknowledged_insert(sock_info, run, op_id)
+                    self.execute_insert_no_results(
+                        sock_info, run, op_id, needs_ack)
                 elif run.op_type == _UPDATE:
                     for operation in run.ops:
                         doc = operation['u']
@@ -429,6 +438,8 @@ class _Bulk(object):
             except OperationFailure:
                 if self.ordered:
                     break
+            finally:
+                run = next_run
 
     def execute(self, write_concern, session, from_insert=False):
         """Execute operations.

@@ -791,8 +791,8 @@ def _do_batched_insert(collection_name, docs, check_keys,
     if not has_docs:
         raise InvalidOperation("cannot do an empty bulk insert")
 
-    request_id, msg = _insert_message(data.getvalue(), send_safe)
-    ctx.legacy_write(request_id, msg, 0, send_safe, to_send)
+    request_id, msg = _insert_message(data.getvalue(), safe)
+    ctx.legacy_write(request_id, msg, 0, safe, to_send)
 
     # Re-raise any exception stored due to continue_on_error
     if last_error is not None:
