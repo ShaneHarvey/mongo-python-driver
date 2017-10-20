@@ -1220,12 +1220,14 @@ _cbson_do_batched_write_command(PyObject* self, PyObject* args) {
     buffer_write_int32_at_position(buffer, cmd_len_loc, (int32_t)length);
     buffer_write_int32_at_position(buffer, 0, (int32_t)position);
     buffer_write_int32_at_position(buffer, 4, (int32_t)request_id);
-    result = Py_BuildValue("i" BYTES_FORMAT_STRING "N", request_id,
+    result = Py_BuildValue("i" BYTES_FORMAT_STRING "O", request_id,
                            buffer_get_buffer(buffer),
                            buffer_get_position(buffer),
                            to_publish);
-    destroy_codec_options(&options);
+
+    Py_DECREF(to_publish);
     buffer_free(buffer);
+    destroy_codec_options(&options);
     return result;
 
 cmditerfail:
