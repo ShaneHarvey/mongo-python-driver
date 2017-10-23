@@ -544,7 +544,7 @@ class Database(common.BaseObject):
                                  codec_options, session=session, **kwargs)
 
     def _list_collections(self, sock_info, slave_okay, filter=None,
-                         session=None):
+                          session=None):
         """Internal listCollections helper."""
         filter = filter or {}
         cmd = SON([("listCollections", 1), ("cursor", {})])
@@ -557,8 +557,9 @@ class Database(common.BaseObject):
             with self.__client._tmp_session(session, close=False) as s:
                 cursor = self._command(
                     sock_info, cmd, slave_okay, session=s)["cursor"]
-                return CommandCursor(coll, cursor, sock_info.address, session=s,
-                                     explicit_session=session is not None)
+                return CommandCursor(
+                    coll, cursor, sock_info.address, session=s,
+                    explicit_session=session is not None)
         else:
             coll = self["system.namespaces"]
             if "name" in filter:
@@ -578,13 +579,26 @@ class Database(common.BaseObject):
             return CommandCursor(coll, cursor, sock_info.address)
 
     def list_collections(self, filter=None, session=None):
-        """Get info about the collections in this database."""
+        """Get info about the collections in this database.
+
+        :Parameters:
+          - `filter` (optional): if ``False`` list
+            will not include system collections (e.g ``system.indexes``)
+          - `session` (optional): a
+            :class:`~pymongo.client_session.ClientSession`.
+
+        .. versionadded:: 3.6
+        """
         with self.__client._socket_for_reads(
                 ReadPreference.PRIMARY) as (sock_info, slave_okay):
 
              wire_version = sock_info.max_wire_version
-             results = self._list_collections(sock_info, slave_okay, filter=filter,
-                                              session=session)
+             results = self._list_collections(
+                 sock_info, slave_okay, filter=filter, session=session)
+
+        # Iterating the cursor to completion may require a socket for getmore.
+        # Ensure we do that outside the "with" block so we don't require more
+        # than one socket at a time.
         for result in results:
             if wire_version <= 2:
                 name = result["name"]
@@ -592,7 +606,6 @@ class Database(common.BaseObject):
                     continue
                 result["name"] = name.split(".", 1)[1]
             yield result
-
 
     def collection_names(self, include_system_collections=True,
                          session=None):
@@ -607,13 +620,8 @@ class Database(common.BaseObject):
         .. versionchanged:: 3.6
            Added ``session`` parameter.
         """
-
-        results = self.list_collections(session=session)
-
-        # Iterating the cursor to completion may require a socket for getmore.
-        # Ensure we do that outside the "with" block so we don't require more
-        # than one socket at a time.
-        names = [result["name"] for result in results]
+        names = [result["name"] for result in
+                 self.list_collections(session=session)]
 
         if not include_system_collections:
             names = [name for name in names if not name.startswith("system.")]

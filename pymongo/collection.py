@@ -1968,9 +1968,8 @@ class Collection(common.BaseObject):
         .. versionchanged:: 3.6
            Added ``session`` parameter.
         """
-        criteria = {"name": self.__name}
-        cursor = self.__database.list_collections(filter=criteria,
-                                                      session=session)
+        cursor = self.__database.list_collections(
+            filter={"name": self.__name}, session=session)
 
         result = None
         for doc in cursor:
