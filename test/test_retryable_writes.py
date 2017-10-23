@@ -278,7 +278,8 @@ class TestRetryableWritesNotSupported(IntegrationTest):
         for method, args, kwargs in retryable_single_statement_ops(coll):
             with self.assertRaisesRegex(
                     ConfigurationError,
-                    'Must be connected to MongoDB 3\.6\+ to use retryWrites'):
+                    'Retryable writes are not supported by this MongoDB '
+                    'deployment'):
                 method(*args, **kwargs)
 
 

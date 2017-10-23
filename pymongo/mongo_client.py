@@ -990,10 +990,11 @@ class MongoClient(common.BaseObject):
         with self._tmp_session(session) as s:
             try:
                 with self._socket_for_writes() as sock_info:
-                    if retryable and sock_info.max_wire_version < 6:
+                    if retryable and (
+                            s is None or not sock_info.supports_sessions):
                         raise ConfigurationError(
-                            'Must be connected to MongoDB 3.6+ to use '
-                            'retryWrites')
+                            'Retryable writes are not supported by this '
+                            'MongoDB deployment')
                     return func(s, sock_info, retryable)
             except ServerSelectionTimeoutError:
                 # A ServerSelectionTimeoutError error indicates that there may
