@@ -35,8 +35,12 @@ from pymongo.common import ORDERED_TYPES
 from pymongo.collation import validate_collation_or_none
 from pymongo.change_stream import ChangeStream
 from pymongo.cursor import Cursor, RawBatchCursor
-from pymongo.errors import ConfigurationError, InvalidName, OperationFailure
-from pymongo.helpers import _check_write_command_response
+from pymongo.errors import (ConfigurationError,
+                            BulkWriteError,
+                            InvalidName,
+                            OperationFailure)
+from pymongo.helpers import (_check_write_command_response,
+                             _raise_last_error)
 from pymongo.message import _UNICODE_REPLACE_CODEC_OPTIONS
 from pymongo.operations import IndexModel
 from pymongo.read_concern import DEFAULT_READ_CONCERN
@@ -571,7 +575,7 @@ class Collection(common.BaseObject):
                     check_keys=check_keys,
                     session=s,
                     client=self.__database.client)
-                _check_write_command_response([(0, result)])
+                _check_write_command_response(result)
         else:
             # Legacy OP_INSERT.
             self._legacy_write(
@@ -623,7 +627,10 @@ class Collection(common.BaseObject):
         concern = (write_concern or self.write_concern).document
         blk = _Bulk(self, ordered, bypass_doc_val)
         blk.ops = [(message._INSERT, doc) for doc in gen()]
-        blk.execute(concern, session=session, from_insert=True)
+        try:
+            blk.execute(concern, session=session)
+        except BulkWriteError as bwe:
+            _raise_last_error(bwe.details)
         return ids
 
     def insert_one(self, document, bypass_document_validation=False,
@@ -787,7 +794,7 @@ class Collection(common.BaseObject):
                     session=s,
                     client=self.__database.client).copy()
 
-            _check_write_command_response([(0, result)])
+            _check_write_command_response(result)
             # Add the updatedExisting field for compatibility.
             if result.get('n') and 'upserted' not in result:
                 result['updatedExisting'] = True
@@ -1066,7 +1073,7 @@ class Collection(common.BaseObject):
                     codec_options=self.__write_response_codec_options,
                     session=s,
                     client=self.__database.client)
-            _check_write_command_response([(0, result)])
+            _check_write_command_response(result)
             return result
         else:
             # Legacy OP_DELETE.
@@ -2572,7 +2579,7 @@ class Collection(common.BaseObject):
                                 read_preference=ReadPreference.PRIMARY,
                                 allowable_errors=[_NO_OBJ_ERROR],
                                 collation=collation, session=session)
-            _check_write_command_response([(0, out)])
+            _check_write_command_response(out)
         return out.get("value")
 
     def find_one_and_delete(self, filter,
@@ -2980,7 +2987,7 @@ class Collection(common.BaseObject):
                                 read_preference=ReadPreference.PRIMARY,
                                 allowable_errors=[_NO_OBJ_ERROR],
                                 collation=collation)
-            _check_write_command_response([(0, out)])
+            _check_write_command_response(out)
 
         if not out['ok']:
             if out["errmsg"] == _NO_OBJ_ERROR:
