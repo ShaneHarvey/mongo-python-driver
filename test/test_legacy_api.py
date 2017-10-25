@@ -272,14 +272,16 @@ class TestLegacy(IntegrationTest):
         with self.assertRaises(DuplicateKeyError):
             collection.insert(
                 [{'_id': 1, 's': large}, {'_id': 2, 's': large}],
-                continue_on_error=True, w=len(client_context.nodes)+1)
+                continue_on_error=True,
+                w=len(client_context.nodes) + 10, wtimeout=1)
         self.assertEqual(2, collection.count())
         collection.delete_many({})
 
         with self.assertRaises(WriteConcernError):
             collection.insert(
                 [{'_id': 1, 's': large}, {'_id': 2, 's': large}],
-                continue_on_error=True, w=len(client_context.nodes)+1)
+                continue_on_error=True,
+                w=len(client_context.nodes) + 10, wtimeout=1)
         self.assertEqual(2, collection.count())
 
     def test_insert_iterables(self):
