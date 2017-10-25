@@ -890,8 +890,7 @@ class MongoClient(common.BaseObject):
         return self._topology
 
     @contextlib.contextmanager
-    def _get_socket(self, selector):
-        server = self._get_topology().select_server(selector)
+    def _get_socket(self, server):
         try:
             with server.get_socket(self.__all_credentials) as sock_info:
                 yield sock_info
@@ -914,7 +913,8 @@ class MongoClient(common.BaseObject):
             raise
 
     def _socket_for_writes(self):
-        return self._get_socket(writable_server_selector)
+        server = self._get_topology().select_server(writable_server_selector)
+        return self._get_socket(server)
 
     @contextlib.contextmanager
     def _socket_for_reads(self, read_preference):
@@ -927,7 +927,8 @@ class MongoClient(common.BaseObject):
         # Thread safe: if the type is single it cannot change.
         topology = self._get_topology()
         single = topology.description.topology_type == TOPOLOGY_TYPE.Single
-        with self._get_socket(read_preference) as sock_info:
+        server = topology.select_server(read_preference)
+        with self._get_socket(server) as sock_info:
             slave_ok = (single and not sock_info.is_mongos) or (
                 preference != ReadPreference.PRIMARY)
             yield sock_info, slave_ok
@@ -992,6 +993,44 @@ class MongoClient(common.BaseObject):
             self.__reset_server(server.description.address)
             raise
 
+    def _retry_with_session(self, retryable_operation, func, session):
+        retryable = retryable_operation and self.retry_writes
+        last_error = None
+        is_retrying = [False]
+        while 1:
+            try:
+                server = self._get_topology().select_server(
+                    writable_server_selector)
+                supports_session = (
+                    session is not None and
+                    server.description.is_retryable_writes_supported)
+                with self._get_socket(server) as sock_info:
+                    if retryable and not supports_session:
+                        if is_retrying[0]:
+                            # A retry is not possible because this server does
+                            # not support sessions raise the last error.
+                            raise last_error
+                        retryable = False
+                    if is_retrying[0]:
+                        # Reset the transaction id and retry the operation.
+                        session._retry_transaction_id()
+                    return func(is_retrying, session, sock_info, retryable)
+            except ServerSelectionTimeoutError:
+                if is_retrying[0]:
+                    # The application may think the write was never attempted
+                    # if we raise ServerSelectionTimeoutError on the retry
+                    # attempt. Raise the original exception instead.
+                    raise last_error
+                # A ServerSelectionTimeoutError error indicates that there may
+                # be a persistent outage. Attempting to retry in this case will
+                # most likely be a waste of time.
+                raise
+            except ConnectionFailure as exc:
+                if not retryable or is_retrying[0]:
+                    raise
+                is_retrying[0] = True
+                last_error = exc
+
     def _retryable_write(self, retryable_operation, func, session):
         """Execute an operation possibly with one retry.
 
@@ -999,39 +1038,11 @@ class MongoClient(common.BaseObject):
 
         Re-raises any exception thrown by func().
         """
-        retryable = retryable_operation and self.retry_writes
+        def single_statement(dummy, session, sock_info, retryable):
+            return func(session, sock_info, retryable)
         with self._tmp_session(session) as s:
-            try:
-                with self._socket_for_writes() as sock_info:
-                    if retryable and (
-                            s is None or not sock_info.supports_sessions):
-                        raise ConfigurationError(
-                            'Retryable writes are not supported by this '
-                            'MongoDB deployment')
-                    return func(s, sock_info, retryable)
-            except ServerSelectionTimeoutError:
-                # A ServerSelectionTimeoutError error indicates that there may
-                # be a persistent outage. Attempting to retry in this case will
-                # most likely be a waste of time.
-                raise
-            except ConnectionFailure as exc:
-                if not retryable:
-                    raise
-                try:
-                    with self._socket_for_writes() as sock_info:
-                        if sock_info.supports_sessions:
-                            # Reset the transaction id and retry the operation.
-                            s._retry_transaction_id()
-                            return func(s, sock_info, retryable)
-
-                    # A retry was not possible because the new server does
-                    # not support sessions raise the original error.
-                    raise
-                except ServerSelectionTimeoutError:
-                    # The application may think the write was never attempted
-                    # if we raise ServerSelectionTimeoutError on the retry
-                    # attempt. Raise the original exception instead.
-                    raise exc
+            return self._retry_with_session(
+                retryable_operation, single_statement, s)
 
     def __reset_server(self, address):
         """Clear our connection pool for a server and mark it Unknown."""
