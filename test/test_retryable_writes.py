@@ -25,6 +25,7 @@ from bson import SON
 
 from pymongo.errors import (ConfigurationError,
                             ConnectionFailure,
+                            OperationFailure,
                             ServerSelectionTimeoutError)
 from pymongo.monitoring import _SENSITIVE_COMMANDS
 from pymongo.mongo_client import MongoClient
@@ -165,7 +166,7 @@ class TestRetryableWrites(IntegrationTest):
 
     @classmethod
     @client_context.require_version_min(3, 5)
-    @client_context.require_replica_set
+    @client_context.require_no_standalone
     def setUpClass(cls):
         super(TestRetryableWrites, cls).setUpClass()
         cls.listener = CommandListener()
@@ -174,14 +175,16 @@ class TestRetryableWrites(IntegrationTest):
         cls.db = cls.client.pymongo_test
 
     def setUp(self):
-        self.client.admin.command(SON([
-            ('configureFailPoint', 'onPrimaryTransactionalWrite'),
-            ('mode', 'alwaysOn')]))
+        if client_context.is_rs:
+            self.client.admin.command(SON([
+                ('configureFailPoint', 'onPrimaryTransactionalWrite'),
+                ('mode', 'alwaysOn')]))
 
     def tearDown(self):
-        self.client.admin.command(SON([
-            ('configureFailPoint', 'onPrimaryTransactionalWrite'),
-            ('mode', 'off')]))
+        if client_context.is_rs:
+            self.client.admin.command(SON([
+                ('configureFailPoint', 'onPrimaryTransactionalWrite'),
+                ('mode', 'off')]))
 
     def test_supported_single_statement_no_retry(self):
         listener = CommandListener()
@@ -198,16 +201,14 @@ class TestRetryableWrites(IntegrationTest):
                          method.__name__, event.command_name))
 
     def test_supported_single_statement(self):
+
         for method, args, kwargs in retryable_single_statement_ops(
                 self.db.retryable_write_test):
             self.listener.results.clear()
             method(*args, **kwargs)
             commands_started = self.listener.results['started']
-            self.assertEqual(len(self.listener.results['failed']), 1,
-                             method.__name__)
             self.assertEqual(len(self.listener.results['succeeded']), 1,
                              method.__name__)
-            self.assertEqual(len(commands_started), 2, method.__name__)
             first_attempt = commands_started[0]
             self.assertIn(
                 'lsid', first_attempt.command,
@@ -218,19 +219,25 @@ class TestRetryableWrites(IntegrationTest):
                 'txnNumber', first_attempt.command,
                 '%s sent no txnNumber with %s' % (
                     method.__name__, first_attempt.command_name))
-            initial_transaction_id = first_attempt.command['txnNumber']
-            retry_attempt = commands_started[1]
-            self.assertIn(
-                'lsid', retry_attempt.command,
-                '%s sent no lsid with %s' % (
-                    method.__name__, first_attempt.command_name))
-            self.assertEqual(retry_attempt.command['lsid'], initial_session_id)
-            self.assertIn(
-                'txnNumber', retry_attempt.command,
-                '%s sent no txnNumber with %s' % (
-                    method.__name__, first_attempt.command_name))
-            self.assertEqual(retry_attempt.command['txnNumber'],
-                             initial_transaction_id)
+
+            # The failpoint is only enabled on a replica set.
+            if client_context.is_rs:
+                self.assertEqual(len(self.listener.results['failed']), 1,
+                                 method.__name__)
+                initial_transaction_id = first_attempt.command['txnNumber']
+                retry_attempt = commands_started[1]
+                self.assertIn(
+                    'lsid', retry_attempt.command,
+                    '%s sent no lsid with %s' % (
+                        method.__name__, first_attempt.command_name))
+                self.assertEqual(
+                    retry_attempt.command['lsid'], initial_session_id)
+                self.assertIn(
+                    'txnNumber', retry_attempt.command,
+                    '%s sent no txnNumber with %s' % (
+                        method.__name__, first_attempt.command_name))
+                self.assertEqual(retry_attempt.command['txnNumber'],
+                                 initial_transaction_id)
 
     def test_unsupported_single_statement(self):
         coll = self.db.retryable_write_test
@@ -251,6 +258,7 @@ class TestRetryableWrites(IntegrationTest):
                         method.__name__, event.command_name))
 
     def test_server_selection_timeout_not_retried(self):
+        """A ServerSelectionTimeoutError is not retried."""
         listener = CommandListener()
         client = MongoClient(
             'somedomainthatdoesntexist.org',
@@ -263,10 +271,38 @@ class TestRetryableWrites(IntegrationTest):
                 method(*args, **kwargs)
             self.assertEqual(len(listener.results['started']), 0)
 
+    @client_context.require_replica_set
+    def test_retry_timeout_raises_original_error(self):
+        """A ServerSelectionTimeoutError on the retry attempt raises the
+        original error.
+        """
+        listener = CommandListener()
+        client = rs_or_single_client(
+            retryWrites=True, event_listeners=[listener])
+        socket_for_writes = client._socket_for_writes
+
+        def mock_socket_for_writes(*args, **kwargs):
+            sock_info = socket_for_writes(*args, **kwargs)
+
+            def raise_error():
+                raise ServerSelectionTimeoutError(
+                    'No primary available for writes')
+            # Raise ServerSelectionTimeout on the retry attempt.
+            client._socket_for_writes = raise_error
+            return sock_info
+
+        for method, args, kwargs in retryable_single_statement_ops(
+                client.db.retryable_write_test):
+            listener.results.clear()
+            client._socket_for_writes = mock_socket_for_writes
+            with self.assertRaises(ConnectionFailure):
+                method(*args, **kwargs)
+            self.assertEqual(len(listener.results['started']), 1)
+
 
 class TestRetryableWritesNotSupported(IntegrationTest):
 
-    @client_context.require_version_max(3, 4, 99)
+    @client_context.require_version_max(3, 5, 0, -1)
     def test_raises_error(self):
         client = rs_or_single_client(retryWrites=True)
         coll = client.pymongo_test.test
@@ -280,6 +316,23 @@ class TestRetryableWritesNotSupported(IntegrationTest):
                     ConfigurationError,
                     'Retryable writes are not supported by this MongoDB '
                     'deployment'):
+                method(*args, **kwargs)
+
+    @client_context.require_version_min(3, 5)
+    @client_context.require_standalone
+    def test_standalone_raises_error(self):
+        client = rs_or_single_client(retryWrites=True)
+        coll = client.pymongo_test.test
+        # No error running non-retryable operations.
+        client.admin.command('isMaster')
+        for method, args, kwargs in non_retryable_single_statement_ops(coll):
+            method(*args, **kwargs)
+
+        for method, args, kwargs in retryable_single_statement_ops(coll):
+            with self.assertRaisesRegex(
+                    OperationFailure,
+                    'Transaction numbers are only allowed on a replica set '
+                    'member or mongos'):
                 method(*args, **kwargs)
 
 

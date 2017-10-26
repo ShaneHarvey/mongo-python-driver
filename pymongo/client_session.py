@@ -141,7 +141,7 @@ class ClientSession(object):
         if self._server_session is None:
             raise InvalidOperation("Cannot use ended session")
 
-        return self._server_session.retry_transaction_id()
+        self._server_session.retry_transaction_id()
 
 
 class _ServerSession(object):
@@ -164,7 +164,6 @@ class _ServerSession(object):
     def transaction_id(self):
         """Monotonically increasing positive 64-bit integer."""
         self._transaction_id += 1
-        # SERVER-31453: The server only supports 64-bit integers.
         return Int64(self._transaction_id)
 
     def retry_transaction_id(self):

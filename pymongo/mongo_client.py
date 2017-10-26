@@ -1001,16 +1001,24 @@ class MongoClient(common.BaseObject):
                 # be a persistent outage. Attempting to retry in this case will
                 # most likely be a waste of time.
                 raise
-            except ConnectionFailure:
+            except ConnectionFailure as exc:
                 if not retryable:
                     raise
-                with self._socket_for_writes() as sock_info:
-                    if sock_info.max_wire_version >= 6:
-                        # Reset the transaction id and retry the operation.
-                        s._retry_transaction_id()
-                        return func(s, sock_info, retryable)
-                # The new server was too old, raise the original error.
-                raise
+                try:
+                    with self._socket_for_writes() as sock_info:
+                        if sock_info.supports_sessions:
+                            # Reset the transaction id and retry the operation.
+                            s._retry_transaction_id()
+                            return func(s, sock_info, retryable)
+
+                    # A retry was not possible because the new server does
+                    # not support sessions raise the original error.
+                    raise
+                except ServerSelectionTimeoutError:
+                    # The application may think the write was never attempted
+                    # if we raise ServerSelectionTimeoutError on the retry
+                    # attempt. Raise the original exception instead.
+                    raise exc
 
     def __reset_server(self, address):
         """Clear our connection pool for a server and mark it Unknown."""
