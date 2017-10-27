@@ -808,8 +808,7 @@ class Collection(common.BaseObject):
                 command['bypassDocumentValidation'] = True
 
             # The command result has to be published for APM unmodified
-            # so we make a shallow copy here before adding
-            # updatedExisting.
+            # so we make a shallow copy here before adding updatedExisting.
             result = sock_info.command(
                 self.__database.name,
                 command,
@@ -854,7 +853,8 @@ class Collection(common.BaseObject):
                 retryable_write=retryable_write)
 
         return self.__database.client._retryable_write(
-            self.write_concern.acknowledged and not multi, _update, session)
+            (write_concern or self.write_concern).acknowledged and not multi,
+            _update, session)
 
     def replace_one(self, filter, replacement, upsert=False,
                     bypass_document_validation=False, collation=None,
@@ -1139,7 +1139,8 @@ class Collection(common.BaseObject):
                 retryable_write=retryable_write)
 
         return self.__database.client._retryable_write(
-            self.write_concern.acknowledged and not multi, _delete, session)
+            (write_concern or self.write_concern).acknowledged and not multi,
+            _delete, session)
 
 
     def delete_one(self, filter, collation=None, session=None):

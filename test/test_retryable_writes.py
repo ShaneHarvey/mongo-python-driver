@@ -180,6 +180,20 @@ def non_retryable_single_statement_ops(coll):
         (coll.remove, [{}], {}),
         # Multi update.
         (coll.update, [{}, {'$set': {'a': 1}}], {'multi': True}),
+        # Unacknowledged deprecated methods.
+        (coll.insert, [{}], {'w': 0}),
+        # Unacknowledged Non-multi update.
+        (coll.update, [{}, {'$set': {'a': 1}}], {'w': 0}),
+        # Unacknowledged Non-multi remove.
+        (coll.remove, [{}], {'multi': False, 'w': 0}),
+        # Unacknowledged Replace.
+        (coll.find_and_modify, [{}, {'a': 3}], {'writeConcern': {'w': 0}}),
+        # Unacknowledged Update.
+        (coll.find_and_modify, [{}, {'$set': {'a': 1}}],
+         {'writeConcern': {'w': 0}}),
+        # Unacknowledged Delete.
+        (coll.find_and_modify, [{}, {}],
+         {'remove': True, 'writeConcern': {'w': 0}}),
     ]
 
 
