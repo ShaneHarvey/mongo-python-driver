@@ -1072,9 +1072,9 @@ class Collection(common.BaseObject):
         self.__database.drop_collection(self.__name, session=session)
 
     def _delete(
-            self, sock_info, criteria, multi,
+            self, criteria, multi,
             write_concern=None, op_id=None, ordered=True,
-            collation=None, session=None, retryable_write=False):
+            collation=None, session=None):
         """Internal delete helper."""
         common.validate_is_mapping("filter", criteria)
         concern = (write_concern or self.write_concern).document
@@ -1083,14 +1083,10 @@ class Collection(common.BaseObject):
                           ('limit', int(not multi))])
         collation = validate_collation_or_none(collation)
         if collation is not None:
-            if sock_info.max_wire_version < 5:
-                raise ConfigurationError(
-                    'Must be connected to MongoDB 3.4+ to use collations.')
-            elif not acknowledged:
+            delete_doc['collation'] = collation
+            if not acknowledged:
                 raise ConfigurationError(
                     'Collation is unsupported for unacknowledged writes.')
-            else:
-                delete_doc['collation'] = collation
         command = SON([('delete', self.name),
                        ('ordered', ordered),
                        ('deletes', [delete_doc])])
@@ -1098,23 +1094,30 @@ class Collection(common.BaseObject):
             command['writeConcern'] = concern
 
         if acknowledged:
-            with self.__database.client._tmp_session(session) as s:
+            def _delete_one(session, sock_info, retryable_write):
+                if collation is not None and sock_info.max_wire_version < 5:
+                    raise ConfigurationError(
+                        'Must be connected to MongoDB 3.4+ to use collations.')
                 # Delete command.
                 result = sock_info.command(
                     self.__database.name,
                     command,
                     codec_options=self.__write_response_codec_options,
-                    session=s,
+                    session=session,
                     client=self.__database.client,
                     retryable_write=retryable_write)
-            _check_write_command_response([(0, result)])
-            return result
+                _check_write_command_response([(0, result)])
+                return result
+
+            return self.__database.client._retryable_write(
+                not multi, _delete_one, session)
         else:
-            # Legacy OP_DELETE.
-            return self._legacy_write(
-                sock_info, 'delete', command, op_id,
-                False, message.delete, self.__full_name, criteria,
-                self.__write_response_codec_options, int(not multi))
+            with self._socket_for_writes() as sock_info:
+                # Legacy OP_DELETE.
+                return self._legacy_write(
+                    sock_info, 'delete', command, op_id,
+                    False, message.delete, self.__full_name, criteria,
+                    self.__write_response_codec_options, int(not multi))
 
     def delete_one(self, filter, collation=None, session=None):
         """Delete a single document matching the filter.
@@ -1146,15 +1149,9 @@ class Collection(common.BaseObject):
 
         .. versionadded:: 3.0
         """
-        def _delete_one(session, sock_info, retryable_write):
-            return DeleteResult(
-                self._delete(sock_info, filter, False, collation=collation,
-                             session=session,
-                             retryable_write=retryable_write),
-                self.write_concern.acknowledged)
-
-        return self.__database.client._retryable_write(
-            self.write_concern.acknowledged, _delete_one, session)
+        return DeleteResult(
+            self._delete(filter, False, collation=collation, session=session),
+            self.write_concern.acknowledged)
 
     def delete_many(self, filter, collation=None, session=None):
         """Delete one or more documents matching the filter.
@@ -1186,11 +1183,9 @@ class Collection(common.BaseObject):
 
         .. versionadded:: 3.0
         """
-        with self._socket_for_writes() as sock_info:
-            return DeleteResult(self._delete(sock_info, filter, True,
-                                             collation=collation,
-                                             session=session),
-                                self.write_concern.acknowledged)
+        return DeleteResult(
+            self._delete(filter, True, collation=collation, session=session),
+            self.write_concern.acknowledged)
 
     def find_one(self, filter=None, *args, **kwargs):
         """Get a single document from the database.
@@ -2973,9 +2968,8 @@ class Collection(common.BaseObject):
         collation = validate_collation_or_none(kwargs.pop('collation', None))
         if kwargs:
             write_concern = WriteConcern(**kwargs)
-        with self._socket_for_writes() as sock_info:
-            return self._delete(sock_info, spec_or_id, multi, write_concern,
-                                collation=collation)
+        return self._delete(spec_or_id, multi, write_concern,
+                            collation=collation)
 
     def find_and_modify(self, query={}, update=None,
                         upsert=False, sort=None, full_response=False,
