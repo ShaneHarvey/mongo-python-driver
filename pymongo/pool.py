@@ -418,9 +418,7 @@ class SocketInfo(object):
         self.max_write_batch_size = (
             ismaster.max_write_batch_size if ismaster else None)
         self.supports_sessions = (
-            ismaster
-            and ismaster.logical_session_timeout_minutes is not None
-            and ismaster.max_wire_version >= 6)
+            ismaster and ismaster.logical_session_timeout_minutes is not None)
 
         self.listeners = pool.opts.event_listeners
 
