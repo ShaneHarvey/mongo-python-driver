@@ -2592,7 +2592,7 @@ class Collection(common.BaseObject):
 
         write_concern = cmd.get('writeConcern')
         if write_concern is not None:
-            acknowledged = write_concern.get("w", 1) > 0
+            acknowledged = write_concern.get("w") != 0
         else:
             acknowledged = self.write_concern.acknowledged
 
@@ -3017,16 +3017,26 @@ class Collection(common.BaseObject):
 
         cmd = SON([("findAndModify", self.__name)])
         cmd.update(kwargs)
-        with self._socket_for_writes() as sock_info:
+
+        write_concern = cmd.get('writeConcern')
+        if write_concern is not None:
+            acknowledged = write_concern.get("w") != 0
+        else:
+            acknowledged = self.write_concern.acknowledged
+
+        def _find_and_modify(session, sock_info, retryable_write):
             if sock_info.max_wire_version >= 4 and 'writeConcern' not in cmd:
                 wc_doc = self.write_concern.document
                 if wc_doc:
                     cmd['writeConcern'] = wc_doc
-            out = self._command(sock_info, cmd,
-                                read_preference=ReadPreference.PRIMARY,
-                                allowable_errors=[_NO_OBJ_ERROR],
-                                collation=collation)
-            _check_write_command_response([(0, out)])
+            return self._command(
+                sock_info, cmd, read_preference=ReadPreference.PRIMARY,
+                allowable_errors=[_NO_OBJ_ERROR], collation=collation,
+                session=session, retryable_write=retryable_write)
+
+        out = self.__database.client._retryable_write(
+            acknowledged, _find_and_modify, None)
+        _check_write_command_response([(0, out)])
 
         if not out['ok']:
             if out["errmsg"] == _NO_OBJ_ERROR:
