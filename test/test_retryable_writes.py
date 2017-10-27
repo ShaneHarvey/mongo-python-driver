@@ -32,7 +32,7 @@ from pymongo.mongo_client import MongoClient
 from pymongo.write_concern import WriteConcern
 
 from test import unittest, client_context, IntegrationTest
-from test.utils import rs_or_single_client, EventListener
+from test.utils import rs_or_single_client, EventListener, DeprecationFilter
 from test.test_crud import run_operation
 
 # Location of JSON test specifications.
@@ -148,10 +148,26 @@ def retryable_single_statement_ops(coll):
         (coll.replace_one, [{}, {}], {}),
         (coll.update_one, [{}, {'$set': {'a': 1}}], {}),
         (coll.delete_one, [{}], {}),
-        (coll.insert_one, [{}], {}),  # Insert document for find_one.
+        # Insert document for find_one_and_*.
+        (coll.insert_one, [{}], {}),
         (coll.find_one_and_replace, [{}, {'a': 3}], {}),
         (coll.find_one_and_update, [{}, {'$set': {'a': 1}}], {}),
         (coll.find_one_and_delete, [{}, {}], {}),
+        # Deprecated methods.
+        # Insert document for update.
+        (coll.insert_one, [{}], {}),
+        # Non-multi update.
+        (coll.update, [{}, {'$set': {'a': 1}}], {}),
+        # Non-multi remove.
+        (coll.remove, [{}], {'multi': False}),
+        # Insert document for find_and_modify.
+        (coll.insert_one, [{}], {}),
+        # Replace.
+        (coll.find_and_modify, [{}, {'a': 3}], {}),
+        # Update.
+        (coll.find_and_modify, [{}, {'$set': {'a': 1}}], {}),
+        # Delete.
+        (coll.find_and_modify, [{}, {}], {'remove': True}),
     ]
 
 
@@ -159,10 +175,28 @@ def non_retryable_single_statement_ops(coll):
     return [
         (coll.update_many, [{}, {'$set': {'a': 1}}], {}),
         (coll.delete_many, [{}], {}),
+        # Deprecated methods.
+        # Multi remove.
+        (coll.remove, [{}], {}),
+        # Multi update.
+        (coll.update, [{}, {'$set': {'a': 1}}], {'multi': True}),
     ]
 
 
-class TestRetryableWrites(IntegrationTest):
+class IgnoreDeprecationsTest(IntegrationTest):
+
+    @classmethod
+    def setUpClass(cls):
+        super(IgnoreDeprecationsTest, cls).setUpClass()
+        cls.deprecation_filter = DeprecationFilter()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.deprecation_filter.stop()
+        super(IgnoreDeprecationsTest, cls).tearDownClass()
+
+
+class TestRetryableWrites(IgnoreDeprecationsTest):
 
     @classmethod
     @client_context.require_version_min(3, 5)
@@ -300,7 +334,7 @@ class TestRetryableWrites(IntegrationTest):
             self.assertEqual(len(listener.results['started']), 1)
 
 
-class TestRetryableWritesNotSupported(IntegrationTest):
+class TestRetryableWritesNotSupported(IgnoreDeprecationsTest):
 
     @client_context.require_version_max(3, 5, 0, -1)
     def test_raises_error(self):
