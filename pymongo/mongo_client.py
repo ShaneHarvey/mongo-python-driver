@@ -979,14 +979,14 @@ class MongoClient(common.BaseObject):
             self.__reset_server(server.description.address)
             raise
 
-    def _retryable_write(self, acknowledged, func, session):
+    def _retryable_write(self, retryable_operation, func, session):
         """Execute an operation possibly with one retry.
 
         Returns func()'s return value on success. On error retries once.
 
         Re-raises any exception thrown by func().
         """
-        retryable = acknowledged and self.retry_writes
+        retryable = retryable_operation and self.retry_writes
         with self._tmp_session(session) as s:
             try:
                 with self._socket_for_writes() as sock_info:

@@ -763,11 +763,11 @@ class Collection(common.BaseObject):
             blk.execute(self.write_concern.document, session=s)
         return InsertManyResult(inserted_ids, self.write_concern.acknowledged)
 
-    def _update(self, criteria, document, upsert=False,
+    def _update(self, sock_info, criteria, document, upsert=False,
                 check_keys=True, multi=False, manipulate=False,
                 write_concern=None, op_id=None, ordered=True,
                 bypass_doc_val=False, collation=None, array_filters=None,
-                session=None):
+                session=None, retryable_write=False):
         """Internal update / replace helper."""
         common.validate_boolean("upsert", upsert)
         if manipulate:
@@ -780,15 +780,23 @@ class Collection(common.BaseObject):
                           ('multi', multi),
                           ('upsert', upsert)])
         if collation is not None:
-            update_doc['collation'] = collation
-            if not acknowledged:
+            if sock_info.max_wire_version < 5:
+                raise ConfigurationError(
+                    'Must be connected to MongoDB 3.4+ to use collations.')
+            elif not acknowledged:
                 raise ConfigurationError(
                     'Collation is unsupported for unacknowledged writes.')
+            else:
+                update_doc['collation'] = collation
         if array_filters is not None:
-            if not acknowledged:
+            if sock_info.max_wire_version < 6:
+                raise ConfigurationError(
+                    'Must be connected to MongoDB 3.6+ to use array_filters.')
+            elif not acknowledged:
                 raise ConfigurationError(
                     'arrayFilters is unsupported for unacknowledged writes.')
-            update_doc['arrayFilters'] = array_filters
+            else:
+                update_doc['arrayFilters'] = array_filters
         command = SON([('update', self.name),
                        ('ordered', ordered),
                        ('updates', [update_doc])])
@@ -796,50 +804,57 @@ class Collection(common.BaseObject):
             command['writeConcern'] = concern
         if acknowledged:
             # Update command.
-            def _update(session, sock_info, retryable_write):
-                if collation and sock_info.max_wire_version < 5:
-                    raise ConfigurationError(
-                        'Must be connected to MongoDB 3.4+ to use collations.')
-                if array_filters and sock_info.max_wire_version < 6:
-                    raise ConfigurationError(
-                        'Must be connected to MongoDB 3.6+ to use '
-                        'array_filters.')
-                if bypass_doc_val and sock_info.max_wire_version >= 4:
-                    command['bypassDocumentValidation'] = True
+            if bypass_doc_val and sock_info.max_wire_version >= 4:
+                command['bypassDocumentValidation'] = True
 
-                # The command result has to be published for APM unmodified
-                # so we make a shallow copy here before adding
-                # updatedExisting.
-                result = sock_info.command(
-                    self.__database.name,
-                    command,
-                    codec_options=self.__write_response_codec_options,
-                    session=session,
-                    client=self.__database.client,
-                    retryable_write=retryable_write).copy()
-                _check_write_command_response([(0, result)])
-                # Add the updatedExisting field for compatibility.
-                if result.get('n') and 'upserted' not in result:
-                    result['updatedExisting'] = True
-                else:
-                    result['updatedExisting'] = False
-                    # MongoDB >= 2.6.0 returns the upsert _id in an array
-                    # element. Break it out for backward compatibility.
-                    if 'upserted' in result:
-                        result['upserted'] = result['upserted'][0]['_id']
+            # The command result has to be published for APM unmodified
+            # so we make a shallow copy here before adding
+            # updatedExisting.
+            result = sock_info.command(
+                self.__database.name,
+                command,
+                codec_options=self.__write_response_codec_options,
+                session=session,
+                client=self.__database.client,
+                retryable_write=retryable_write).copy()
+            _check_write_command_response([(0, result)])
+            # Add the updatedExisting field for compatibility.
+            if result.get('n') and 'upserted' not in result:
+                result['updatedExisting'] = True
+            else:
+                result['updatedExisting'] = False
+                # MongoDB >= 2.6.0 returns the upsert _id in an array
+                # element. Break it out for backward compatibility.
+                if 'upserted' in result:
+                    result['upserted'] = result['upserted'][0]['_id']
 
-                return result
-
-            return self.__database.client._retryable_write(
-                not multi, _update, session)
+            return result
         else:
-            with self._socket_for_writes() as sock_info:
-                # Legacy OP_UPDATE.
-                return self._legacy_write(
-                    sock_info, 'update', command, op_id,
-                    bypass_doc_val, message.update, self.__full_name, upsert,
-                    multi, criteria, document, check_keys,
-                    self.__write_response_codec_options)
+            # Legacy OP_UPDATE.
+            return self._legacy_write(
+                sock_info, 'update', command, op_id,
+                bypass_doc_val, message.update, self.__full_name, upsert,
+                multi, criteria, document, check_keys,
+                self.__write_response_codec_options)
+
+    def _update_retryable(
+            self, criteria, document, upsert=False,
+            check_keys=True, multi=False, manipulate=False,
+            write_concern=None, op_id=None, ordered=True,
+            bypass_doc_val=False, collation=None, array_filters=None,
+            session=None):
+        """Internal update / replace helper."""
+        def _update(session, sock_info, retryable_write):
+            return self._update(
+                sock_info, criteria, document, upsert=upsert,
+                check_keys=check_keys, multi=multi, manipulate=manipulate,
+                write_concern=write_concern, op_id=op_id, ordered=ordered,
+                bypass_doc_val=bypass_doc_val, collation=collation,
+                array_filters=array_filters, session=session,
+                retryable_write=retryable_write)
+
+        return self.__database.client._retryable_write(
+            self.write_concern.acknowledged and not multi, _update, session)
 
     def replace_one(self, filter, replacement, upsert=False,
                     bypass_document_validation=False, collation=None,
@@ -908,9 +923,10 @@ class Collection(common.BaseObject):
         common.validate_ok_for_replace(replacement)
 
         return UpdateResult(
-            self._update(filter, replacement, upsert,
-                         bypass_doc_val=bypass_document_validation,
-                         collation=collation, session=session),
+            self._update_retryable(
+                filter, replacement, upsert,
+                bypass_doc_val=bypass_document_validation,
+                collation=collation, session=session),
             self.write_concern.acknowledged)
 
     def update_one(self, filter, update, upsert=False,
@@ -974,12 +990,11 @@ class Collection(common.BaseObject):
         common.validate_list_or_none('array_filters', array_filters)
 
         return UpdateResult(
-            self._update(filter, update, upsert,
-                         check_keys=False,
-                         bypass_doc_val=bypass_document_validation,
-                         collation=collation,
-                         array_filters=array_filters,
-                         session=session),
+            self._update_retryable(
+                filter, update, upsert, check_keys=False,
+                bypass_doc_val=bypass_document_validation,
+                collation=collation, array_filters=array_filters,
+                session=session),
             self.write_concern.acknowledged)
 
     def update_many(self, filter, update, upsert=False, array_filters=None,
@@ -1043,12 +1058,11 @@ class Collection(common.BaseObject):
         common.validate_list_or_none('array_filters', array_filters)
 
         return UpdateResult(
-            self._update(filter, update, upsert,
-                         check_keys=False, multi=True,
-                         bypass_doc_val=bypass_document_validation,
-                         collation=collation,
-                         array_filters=array_filters,
-                         session=session),
+            self._update_retryable(
+                filter, update, upsert, check_keys=False, multi=True,
+                bypass_doc_val=bypass_document_validation,
+                collation=collation, array_filters=array_filters,
+                session=session),
             self.write_concern.acknowledged)
 
     def drop(self, session=None):
@@ -1069,9 +1083,9 @@ class Collection(common.BaseObject):
         self.__database.drop_collection(self.__name, session=session)
 
     def _delete(
-            self, criteria, multi,
+            self, sock_info, criteria, multi,
             write_concern=None, op_id=None, ordered=True,
-            collation=None, session=None):
+            collation=None, session=None, retryable_write=False):
         """Internal delete helper."""
         common.validate_is_mapping("filter", criteria)
         concern = (write_concern or self.write_concern).document
@@ -1080,10 +1094,14 @@ class Collection(common.BaseObject):
                           ('limit', int(not multi))])
         collation = validate_collation_or_none(collation)
         if collation is not None:
-            delete_doc['collation'] = collation
-            if not acknowledged:
+            if sock_info.max_wire_version < 5:
+                raise ConfigurationError(
+                    'Must be connected to MongoDB 3.4+ to use collations.')
+            elif not acknowledged:
                 raise ConfigurationError(
                     'Collation is unsupported for unacknowledged writes.')
+            else:
+                delete_doc['collation'] = collation
         command = SON([('delete', self.name),
                        ('ordered', ordered),
                        ('deletes', [delete_doc])])
@@ -1091,30 +1109,38 @@ class Collection(common.BaseObject):
             command['writeConcern'] = concern
 
         if acknowledged:
-            def _delete_one(session, sock_info, retryable_write):
-                if collation is not None and sock_info.max_wire_version < 5:
-                    raise ConfigurationError(
-                        'Must be connected to MongoDB 3.4+ to use collations.')
-                # Delete command.
-                result = sock_info.command(
-                    self.__database.name,
-                    command,
-                    codec_options=self.__write_response_codec_options,
-                    session=session,
-                    client=self.__database.client,
-                    retryable_write=retryable_write)
-                _check_write_command_response([(0, result)])
-                return result
-
-            return self.__database.client._retryable_write(
-                not multi, _delete_one, session)
+            # Delete command.
+            result = sock_info.command(
+                self.__database.name,
+                command,
+                codec_options=self.__write_response_codec_options,
+                session=session,
+                client=self.__database.client,
+                retryable_write=retryable_write)
+            _check_write_command_response([(0, result)])
+            return result
         else:
-            with self._socket_for_writes() as sock_info:
-                # Legacy OP_DELETE.
-                return self._legacy_write(
-                    sock_info, 'delete', command, op_id,
-                    False, message.delete, self.__full_name, criteria,
-                    self.__write_response_codec_options, int(not multi))
+            # Legacy OP_DELETE.
+            return self._legacy_write(
+                sock_info, 'delete', command, op_id,
+                False, message.delete, self.__full_name, criteria,
+                self.__write_response_codec_options, int(not multi))
+
+    def _delete_retryable(
+            self, criteria, multi,
+            write_concern=None, op_id=None, ordered=True,
+            collation=None, session=None):
+        """Internal delete helper."""
+        def _delete(session, sock_info, retryable_write):
+            return self._delete(
+                sock_info, criteria, multi,
+                write_concern=write_concern, op_id=op_id, ordered=ordered,
+                collation=collation, session=session,
+                retryable_write=retryable_write)
+
+        return self.__database.client._retryable_write(
+            self.write_concern.acknowledged and not multi, _delete, session)
+
 
     def delete_one(self, filter, collation=None, session=None):
         """Delete a single document matching the filter.
@@ -1147,7 +1173,8 @@ class Collection(common.BaseObject):
         .. versionadded:: 3.0
         """
         return DeleteResult(
-            self._delete(filter, False, collation=collation, session=session),
+            self._delete_retryable(
+                filter, False, collation=collation, session=session),
             self.write_concern.acknowledged)
 
     def delete_many(self, filter, collation=None, session=None):
@@ -1181,7 +1208,8 @@ class Collection(common.BaseObject):
         .. versionadded:: 3.0
         """
         return DeleteResult(
-            self._delete(filter, True, collation=collation, session=session),
+            self._delete_retryable(
+                filter, True, collation=collation, session=session),
             self.write_concern.acknowledged)
 
     def find_one(self, filter=None, *args, **kwargs):
@@ -2888,9 +2916,10 @@ class Collection(common.BaseObject):
                 return self._insert(sock_info, to_save, True,
                                     check_keys, manipulate, write_concern)
         else:
-            self._update({"_id": to_save["_id"]}, to_save, True,
-                         check_keys, False, manipulate, write_concern,
-                         collation=collation)
+            self._update_retryable(
+                {"_id": to_save["_id"]}, to_save, True,
+                check_keys, False, manipulate, write_concern,
+                collation=collation)
             return to_save.get("_id")
 
     def insert(self, doc_or_docs, manipulate=True,
@@ -2941,9 +2970,9 @@ class Collection(common.BaseObject):
         collation = validate_collation_or_none(kwargs.pop('collation', None))
         if kwargs:
             write_concern = WriteConcern(**kwargs)
-        return self._update(spec, document, upsert,
-                            check_keys, multi, manipulate, write_concern,
-                            collation=collation)
+        return self._update_retryable(
+            spec, document, upsert, check_keys, multi, manipulate,
+            write_concern, collation=collation)
 
     def remove(self, spec_or_id=None, multi=True, **kwargs):
         """Remove a document(s) from this collection.
@@ -2964,8 +2993,8 @@ class Collection(common.BaseObject):
         collation = validate_collation_or_none(kwargs.pop('collation', None))
         if kwargs:
             write_concern = WriteConcern(**kwargs)
-        return self._delete(spec_or_id, multi, write_concern,
-                            collation=collation)
+        return self._delete_retryable(
+            spec_or_id, multi, write_concern, collation=collation)
 
     def find_and_modify(self, query={}, update=None,
                         upsert=False, sort=None, full_response=False,
