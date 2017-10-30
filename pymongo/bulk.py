@@ -330,7 +330,6 @@ class _Bulk(object):
                 results = []
                 idx_offset = 0
                 while idx_offset < len(run.ops):
-                    client._send_cluster_time(cmd)
                     check_keys = run.op_type == _INSERT
                     ops = islice(run.ops, idx_offset, None)
                     # Run as many ops as possible.

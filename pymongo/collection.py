@@ -35,8 +35,8 @@ from pymongo.common import ORDERED_TYPES
 from pymongo.collation import validate_collation_or_none
 from pymongo.change_stream import ChangeStream
 from pymongo.cursor import Cursor, RawBatchCursor
-from pymongo.errors import (ConfigurationError,
-                            BulkWriteError,
+from pymongo.errors import (BulkWriteError,
+                            ConfigurationError,
                             InvalidName,
                             OperationFailure)
 from pymongo.helpers import (_check_write_command_response,
