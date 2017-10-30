@@ -1165,8 +1165,10 @@ _cbson_do_batched_write_command(PyObject* self, PyObject* args) {
             goto cmditerfail;
         }
 
-        /* We have enough data, maybe send this batch. */
-        enough_data = (buffer_get_position(buffer) + 2 > max_cmd_size);
+        /* We have enough data, return this batch.
+         * max_cmd_size accounts for the two trailing null bytes.
+         */
+        enough_data = (buffer_get_position(buffer) > max_cmd_size);
         enough_documents = (idx >= max_write_batch_size);
         if (enough_data || enough_documents) {
             cur_size = buffer_get_position(buffer) - cur_doc_begin;

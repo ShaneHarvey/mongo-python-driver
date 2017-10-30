@@ -803,7 +803,7 @@ if _use_c:
 
 def _do_batched_write_command(namespace, operation, command,
                               docs, check_keys, opts, ctx):
-    """Execute a batch of insert, update, or delete commands.
+    """Create the next batched insert, update, or delete command.
     """
     max_bson_size = ctx.max_bson_size
     max_write_batch_size = ctx.max_write_batch_size
@@ -848,8 +848,9 @@ def _do_batched_write_command(namespace, operation, command,
         # Encode the current operation
         key = b(str(idx))
         value = bson.BSON.encode(doc, check_keys, opts)
-        # Send a batch?
-        enough_data = (buf.tell() + len(key) + len(value) + 2) >= max_cmd_size
+        # Is there enough room to add this document? max_cmd_size accounts for
+        # the two trailing null bytes.
+        enough_data = (buf.tell() + len(key) + len(value)) >= max_cmd_size
         enough_documents = (idx >= max_write_batch_size)
         if enough_data or enough_documents:
             if not idx:
