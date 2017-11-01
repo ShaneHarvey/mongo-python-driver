@@ -142,7 +142,7 @@ def parse_host(entity, default_port=DEFAULT_PORT):
                              "and ']' according to RFC 2732.")
         host, port = host.split(':', 1)
     if isinstance(port, string_type):
-        if not port.isdigit() or int(port) > 65535 or int(port) <= 0:
+        if not port.isdigit() or int(port) > 65535 or int(port) < 0:
             raise ValueError("Port must be an integer between 0 and 65535: %s"
                              % (port,))
         port = int(port)
