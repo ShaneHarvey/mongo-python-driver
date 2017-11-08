@@ -66,6 +66,7 @@ class TestAllScenarios(IntegrationTest):
     @classmethod
     @client_context.require_version_min(3, 5)
     @client_context.require_replica_set
+    @client_context.require_test_commands
     def setUpClass(cls):
         super(TestAllScenarios, cls).setUpClass()
         cls.client = rs_or_single_client(retryWrites=True)
@@ -241,13 +242,15 @@ class TestRetryableWrites(IgnoreDeprecationsTest):
         cls.db = cls.client.pymongo_test
 
     def setUp(self):
-        if client_context.version.at_least(3, 5) and client_context.is_rs:
+        if (client_context.version.at_least(3, 5) and client_context.is_rs
+                and client_context.test_commands_enabled):
             self.client.admin.command(SON([
                 ('configureFailPoint', 'onPrimaryTransactionalWrite'),
                 ('mode', 'alwaysOn')]))
 
     def tearDown(self):
-        if client_context.version.at_least(3, 5) and client_context.is_rs:
+        if (client_context.version.at_least(3, 5) and client_context.is_rs
+                and client_context.test_commands_enabled):
             self.client.admin.command(SON([
                 ('configureFailPoint', 'onPrimaryTransactionalWrite'),
                 ('mode', 'off')]))
@@ -288,7 +291,8 @@ class TestRetryableWrites(IgnoreDeprecationsTest):
                     msg, first_attempt.command_name))
 
             # The failpoint is not enabled on mongos.
-            if client_context.is_mongos:
+            if (client_context.is_mongos or
+                    not client_context.test_commands_enabled):
                 continue
 
             initial_transaction_id = first_attempt.command['txnNumber']
@@ -356,6 +360,7 @@ class TestRetryableWrites(IgnoreDeprecationsTest):
 
     @client_context.require_version_min(3, 5)
     @client_context.require_replica_set
+    @client_context.require_test_commands
     def test_retry_timeout_raises_original_error(self):
         """A ServerSelectionTimeoutError on the retry attempt raises the
         original error.
