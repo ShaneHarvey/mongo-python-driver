@@ -226,7 +226,33 @@ class MongoClient(common.BaseObject):
             :mod:`~pymongo.monitoring` for details.
           - `retryWrites`: (boolean) Whether supported write operations
             executed within this MongoClient will be retried after a network
-            error, requires MongoDB 3.6+. See
+            error on MongoDB 3.6+. Defaults to ``False``.
+            The supported write operations are:
+
+              - :meth:`~pymongo.collection.Collection.bulk_write`, as long as
+                :class:`~pymongo.operations.UpdateMany` or
+                :class:`~pymongo.operations.DeleteMany` are not included.
+              - :meth:`~pymongo.collection.Collection.delete_one`
+              - :meth:`~pymongo.collection.Collection.insert_one`
+              - :meth:`~pymongo.collection.Collection.insert_many`
+              - :meth:`~pymongo.collection.Collection.replace_one`
+              - :meth:`~pymongo.collection.Collection.update_one`
+              - :meth:`~pymongo.collection.Collection.find_one_and_delete`
+              - :meth:`~pymongo.collection.Collection.find_one_and_replace`
+              - :meth:`~pymongo.collection.Collection.find_one_and_update`
+              - :meth:`~pymongo.collection.Collection.insert`
+              - :meth:`~pymongo.collection.Collection.save`
+              - :meth:`~pymongo.collection.Collection.update` with
+                ``multi=False``.
+              - :meth:`~pymongo.collection.Collection.remove` with
+                ``multi=False``.
+              - :meth:`~pymongo.collection.Collection.find_and_modify`
+              - :meth:`pymongo.bulk.BulkOperationBuilder.execute`
+
+            Unsupported write operations include, but is not limited to,
+            :meth:`~pymongo.collection.Collection.aggregate` using the ``$out``
+            pipeline operator and any operation with an unacknowledged write
+            concern (e.g. {w: 0})). See
             https://github.com/mongodb/specifications/blob/master/source/retryable-writes/retryable-writes.rst
           - `socketKeepAlive`: (boolean) **DEPRECATED** Whether to send
             periodic keep-alive packets on connected sockets. Defaults to
