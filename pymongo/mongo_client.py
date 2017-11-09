@@ -994,6 +994,13 @@ class MongoClient(common.BaseObject):
             raise
 
     def _retry_with_session(self, retryable_operation, func, session):
+        """Execute an operation with at most one consecutive retries
+
+        Returns func()'s return value on success. On error retries the same
+        command once.
+
+        Re-raises any exception thrown by func().
+        """
         retryable = retryable_operation and self.retry_writes
         last_error = None
         is_retrying = [False]
@@ -1032,12 +1039,7 @@ class MongoClient(common.BaseObject):
                 last_error = exc
 
     def _retryable_write(self, retryable_operation, func, session):
-        """Execute an operation possibly with one retry.
-
-        Returns func()'s return value on success. On error retries once.
-
-        Re-raises any exception thrown by func().
-        """
+        """Internal retryable write helper."""
         def single_statement(dummy, session, sock_info, retryable):
             return func(session, sock_info, retryable)
         with self._tmp_session(session) as s:

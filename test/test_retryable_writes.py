@@ -16,12 +16,14 @@
 
 import json
 import os
-import re
 import sys
 
 sys.path[0:0] = [""]
 
-from bson import SON
+from bson.int64 import Int64
+from bson.objectid import ObjectId
+from bson.son import SON
+
 
 from pymongo.errors import (ConnectionFailure,
                             ServerSelectionTimeoutError)
@@ -165,6 +167,7 @@ def retryable_single_statement_ops(coll):
         (coll.bulk_write, [[DeleteOne({})]], {}),
         (coll.bulk_write, [[DeleteOne({}), DeleteOne({})]], {}),
         (coll.insert_one, [{}], {}),
+        (coll.insert_many, [[{}, {}]], {}),
         (coll.replace_one, [{}, {}], {}),
         (coll.update_one, [{}, {'$set': {'a': 1}}], {}),
         (coll.delete_one, [{}], {}),
@@ -172,14 +175,17 @@ def retryable_single_statement_ops(coll):
         (coll.find_one_and_update, [{}, {'$set': {'a': 1}}], {}),
         (coll.find_one_and_delete, [{}, {}], {}),
         # Deprecated methods.
-        # Insert document for update.
-        (coll.insert_one, [{}], {}),
+        # Insert with single or multiple documents.
+        (coll.insert, [{}], {}),
+        (coll.insert, [[{}]], {}),
+        (coll.insert, [[{}, {}]], {}),
+        # Save with and without an _id.
+        (coll.save, [{}], {}),
+        (coll.save, [{'_id': ObjectId()}], {}),
         # Non-multi update.
         (coll.update, [{}, {'$set': {'a': 1}}], {}),
         # Non-multi remove.
         (coll.remove, [{}], {'multi': False}),
-        # Insert document for find_and_modify.
-        (coll.insert_one, [{}], {}),
         # Replace.
         (coll.find_and_modify, [{}, {'a': 3}], {}),
         # Update.
@@ -348,7 +354,7 @@ class TestRetryableWrites(IgnoreDeprecationsTest):
         listener = CommandListener()
         client = MongoClient(
             'somedomainthatdoesntexist.org',
-            serverSelectionTimeoutMS=10,
+            serverSelectionTimeoutMS=1,
             retryWrites=True, event_listeners=[listener])
         for method, args, kwargs in retryable_single_statement_ops(
                 client.db.retryable_write_test):
@@ -390,6 +396,69 @@ class TestRetryableWrites(IgnoreDeprecationsTest):
             with self.assertRaises(ConnectionFailure, msg=msg):
                 method(*args, **kwargs)
             self.assertEqual(len(listener.results['started']), 1, msg)
+
+    @client_context.require_version_min(3, 5)
+    @client_context.require_replica_set
+    @client_context.require_test_commands
+    def test_batch_splitting(self):
+        """Test retry succeeds after failures during batch splitting."""
+        large = 's' * 1024 * 1024 * 15
+        coll = self.db.retryable_write_test
+        coll.delete_many({})
+        self.listener.results.clear()
+        coll.bulk_write([
+            InsertOne({'_id': 1, 'l': large}),
+            InsertOne({'_id': 2, 'l': large}),
+            InsertOne({'_id': 3, 'l': large}),
+            UpdateOne({'_id': 1, 'l': large},
+                      {'$unset': {'l': 1}, '$inc': {'count': 1}}),
+            UpdateOne({'_id': 2, 'l': large}, {'$set': {'foo': 'bar'}}),
+            DeleteOne({'l': large}),
+            DeleteOne({'l': large})])
+        # Each command should
+        self.assertEqual(len(self.listener.results['started']), 14)
+        self.assertEqual(coll.find_one(), {'_id': 1, 'count': 1})
+
+    @client_context.require_version_min(3, 5)
+    @client_context.require_replica_set
+    @client_context.require_test_commands
+    def test_batch_splitting_retry_fails(self):
+        """Test retry fails during batch splitting."""
+        large = 's' * 1024 * 1024 * 15
+        coll = self.db.retryable_write_test
+        coll.delete_many({})
+        self.client.admin.command(SON([
+            ('configureFailPoint', 'onPrimaryTransactionalWrite'),
+            ('mode', {'skip': 1}),
+            ('data', {'failBeforeCommitExceptionCode': 1})]))
+        self.listener.results.clear()
+        with self.client.start_session() as session:
+            initial_txn = session._server_session._transaction_id
+            try:
+                coll.bulk_write([InsertOne({'_id': 1, 'l': large}),
+                                 InsertOne({'_id': 2, 'l': large}),
+                                 InsertOne({'_id': 3, 'l': large})],
+                                session=session)
+            except ConnectionFailure:
+                pass
+            else:
+                self.fail("bulk_write should have failed")
+
+            started = self.listener.results['started']
+            self.assertEqual(len(started), 3)
+            self.assertEqual(len(self.listener.results['succeeded']), 1)
+            expected_txn = Int64(initial_txn + 1)
+            self.assertEqual(started[0].command['txnNumber'], expected_txn)
+            self.assertEqual(started[0].command['lsid'], session.session_id)
+            expected_txn = Int64(initial_txn + 2)
+            self.assertEqual(started[1].command['txnNumber'], expected_txn)
+            self.assertEqual(started[1].command['lsid'], session.session_id)
+            started[1].command.pop('$clusterTime')
+            started[2].command.pop('$clusterTime')
+            self.assertEqual(started[1].command, started[2].command)
+            final_txn = session._server_session._transaction_id
+            self.assertEqual(final_txn, expected_txn)
+        self.assertEqual(coll.find_one(projection={'_id': True}), {'_id': 1})
 
 
 if __name__ == '__main__':
