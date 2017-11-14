@@ -157,8 +157,6 @@ def retryable_single_statement_ops(coll):
     return [
         (coll.bulk_write, [[InsertOne({}), InsertOne({})]], {}),
         (coll.bulk_write, [[InsertOne({}),
-                            InsertOne({})]], {}),
-        (coll.bulk_write, [[InsertOne({}),
                             InsertOne({})]], {'ordered': False}),
         (coll.bulk_write, [[ReplaceOne({}, {})]], {}),
         (coll.bulk_write, [[ReplaceOne({}, {}), ReplaceOne({}, {})]], {}),
@@ -296,9 +294,10 @@ class TestRetryableWrites(IgnoreDeprecationsTest):
                 '%s sent no txnNumber with %s' % (
                     msg, first_attempt.command_name))
 
-            # The failpoint is not enabled on mongos.
+            # There should be no retry when the failpoint is not active.
             if (client_context.is_mongos or
                     not client_context.test_commands_enabled):
+                self.assertEqual(len(commands_started), 1)
                 continue
 
             initial_transaction_id = first_attempt.command['txnNumber']
@@ -415,7 +414,7 @@ class TestRetryableWrites(IgnoreDeprecationsTest):
             UpdateOne({'_id': 2, 'l': large}, {'$set': {'foo': 'bar'}}),
             DeleteOne({'l': large}),
             DeleteOne({'l': large})])
-        # Each command should
+        # Each command should fail and be retried.
         self.assertEqual(len(self.listener.results['started']), 14)
         self.assertEqual(coll.find_one(), {'_id': 1, 'count': 1})
 

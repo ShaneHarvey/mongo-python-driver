@@ -202,7 +202,7 @@ class ServerDescription(object):
         return self.server_type != SERVER_TYPE.Unknown
 
     @property
-    def is_retryable_writes_supported(self):
+    def retryable_writes_supported(self):
         """Checks if this server supports retryable writes."""
         return (
             self._ls_timeout_minutes is not None and

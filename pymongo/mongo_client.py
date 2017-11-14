@@ -225,8 +225,8 @@ class MongoClient(common.BaseObject):
           - `event_listeners`: a list or tuple of event listeners. See
             :mod:`~pymongo.monitoring` for details.
           - `retryWrites`: (boolean) Whether supported write operations
-            executed within this MongoClient will be retried after a network
-            error on MongoDB 3.6+. Defaults to ``False``.
+            executed within this MongoClient will be retried once after a
+            network error on MongoDB 3.6+. Defaults to ``False``.
             The supported write operations are:
 
               - :meth:`~pymongo.collection.Collection.bulk_write`, as long as
@@ -240,16 +240,8 @@ class MongoClient(common.BaseObject):
               - :meth:`~pymongo.collection.Collection.find_one_and_delete`
               - :meth:`~pymongo.collection.Collection.find_one_and_replace`
               - :meth:`~pymongo.collection.Collection.find_one_and_update`
-              - :meth:`~pymongo.collection.Collection.insert`
-              - :meth:`~pymongo.collection.Collection.save`
-              - :meth:`~pymongo.collection.Collection.update` with
-                ``multi=False``.
-              - :meth:`~pymongo.collection.Collection.remove` with
-                ``multi=False``.
-              - :meth:`~pymongo.collection.Collection.find_and_modify`
-              - :meth:`pymongo.bulk.BulkOperationBuilder.execute`
 
-            Unsupported write operations include, but is not limited to,
+            Unsupported write operations include, but are not limited to,
             :meth:`~pymongo.collection.Collection.aggregate` using the ``$out``
             pipeline operator and any operation with an unacknowledged write
             concern (e.g. {w: 0})). See
@@ -1030,13 +1022,13 @@ class MongoClient(common.BaseObject):
         retryable = retryable_operation and self.retry_writes
         last_error = None
         is_retrying = [False]
-        while 1:
+        while True:
             try:
                 server = self._get_topology().select_server(
                     writable_server_selector)
                 supports_session = (
                     session is not None and
-                    server.description.is_retryable_writes_supported)
+                    server.description.retryable_writes_supported)
                 with self._get_socket(server) as sock_info:
                     if retryable and not supports_session:
                         if is_retrying[0]:
