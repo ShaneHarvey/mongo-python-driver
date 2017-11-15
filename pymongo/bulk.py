@@ -150,7 +150,6 @@ class _Bulk(object):
         self.uses_array_filters = False
         self.is_retryable = collection.database.client.retry_writes
         # Extra state so that we know where to pick up on a retry attempt.
-        self.is_retrying = False
         self.current_run = None
 
     def add_insert(self, document):
@@ -282,11 +281,11 @@ class _Bulk(object):
                 result = bwc.write_command(request_id, msg, to_send)
                 client._receive_cluster_time(result, session)
                 results.append((run.idx_offset, result))
+                # We're no longer in a retry once a command succeeds.
+                is_retrying[0] = False
                 if self.ordered and "writeErrors" in result:
                     break
                 run.idx_offset += len(to_send)
-                # We're no longer in a retry once a command succeeds.
-                is_retrying[0] = False
 
             _merge_command(run, full_result, results)
 
