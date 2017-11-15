@@ -1011,7 +1011,7 @@ class MongoClient(common.BaseObject):
             self.__reset_server(server.description.address)
             raise
 
-    def _retry_with_session(self, retryable_operation, func, session):
+    def _retry_with_session(self, retryable, func, session, bulk):
         """Execute an operation with at most one consecutive retries
 
         Returns func()'s return value on success. On error retries the same
@@ -1019,9 +1019,12 @@ class MongoClient(common.BaseObject):
 
         Re-raises any exception thrown by func().
         """
-        retryable = retryable_operation and self.retry_writes
+        retryable = retryable and self.retry_writes
         last_error = None
-        is_retrying = [False]
+        retrying = False
+
+        def is_retrying():
+            return bulk.retrying if bulk else retrying
         while True:
             try:
                 server = self._get_topology().select_server(
@@ -1031,17 +1034,17 @@ class MongoClient(common.BaseObject):
                     server.description.retryable_writes_supported)
                 with self._get_socket(server) as sock_info:
                     if retryable and not supports_session:
-                        if is_retrying[0]:
+                        if is_retrying():
                             # A retry is not possible because this server does
                             # not support sessions raise the last error.
                             raise last_error
                         retryable = False
-                    if is_retrying[0]:
+                    if is_retrying():
                         # Reset the transaction id and retry the operation.
                         session._retry_transaction_id()
-                    return func(is_retrying, session, sock_info, retryable)
+                    return func(session, sock_info, retryable)
             except ServerSelectionTimeoutError:
-                if is_retrying[0]:
+                if is_retrying():
                     # The application may think the write was never attempted
                     # if we raise ServerSelectionTimeoutError on the retry
                     # attempt. Raise the original exception instead.
@@ -1051,18 +1054,18 @@ class MongoClient(common.BaseObject):
                 # most likely be a waste of time.
                 raise
             except ConnectionFailure as exc:
-                if not retryable or is_retrying[0]:
+                if not retryable or is_retrying():
                     raise
-                is_retrying[0] = True
+                if bulk:
+                    bulk.retrying = True
+                else:
+                    retrying = True
                 last_error = exc
 
-    def _retryable_write(self, retryable_operation, func, session):
+    def _retryable_write(self, retryable, func, session):
         """Internal retryable write helper."""
-        def single_statement(dummy, session, sock_info, retryable):
-            return func(session, sock_info, retryable)
         with self._tmp_session(session) as s:
-            return self._retry_with_session(
-                retryable_operation, single_statement, s)
+            return self._retry_with_session(retryable, func, s, None)
 
     def __reset_server(self, address):
         """Clear our connection pool for a server and mark it Unknown."""

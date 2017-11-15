@@ -148,7 +148,8 @@ class _Bulk(object):
         self.bypass_doc_val = bypass_document_validation
         self.uses_collation = False
         self.uses_array_filters = False
-        self.is_retryable = collection.database.client.retry_writes
+        self.is_retryable = True
+        self.retrying = False
         # Extra state so that we know where to pick up on a retry attempt.
         self.current_run = None
 
@@ -233,8 +234,7 @@ class _Bulk(object):
                 yield run
 
     def _execute_command(self, generator, write_concern, session,
-                         sock_info, op_id, retryable, is_retrying,
-                         full_result):
+                         sock_info, op_id, retryable, full_result):
         if sock_info.max_wire_version < 5 and self.uses_collation:
             raise ConfigurationError(
                 'Must be connected to MongoDB 3.4+ to use a collation.')
@@ -282,7 +282,7 @@ class _Bulk(object):
                 client._receive_cluster_time(result, session)
                 results.append((run.idx_offset, result))
                 # We're no longer in a retry once a command succeeds.
-                is_retrying[0] = False
+                self.retrying = False
                 if self.ordered and "writeErrors" in result:
                     break
                 run.idx_offset += len(to_send)
@@ -312,14 +312,15 @@ class _Bulk(object):
         }
         op_id = _randint()
 
-        def retryable_bulk(is_retrying, session, sock_info, retryable):
+        def retryable_bulk(session, sock_info, retryable):
             self._execute_command(
                 generator, write_concern, session, sock_info, op_id,
-                retryable, is_retrying, full_result)
+                retryable, full_result)
 
         client = self.collection.database.client
         with client._tmp_session(session) as s:
-            client._retry_with_session(self.is_retryable, retryable_bulk, s)
+            client._retry_with_session(
+                self.is_retryable, retryable_bulk, s, self)
 
         if full_result["writeErrors"] or full_result["writeConcernErrors"]:
             if full_result['writeErrors']:
