@@ -26,6 +26,7 @@ from bson.son import SON
 
 
 from pymongo.errors import (ConnectionFailure,
+                            InvalidOperation,
                             ServerSelectionTimeoutError)
 from pymongo.monitoring import _SENSITIVE_COMMANDS
 from pymongo.mongo_client import MongoClient
@@ -458,6 +459,20 @@ class TestRetryableWrites(IgnoreDeprecationsTest):
             final_txn = session._server_session._transaction_id
             self.assertEqual(final_txn, expected_txn)
         self.assertEqual(coll.find_one(projection={'_id': True}), {'_id': 1})
+
+    @client_context.require_version_min(3, 5)
+    @client_context.require_no_standalone
+    def test_transaction_id_overflow(self):
+        with self.client.start_session() as session:
+            server_session = session._server_session
+            session._server_session._transaction_id = (1 << 63) - 2
+            self.db.test.delete_one({}, session=session)
+            with self.assertRaisesRegex(
+                    InvalidOperation,
+                    "session transaction id exceeded signed 64-bit integer"):
+                self.db.test.delete_one({}, session=session)
+        # The server session should not be returned to the pool.
+        self.assertNotIn(server_session, self.client._topology._session_pool)
 
 
 if __name__ == '__main__':

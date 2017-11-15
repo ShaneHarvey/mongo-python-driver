@@ -222,9 +222,16 @@ class _ServerSession(object):
         self.last_use = monotonic.time()
         return self.session_id
 
+    def near_overflow(self):
+        """Transaction id is near signed 64-bit integer limit."""
+        return self._transaction_id >= 1 << 62
+
     def transaction_id(self):
         """Monotonically increasing positive 64-bit integer."""
         self._transaction_id += 1
+        if self._transaction_id >= 1 << 63:
+            raise InvalidOperation(
+                "session transaction id exceeded signed 64-bit integer")
         return Int64(self._transaction_id)
 
     def retry_transaction_id(self):
@@ -255,10 +262,13 @@ class _ServerSessionPool(collections.deque):
     def return_server_session(self, server_session, session_timeout_minutes):
         self._clear_stale(session_timeout_minutes)
         if not server_session.timed_out(session_timeout_minutes):
-            self.appendleft(server_session)
+            self.return_server_session_no_lock(server_session)
 
     def return_server_session_no_lock(self, server_session):
-        self.appendleft(server_session)
+        # Sessions with sufficiently high transactions numbers should not be
+        # added to the pool in order to limit the occurrences of overflow.
+        if not server_session.near_overflow():
+            self.appendleft(server_session)
 
     def _clear_stale(self, session_timeout_minutes):
         # Clear stale sessions. The least recently used are on the right.
