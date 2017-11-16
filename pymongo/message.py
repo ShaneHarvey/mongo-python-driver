@@ -170,30 +170,7 @@ _MODIFIERS = SON([
     ('$snapshot', 'snapshot')])
 
 
-def _gen_explain_command(
-        coll, spec, projection, skip, limit, batch_size,
-        options, read_concern, session, client):
-    """Generate an explain command document."""
-    cmd = _gen_find_command(coll, spec, projection, skip, limit, batch_size,
-                            options, session=None, client=None)
-    if read_concern.level:
-        explain = SON([('explain', cmd), ('readConcern', read_concern.document)])
-    else:
-        explain = SON([('explain', cmd)])
-
-    if session:
-        explain['lsid'] = session._use_lsid()
-        if (session.options.causal_consistency
-                and session.operation_time is not None):
-            explain.setdefault(
-                'readConcern', {})['afterClusterTime'] = session.operation_time
-
-    client._send_cluster_time(explain, session)
-    return explain
-
-
 def _gen_find_command(coll, spec, projection, skip, limit, batch_size, options,
-                      session, client, read_concern=DEFAULT_READ_CONCERN,
                       collation=None):
     """Generate a find command document."""
     cmd = SON([('find', coll)])
@@ -217,27 +194,16 @@ def _gen_find_command(coll, spec, projection, skip, limit, batch_size, options,
             cmd['singleBatch'] = True
     if batch_size:
         cmd['batchSize'] = batch_size
-    if read_concern.level:
-        cmd['readConcern'] = read_concern.document
     if collation:
         cmd['collation'] = collation
     if options:
         cmd.update([(opt, True)
                     for opt, val in _OPTIONS.items()
                     if options & val])
-    if session:
-        cmd['lsid'] = session._use_lsid()
-        if (session.options.causal_consistency
-                and session.operation_time is not None):
-            cmd.setdefault(
-                'readConcern', {})['afterClusterTime'] = session.operation_time
-    if client:
-        client._send_cluster_time(cmd, session)
     return cmd
 
 
-def _gen_get_more_command(cursor_id, coll, batch_size, max_await_time_ms,
-                          session, client):
+def _gen_get_more_command(cursor_id, coll, batch_size, max_await_time_ms):
     """Generate a getMore command document."""
     cmd = SON([('getMore', cursor_id),
                ('collection', coll)])
@@ -245,9 +211,6 @@ def _gen_get_more_command(cursor_id, coll, batch_size, max_await_time_ms,
         cmd['batchSize'] = batch_size
     if max_await_time_ms is not None:
         cmd['maxTimeMS'] = max_await_time_ms
-    if session:
-        cmd['lsid'] = session._use_lsid()
-    client._send_cluster_time(cmd, session)
     return cmd
 
 
@@ -299,23 +262,31 @@ class _Query(object):
 
         return use_find_cmd
 
-    def as_command(self):
+    def as_command(self, sock_info):
         """Return a find command document for this query.
 
         Should be called *after* get_message.
         """
+        cmd = _gen_find_command(
+            self.coll, self.spec, self.fields, self.ntoskip,
+            self.limit, self.batch_size, self.flags, self.collation)
         if '$explain' in self.spec:
             self.name = 'explain'
-            return _gen_explain_command(
-                self.coll, self.spec, self.fields, self.ntoskip,
-                self.limit, self.batch_size, self.flags,
-                self.read_concern, self.session, self.client), self.db
-        return _gen_find_command(self.coll, self.spec, self.fields,
-                                 self.ntoskip, self.limit, self.batch_size,
-                                 self.flags, self.session, self.client,
-                                 self.read_concern, self.collation), self.db
+            cmd = SON([('explain', cmd)])
+        if self.read_concern.level:
+            cmd['readConcern'] = self.read_concern.document
+        session = self.session
+        if session:
+            cmd['lsid'] = session._use_lsid()
+            if (session.options.causal_consistency
+                and session.operation_time is not None):
+                cmd.setdefault(
+                    'readConcern', {})[
+                    'afterClusterTime'] = session.operation_time
+        sock_info.send_cluster_time(cmd, session, self.client)
+        return cmd, self.db
 
-    def get_message(self, set_slave_ok, is_mongos, use_cmd=False):
+    def get_message(self, set_slave_ok, sock_info, use_cmd=False):
         """Get a query message, possibly setting the slaveOk bit."""
         if set_slave_ok:
             # Set the slaveOk bit.
@@ -328,7 +299,7 @@ class _Query(object):
 
         if use_cmd:
             ns = _UJOIN % (self.db, "$cmd")
-            spec = self.as_command()[0]
+            spec = self.as_command(sock_info)[0]
             ntoreturn = -1  # All DB commands return 1 document
         else:
             # OP_QUERY treats ntoreturn of -1 and 1 the same, return
@@ -341,7 +312,7 @@ class _Query(object):
                 else:
                     ntoreturn = self.limit
 
-        if is_mongos:
+        if sock_info.is_mongos:
             spec = _maybe_add_read_preference(spec,
                                               self.read_preference)
 
@@ -372,22 +343,25 @@ class _GetMore(object):
         sock_info.validate_session(self.client, self.session)
         return sock_info.max_wire_version >= 4 and not exhaust
 
-    def as_command(self):
+    def as_command(self, sock_info):
         """Return a getMore command document for this query."""
-        return _gen_get_more_command(self.cursor_id, self.coll,
-                                     self.ntoreturn,
-                                     self.max_await_time_ms,
-                                     self.session,
-                                     self.client), self.db
+        cmd = _gen_get_more_command(self.cursor_id, self.coll,
+                                    self.ntoreturn,
+                                    self.max_await_time_ms)
 
-    def get_message(self, dummy0, dummy1, use_cmd=False):
+        if self.session:
+            cmd['lsid'] = self.session._use_lsid()
+        sock_info.send_cluster_time(cmd, self.session, self.client)
+        return cmd, self.db
+
+    def get_message(self, dummy0, sock_info, use_cmd=False):
         """Get a getmore message."""
 
         ns = _UJOIN % (self.db, self.coll)
 
         if use_cmd:
             ns = _UJOIN % (self.db, "$cmd")
-            spec = self.as_command()[0]
+            spec = self.as_command(sock_info)[0]
 
             return query(0, ns, 0, -1, spec, None, self.codec_options)
 
@@ -401,20 +375,20 @@ class _RawBatchQuery(_Query):
 
         return False
 
-    def get_message(self, set_slave_ok, is_mongos, use_cmd=False):
+    def get_message(self, set_slave_ok, sock_info, use_cmd=False):
         # Always pass False for use_cmd.
-        return super(_RawBatchQuery, self).get_message(set_slave_ok, is_mongos,
-                                                       False)
+        return super(_RawBatchQuery, self).get_message(
+            set_slave_ok, sock_info, False)
 
 
 class _RawBatchGetMore(_GetMore):
     def use_command(self, socket_info, exhaust):
         return False
 
-    def get_message(self, set_slave_ok, is_mongos, use_cmd=False):
+    def get_message(self, set_slave_ok, sock_info, use_cmd=False):
         # Always pass False for use_cmd.
-        return super(_RawBatchGetMore, self).get_message(set_slave_ok, is_mongos,
-                                                         False)
+        return super(_RawBatchGetMore, self).get_message(
+            set_slave_ok, sock_info, False)
 
 
 class _CursorAddress(tuple):
@@ -982,12 +956,11 @@ class _OpReply(object):
 
 
 def _first_batch(sock_info, db, coll, query, ntoreturn,
-                 slave_ok, codec_options, read_preference, cmd, listeners,
-                 session):
+                 slave_ok, codec_options, read_preference, cmd, listeners):
     """Simple query helper for retrieving a first (and possibly only) batch."""
     query = _Query(
         0, db, coll, 0, query, None, codec_options,
-        read_preference, ntoreturn, 0, DEFAULT_READ_CONCERN, None, session,
+        read_preference, ntoreturn, 0, DEFAULT_READ_CONCERN, None, None,
         None)
 
     name = next(iter(cmd))
