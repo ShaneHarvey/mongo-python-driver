@@ -80,6 +80,13 @@ def check_result(expected_result, result):
                 if isinstance(ids, dict):
                     ids = [ids[str(i)] for i in range(len(ids))]
                 return ids == result.inserted_ids
+            elif prop == "upserted_ids":
+                # Convert indexes from strings to integers.
+                ids = expected_result[res]
+                expected_ids = {}
+                for str_index in ids:
+                    expected_ids[int(str_index)] = ids[str_index]
+                return expected_ids == result.upserted_ids
             elif getattr(result, prop) != expected_result[res]:
                 return False
         return True
