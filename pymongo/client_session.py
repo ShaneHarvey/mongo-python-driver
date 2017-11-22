@@ -236,10 +236,10 @@ class _ServerSessionPool(collections.deque):
 
     This class is not thread-safe, access it while holding the Topology lock.
     """
-    def clear_sessions(self):
+    def pop_all(self):
         ids = []
         while self:
-            ids.append(self.popleft().session_id)
+            ids.append(self.pop().session_id)
         return ids
 
     def get_server_session(self, session_timeout_minutes):

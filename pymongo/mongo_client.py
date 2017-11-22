@@ -890,7 +890,7 @@ class MongoClient(common.BaseObject):
         .. versionchanged:: 3.6
            End all server sessions created by this client.
         """
-        session_ids = self._topology.clear_session_pool()
+        session_ids = self._topology.pop_all_sessions()
         if session_ids:
             self._end_sessions(session_ids)
         # Run _process_periodic_tasks to send pending killCursor requests
@@ -1348,7 +1348,7 @@ class MongoClient(common.BaseObject):
         deprecated method :meth:`~pymongo.database.Database.authenticate`.
 
         A :class:`~pymongo.client_session.ClientSession` may only be used with
-        the MongoClient which started it.
+        the MongoClient that started it.
 
         :Returns:
           An instance of :class:`~pymongo.client_session.ClientSession`.
