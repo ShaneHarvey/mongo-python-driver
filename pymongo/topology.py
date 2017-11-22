@@ -1,4 +1,4 @@
-# Copyright 2014-2016 MongoDB, Inc.
+# Copyright 2014-present MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you
 # may not use this file except in compliance with the License.  You
@@ -383,7 +383,7 @@ class Topology(object):
 
             # Mark all servers Unknown.
             self._description = self._description.reset()
-            self._update_servers()
+            self._servers.clear()
             self._opened = False
 
         # Publish only after releasing the lock.

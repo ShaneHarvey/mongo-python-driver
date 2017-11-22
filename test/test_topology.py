@@ -1,4 +1,4 @@
-# Copyright 2014-2015 MongoDB, Inc.
+# Copyright 2014-present MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -402,9 +402,14 @@ class TestMultiServerTopology(TopologyTest):
                          t.description.topology_type)
 
         t.close()
-        self.assertEqual(2, len(t.description.server_descriptions()))
-        self.assertEqual(SERVER_TYPE.Unknown, get_type(t, 'a'))
-        self.assertEqual(SERVER_TYPE.Unknown, get_type(t, 'b'))
+
+        server_descriptions = t.description.server_descriptions()
+        self.assertEqual({}, t._servers)
+        self.assertEqual(2, len(server_descriptions))
+        self.assertEqual(SERVER_TYPE.Unknown,
+                         server_descriptions[('a', 27017)].server_type)
+        self.assertEqual(SERVER_TYPE.Unknown,
+                         server_descriptions[('b', 27017)].server_type)
         self.assertEqual('rs', t.description.replica_set_name)
         self.assertEqual(TOPOLOGY_TYPE.ReplicaSetNoPrimary,
                          t.description.topology_type)
