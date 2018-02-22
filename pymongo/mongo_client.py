@@ -511,6 +511,7 @@ class MongoClient(common.BaseObject):
         self.__lock = threading.Lock()
         self.__cursor_manager = None
         self.__kill_cursors_queue = []
+        self.__return_sessions_queue = []
 
         self._event_listeners = options.pool_options.event_listeners
 
@@ -895,12 +896,12 @@ class MongoClient(common.BaseObject):
         .. versionchanged:: 3.6
            End all server sessions created by this client.
         """
+        # Run _process_periodic_tasks to send pending killCursor requests
+        # and return server sessions to the pool before closing the topology.
+        self._process_periodic_tasks()
         session_ids = self._topology.pop_all_sessions()
         if session_ids:
             self._end_sessions(session_ids)
-        # Run _process_periodic_tasks to send pending killCursor requests
-        # before closing the topology.
-        self._process_periodic_tasks()
         self._topology.close()
 
     def set_cursor_manager(self, manager_class):
@@ -1312,10 +1313,12 @@ class MongoClient(common.BaseObject):
                         duration, reply, 'killCursors', request_id,
                         tuple(address))
 
-    # This method is run periodically by a background thread.
     def _process_periodic_tasks(self):
-        """Process any pending kill cursors requests and
-        maintain connection pool parameters."""
+        """Run background thread tasks for this client.
+
+        Send pending kill cursors requests, return server sessions to the pool,
+        and maintain connection pool parameters.
+        """
         address_to_cursor_ids = defaultdict(list)
 
         # Other threads or the GC may append to the queue concurrently.
@@ -1336,6 +1339,15 @@ class MongoClient(common.BaseObject):
                         cursor_ids, address, topology, session=None)
                 except Exception:
                     helpers._handle_exception()
+
+        # Return server sessions to the pool.
+        while True:
+            try:
+                server_session = self.__return_sessions_queue.pop()
+            except IndexError:
+                break
+            self._return_server_session(server_session, True)
+
         try:
             self._topology.update_pool()
         except Exception:
@@ -1381,7 +1393,12 @@ class MongoClient(common.BaseObject):
 
     def _return_server_session(self, server_session, lock):
         """Internal: return a _ServerSession to the pool."""
-        return self._topology.return_server_session(server_session, lock)
+        if lock:
+            self._topology.return_server_session(server_session)
+        else:
+            # Called from a __del__ method, can't use a lock. The background
+            # thread will return it to the pool soon.
+            self.__return_sessions_queue.append(server_session)
 
     def _ensure_session(self, session=None):
         """If provided session is None, lend a temporary session."""

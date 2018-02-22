@@ -28,8 +28,16 @@ from pymongo.errors import (ConfigurationError,
 from pymongo.monotonic import time as _time
 from pymongo.read_concern import ReadConcern
 from pymongo.write_concern import WriteConcern
-from test import IntegrationTest, client_context, db_user, db_pwd, unittest, SkipTest
-from test.utils import ignore_deprecations, rs_or_single_client, EventListener
+from test import (client_context,
+                  db_user,
+                  db_pwd,
+                  IntegrationTest,
+                  SkipTest,
+                  unittest)
+from test.utils import (EventListener,
+                        ignore_deprecations,
+                        rs_or_single_client,
+                        wait_until)
 
 
 # Ignore auth commands like saslStart, so we can assert lsid is in all commands.
@@ -54,7 +62,8 @@ class SessionTestListener(EventListener):
 
 
 def session_ids(client):
-    return [s.session_id for s in client._topology._session_pool.__copy__()]
+    with client._topology._lock:
+        return [s.session_id for s in client._topology._session_pool]
 
 
 class TestSession(IntegrationTest):
@@ -608,7 +617,7 @@ class TestSession(IntegrationTest):
         # Session was returned to pool despite error.
         self.assertIn(lsid, session_ids(client))
 
-    def _test_cursor_helper(self, create_cursor, close_cursor):
+    def _test_cursor_helper(self, create_cursor, close_cursor, is_del):
         coll = self.client.pymongo_test.collection
         coll.insert_many([{} for _ in range(1000)])
         self.addCleanup(coll.drop)
@@ -624,7 +633,11 @@ class TestSession(IntegrationTest):
         # Cursor owns its session unto death.
         self.assertNotIn(lsid, session_ids(self.client))
         close_cursor(cursor)
-        self.assertIn(lsid, session_ids(self.client))
+        if is_del:
+            wait_until(lambda: lsid in session_ids(self.client),
+                       "return session to pool")
+        else:
+            self.assertIn(lsid, session_ids(self.client))
 
         # An explicit session is not ended by cursor.close() or list(cursor).
         with self.client.start_session() as s:
@@ -640,22 +653,26 @@ class TestSession(IntegrationTest):
     def test_cursor_close(self):
         self._test_cursor_helper(
             lambda coll, session: coll.find(session=session),
-            lambda cursor: cursor.close())
+            lambda cursor: cursor.close(),
+            False)
 
     def test_command_cursor_close(self):
         self._test_cursor_helper(
             lambda coll, session: coll.aggregate([], session=session),
-            lambda cursor: cursor.close())
+            lambda cursor: cursor.close(),
+            False)
 
     def test_cursor_del(self):
         self._test_cursor_helper(
             lambda coll, session: coll.find(session=session),
-            lambda cursor: cursor.__del__())
+            lambda cursor: cursor.__del__(),
+            True)
 
     def test_command_cursor_del(self):
         self._test_cursor_helper(
             lambda coll, session: coll.aggregate([], session=session),
-            lambda cursor: cursor.__del__())
+            lambda cursor: cursor.__del__(),
+            True)
 
 
 class TestCausalConsistency(unittest.TestCase):
