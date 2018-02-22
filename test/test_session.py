@@ -145,14 +145,10 @@ class TestSession(IntegrationTest):
 
                 lsids.append(event.command['lsid'])
 
-            if not (sys.platform.startswith('java') or 'PyPy' in sys.version):
-                # Server session was returned to pool. Ignore interpreters with
-                # non-deterministic GC.
-                for lsid in lsids:
-                    self.assertIn(
-                        lsid, session_ids(client),
-                        "%s did not return implicit session to pool" % (
-                            f.__name__,))
+            # Server sessions should be returned to the pool, possibly via GC.
+            wait_until(
+                lambda: all(lsid in session_ids(client) for lsid in lsids),
+                "return implicit sessions to pool after %s" % (f.__name__,))
 
     def test_pool_lifo(self):
         # "Pool is LIFO" test from Driver Sessions Spec.
@@ -544,12 +540,12 @@ class TestSession(IntegrationTest):
         self.assertTrue(s.has_ended)
 
         # No explicit session.
-        cursor = bucket.find()
-        files = list(cursor)
-
+        cursor = bucket.find(batch_size=1)
+        files = [cursor.next()]
         s = cursor._Cursor__session
         self.assertFalse(s.has_ended)
-        cursor.__del__()
+        files.extend(cursor)
+        self.assertIsNone(cursor._Cursor__session)
         self.assertTrue(s.has_ended)
 
         # Files are still valid, they use their own sessions.
