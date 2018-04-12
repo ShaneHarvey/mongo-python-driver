@@ -33,7 +33,12 @@ _TEST_PATH = os.path.join(
 
 
 class TestReadWriteConcernSpec(unittest.TestCase):
-    pass
+
+    def test_omit_default_write_concern(self):
+        # TODO: from the spec:
+        # Commands supporting a write concern MUST send any non-default
+        # acknowledged write concern to the server.
+        pass
 
 
 def normalize_write_concern(concern):
@@ -100,11 +105,16 @@ def create_document_test(test_case):
                 concern = WriteConcern(**normalized)
                 self.assertEqual(
                     concern.document, test_case['writeConcernDocument'])
-                self.assertEqual(concern.acknowledged, test_case['isAcknowledged'])
+                self.assertEqual(
+                    concern.acknowledged, test_case['isAcknowledged'])
+                self.assertEqual(
+                    not bool(concern), test_case['isServerDefault'])
         if 'readConcern' in test_case:
             # Any string for 'level' is equaly valid
             concern = ReadConcern(**test_case['readConcern'])
             self.assertEqual(concern.document, test_case['readConcernDocument'])
+            self.assertEqual(
+                not bool(concern.level), test_case['isServerDefault'])
 
     return run_test
 
