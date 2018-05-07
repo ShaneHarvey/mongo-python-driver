@@ -23,7 +23,6 @@ MongoDB.
 import datetime
 import random
 import struct
-import sys
 
 import bson
 from bson import CodecOptions
@@ -968,8 +967,9 @@ class _OpReply(object):
         # PYTHON-945: ignore starting_from field.
         flags, cursor_id, _, number_returned = cls.UNPACK(msg[:20])
 
-        if sys.version_info[:2] <= (2, 6):
-            # In Python 2.6 msg is a bytearray.
+        if isinstance(msg, bytes):
+            documents = msg[20:]
+        elif isinstance(msg, bytearray):
             documents = bytes(msg[20:])
         else:
             # In Python >= 2.7 msg is a memoryview.
