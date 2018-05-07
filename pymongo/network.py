@@ -165,10 +165,12 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
     return _OpReply.unpack(_receive_data_on_socket(sock, length - 16))
 
 
-# memoryview was introduced in Python 2.7.
+# memoryview was introduced in Python 2.7 but we only use it on Python 3
+# because before 2.7.4 the struct module did not support memoryview:
+# https://bugs.python.org/issue10212.
 # In Jython, using slice assignment on a memoryview results in a
 # NullPointerException.
-if sys.version_info[:2] <= (2, 6) or sys.platform.startswith('java'):
+if sys.version_info[1] <= 2 or sys.platform.startswith('java'):
     def _receive_data_on_socket(sock, length):
         buf = bytearray(length)
         i = 0
