@@ -83,7 +83,7 @@ def _receive_data_extend(sock, length):
         i += len(chunk)
         length -= len(chunk)
 
-    return msg
+    return bytes(msg)
 
 
 def _receive_data_extend_min(sock, length):
@@ -103,7 +103,7 @@ def _receive_data_extend_min(sock, length):
         i += len(chunk)
         length -= len(chunk)
 
-    return msg
+    return bytes(msg)
 
 def _receive_data_addition(sock, length):
     msg = b""
