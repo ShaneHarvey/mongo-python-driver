@@ -23,6 +23,7 @@ MongoDB.
 import datetime
 import random
 import struct
+import sys
 
 import bson
 from bson import CodecOptions
@@ -966,7 +967,14 @@ class _OpReply(object):
         """Construct an _OpReply from raw bytes."""
         # PYTHON-945: ignore starting_from field.
         flags, cursor_id, _, number_returned = cls.UNPACK(msg[:20])
-        return cls(flags, cursor_id, number_returned, msg[20:])
+
+        if sys.version_info[:2] <= (2, 6):
+            # In Python 2.6 msg is a bytearray.
+            documents = bytes(msg[20:])
+        else:
+            # In Python >= 2.7 msg is a memoryview.
+            documents = msg[20:].tobytes()
+        return cls(flags, cursor_id, number_returned, documents)
 
 
 def _first_batch(sock_info, db, coll, query, ntoreturn,

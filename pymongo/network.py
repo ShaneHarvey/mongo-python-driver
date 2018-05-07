@@ -167,7 +167,7 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
 
 if sys.version_info[:2] <= (2, 6):
     def _receive_data_on_socket(sock, length):
-        msg = b""
+        buf = bytearray()
         while length:
             try:
                 chunk = sock.recv(length)
@@ -179,9 +179,9 @@ if sys.version_info[:2] <= (2, 6):
                 raise AutoReconnect("connection closed")
 
             length -= len(chunk)
-            msg += chunk
+            buf.extend(chunk)
 
-        return msg
+        return buf
 else:
     def _receive_data_on_socket(sock, length):
         buf = bytearray(length)
@@ -199,7 +199,7 @@ else:
 
             bytes_read += chunk_length
 
-        return bytes(buf)
+        return mv
 
 
 def _errno_from_exception(exc):
