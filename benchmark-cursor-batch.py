@@ -83,7 +83,7 @@ def _receive_data_extend(sock, length):
         i += len(chunk)
         length -= len(chunk)
 
-    return bytes(msg)
+    return msg
 
 
 def _receive_data_extend_min(sock, length):
@@ -103,7 +103,7 @@ def _receive_data_extend_min(sock, length):
         i += len(chunk)
         length -= len(chunk)
 
-    return bytes(msg)
+    return msg
 
 def _receive_data_addition(sock, length):
     msg = b""
@@ -191,7 +191,7 @@ def _receive_data_memoryview(sock, length):
 
         bytes_read += chunk_length
 
-    return bytes(buf)
+    return mv
 
 
 if __name__ == "__main__":
