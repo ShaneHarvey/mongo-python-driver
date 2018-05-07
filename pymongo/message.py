@@ -969,8 +969,6 @@ class _OpReply(object):
 
         if isinstance(msg, bytes):
             documents = msg[20:]
-        elif isinstance(msg, bytearray):
-            documents = bytes(msg[20:])
         else:
             # In Python >= 2.7 msg is a memoryview.
             documents = msg[20:].tobytes()

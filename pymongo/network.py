@@ -165,9 +165,13 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
     return _OpReply.unpack(_receive_data_on_socket(sock, length - 16))
 
 
-if sys.version_info[:2] <= (2, 6):
+# memoryview was introduced in Python 2.7.
+# In Jython, using slice assignment on a memoryview results in a
+# NullPointerException.
+if sys.version_info[:2] <= (2, 6) or sys.platform.startswith('java'):
     def _receive_data_on_socket(sock, length):
-        buf = bytearray()
+        buf = bytearray(length)
+        i = 0
         while length:
             try:
                 chunk = sock.recv(length)
@@ -178,10 +182,11 @@ if sys.version_info[:2] <= (2, 6):
             if chunk == b"":
                 raise AutoReconnect("connection closed")
 
+            buf[i:i + len(chunk)] = chunk
+            i += len(chunk)
             length -= len(chunk)
-            buf.extend(chunk)
 
-        return buf
+        return bytes(buf)
 else:
     def _receive_data_on_socket(sock, length):
         buf = bytearray(length)
