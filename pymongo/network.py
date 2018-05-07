@@ -18,7 +18,6 @@ import datetime
 import errno
 import select
 import struct
-import sys
 import threading
 
 _HAS_POLL = True
@@ -34,6 +33,8 @@ try:
     from select import error as _SELECT_ERROR
 except ImportError:
     _SELECT_ERROR = OSError
+
+from bson.py3compat import PY3
 
 from pymongo import helpers, message
 from pymongo.common import MAX_MESSAGE_SIZE
@@ -170,7 +171,7 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
 # https://bugs.python.org/issue10212.
 # In Jython, using slice assignment on a memoryview results in a
 # NullPointerException.
-if sys.version_info[1] <= 2 or sys.platform.startswith('java'):
+if not PY3:
     def _receive_data_on_socket(sock, length):
         buf = bytearray(length)
         i = 0
