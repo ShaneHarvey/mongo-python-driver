@@ -609,11 +609,9 @@ def _encode_with_cluster_time(doc, check_keys, opts):
     return encoded
 
 
-# TODO: Write C extension version.
-def op_msg(flags, command, dbname, read_preference, slave_ok, opts,
-           check_keys=False):
-    """Get a **OP_MSG** message.
-    """
+def _op_msg(flags, command, dbname, read_preference, slave_ok, opts,
+            check_keys=False):
+    """Get a OP_MSG message."""
     data = struct.pack("<IB", flags, 0)
     encoded = _encode_with_cluster_time(command, check_keys, opts)
     extra = bson._element_to_bson("$db", dbname, False, opts)
@@ -629,8 +627,38 @@ def op_msg(flags, command, dbname, read_preference, slave_ok, opts,
                extra + b'\x00')
     data += encoded
     max_bson_size = len(encoded)
+    return data, max_bson_size
+
+
+def _op_msg_compressed(flags, command, dbname, read_preference, slave_ok,
+                         opts, check_keys=False, ctx=None):
+    """Internal OP_MSG message helper."""
+    msg, max_bson_size = _op_msg(
+        flags, command, dbname, read_preference, slave_ok, opts, check_keys)
+    rid, msg = _compress(2013, msg, ctx)
+    return rid, msg, max_bson_size
+
+
+# TODO: Write C extension version.
+def _op_msg_uncompressed(flags, command, dbname, read_preference, slave_ok, opts,
+                         check_keys=False):
+    """Internal compressed OP_MSG message helper."""
+    data, max_bson_size = _op_msg(
+        flags, command, dbname, read_preference, slave_ok, opts, check_keys)
     request_id, query_message = __pack_message(2013, data)
     return request_id, query_message, max_bson_size
+
+
+def op_msg(flags, command, dbname, read_preference, slave_ok, opts,
+           check_keys=False, ctx=None):
+    """Get a OP_MSG message."""
+    if ctx:
+        return _op_msg_compressed(
+            flags, command, dbname, read_preference, slave_ok, opts,
+            check_keys, ctx)
+    return _op_msg_uncompressed(
+        flags, command, dbname, read_preference, slave_ok, opts,
+        check_keys)
 
 
 def _query(options, collection_name, num_to_skip,
