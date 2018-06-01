@@ -26,6 +26,7 @@ from bson.son import SON
 
 
 from pymongo.errors import (ConnectionFailure,
+                            OperationFailure,
                             ServerSelectionTimeoutError)
 from pymongo.mongo_client import MongoClient
 from pymongo.operations import (InsertOne,
@@ -85,7 +86,7 @@ def create_test(scenario_def, test):
         db = rs_or_single_client(**test['clientOptions']).pymongo_test
         try:
             result = run_operation(db.test, test)
-        except ConnectionFailure as exc:
+        except (ConnectionFailure, OperationFailure) as exc:
             error = exc
 
         if should_fail:
