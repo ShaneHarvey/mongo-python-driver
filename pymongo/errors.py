@@ -24,6 +24,19 @@ except ImportError:
 
 class PyMongoError(Exception):
     """Base class for all PyMongo exceptions."""
+    def __init__(self, message='', error_labels=None):
+        if error_labels is None:
+            self._error_labels = tuple()
+        else:
+            self._error_labels = tuple(error_labels)
+        Exception.__init__(self, message)
+
+    def has_error_label(self, label):
+        """Return True if this error contains the given label.
+
+        .. versionadded:: 3.7
+        """
+        return label in self._error_labels
 
 
 class ProtocolError(PyMongoError):
@@ -32,13 +45,10 @@ class ProtocolError(PyMongoError):
 
 class ConnectionFailure(PyMongoError):
     """Raised when a connection to the database cannot be made or is lost."""
-
-    def has_label(self, label):
-        """Return True if this error contains the given label.
-
-        .. versionadded:: 3.7
-        """
-        return label == "TemporaryTxnFailure"
+    def __init__(self, message='', error_labels=None):
+        if error_labels is None:
+            error_labels = ("TransientTransactionError",)
+        PyMongoError.__init__(self, message, error_labels=error_labels)
 
 
 class AutoReconnect(ConnectionFailure):
@@ -111,7 +121,10 @@ class OperationFailure(PyMongoError):
     def __init__(self, error, code=None, details=None):
         self.__code = code
         self.__details = details
-        PyMongoError.__init__(self, error)
+        error_labels = None
+        if details is not None:
+            error_labels = details.get('errorLabels')
+        PyMongoError.__init__(self, error, error_labels=error_labels)
 
     @property
     def code(self):
