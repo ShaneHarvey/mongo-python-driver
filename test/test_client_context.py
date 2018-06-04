@@ -25,9 +25,6 @@ class TestClientContext(unittest.TestCase):
         if 'PYMONGO_MUST_CONNECT' not in os.environ:
             raise SkipTest('PYMONGO_MUST_CONNECT is not set')
 
-        # Ensure the ClientContext is initialized.
-        client_context.init()
-
         self.assertTrue(client_context.connected,
                         'client context must be connected when '
                         'PYMONGO_MUST_CONNECT is set. Failed attempts:\n%s' %

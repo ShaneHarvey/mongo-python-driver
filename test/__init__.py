@@ -633,6 +633,7 @@ class MockClientTest(unittest.TestCase):
 
 
 def setup():
+    client_context.init()
     warnings.resetwarnings()
     warnings.simplefilter("always")
 
