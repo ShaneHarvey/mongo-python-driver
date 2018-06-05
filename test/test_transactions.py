@@ -428,14 +428,14 @@ def create_test(scenario_def, test):
                 if expect_error_message(expected_result):
                     self.assertIn(expected_result['errorContains'].lower(),
                                   str(context.exception).lower())
-                elif expect_error_code(expected_result):
+                if expect_error_code(expected_result):
                     self.assertEqual(expected_result['errorCodeName'],
                                      context.exception.details.get('codeName'))
-                elif expect_error_labels_contain(expected_result):
+                if expect_error_labels_contain(expected_result):
                     self.assertErrorLabelsContain(
                         context.exception,
                         expected_result['errorLabelsContain'])
-                elif expect_error_labels_omit(expected_result):
+                if expect_error_labels_omit(expected_result):
                     self.assertErrorLabelsContain(
                         context.exception,
                         expected_result['errorLabelsOmit'])
