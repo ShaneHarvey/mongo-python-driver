@@ -122,10 +122,26 @@ def create_tests():
                 scenario_def = json.load(scenario_stream)
 
             test_type = os.path.splitext(filename)[0]
+            min_ver, max_ver = None, None
+            if 'minServerVersion' in scenario_def:
+                min_ver = tuple(
+                    int(elt) for
+                    elt in scenario_def['minServerVersion'].split('.'))
+            if 'maxServerVersion' in scenario_def:
+                max_ver = tuple(
+                    int(elt) for
+                    elt in scenario_def['maxServerVersion'].split('.'))
 
             # Construct test from scenario.
             for test in scenario_def['tests']:
                 new_test = create_test(scenario_def, test)
+                if min_ver is not None:
+                    new_test = client_context.require_version_min(*min_ver)(
+                        new_test)
+                if max_ver is not None:
+                    new_test = client_context.require_version_max(*max_ver)(
+                        new_test)
+
                 test_name = 'test_%s_%s_%s' % (
                     dirname,
                     test_type,
