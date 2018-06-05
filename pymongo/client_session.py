@@ -88,6 +88,7 @@ import uuid
 from bson.binary import Binary
 from bson.int64 import Int64
 from bson.py3compat import abc, reraise_same
+from bson.son import SON
 from bson.timestamp import Timestamp
 
 from pymongo import monotonic
@@ -385,18 +386,22 @@ class ClientSession(object):
             self._transaction.state = _TxnState.ABORTED
 
     def _finish_transaction(self, command_name):
-        # TODO: commitTransaction should be a retryable write.
-        # Use _command directly because commit/abort are writes and must
-        # always go to the primary.
-        with self._client._socket_for_writes() as sock_info:
-            return self._client.admin._command(
-                sock_info,
-                command_name,
-                txnNumber=self._transaction.transaction_id,
-                autocommit=False,
-                session=self,
+        command = SON([(command_name, 1),
+                       ("txnNumber", self._transaction.transaction_id),
+                       ("autocommit", False)])
+
+        def _command(session, sock_info, retryable_write):
+            return sock_info.command(
+                'admin',
+                command,
                 write_concern=self._transaction.opts.write_concern,
-                parse_write_concern_error=True)
+                parse_write_concern_error=True,
+                check_keys=False,
+                session=session,
+                client=self._client,
+                retryable_write=retryable_write)
+
+        return self._client._retryable_write(True, _command, self)
 
     def _advance_cluster_time(self, cluster_time):
         """Internal cluster time helper."""
