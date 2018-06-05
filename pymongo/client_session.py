@@ -350,16 +350,7 @@ class ClientSession(object):
                 "Cannot call commitTransaction after calling abortTransaction")
 
         try:
-            try:
-                self._finish_transaction("commitTransaction")
-            except ServerSelectionTimeoutError:
-                raise
-            except ConnectionFailure:
-                self._finish_transaction("commitTransaction")
-            except OperationFailure as exc:
-                if exc.code not in (7, 6, 89, 9001):
-                    raise
-                self._finish_transaction("commitTransaction")
+            self._finish_transaction_with_retry("commitTransaction")
         except ConnectionFailure as exc:
             _, _, exc_tb = sys.exc_info()
             exc._error_labels = ("UnknownTransactionCommitResult",)
@@ -388,7 +379,7 @@ class ClientSession(object):
                 "Cannot call abortTransaction after calling commitTransaction")
 
         try:
-            self._finish_transaction("abortTransaction")
+            self._finish_transaction_with_retry("abortTransaction")
         except (OperationFailure, ConnectionFailure):
             # The transactions spec says to ignore abortTransaction errors.
             pass
@@ -396,22 +387,32 @@ class ClientSession(object):
             self._transaction.state = _TxnState.ABORTED
 
     def _finish_transaction(self, command_name):
-        command = SON([(command_name, 1),
-                       ("txnNumber", self._transaction.transaction_id),
-                       ("autocommit", False)])
-
-        def _command(session, sock_info, retryable_write):
-            return sock_info.command(
-                'admin',
-                command,
+        with self._client._socket_for_writes() as sock_info:
+            return self._client.admin._command(
+                sock_info,
+                command_name,
+                txnNumber=self._transaction.transaction_id,
+                autocommit=False,
+                session=self,
                 write_concern=self._transaction.opts.write_concern,
-                parse_write_concern_error=True,
-                check_keys=False,
-                session=session,
-                client=self._client,
-                retryable_write=retryable_write)
+                parse_write_concern_error=True)
 
-        return self._client._retryable_write(True, _command, self)
+    def _finish_transaction_with_retry(self, command_name):
+        # This can be refactored with MongoClient._retry_with_session.
+        try:
+            return self._finish_transaction(command_name)
+        except ServerSelectionTimeoutError:
+            raise
+        except ConnectionFailure:
+            return self._finish_transaction(command_name)
+        except OperationFailure as exc:
+            if exc.code not in (7, 6, 89, 9001):
+                # HostNotFound, HostUnreachable, NetworkTimeout, and
+                # SocketException are temporary failures not considered
+                # "not master" or "node is recovering" errors but should
+                # nonetheless be retried.
+                raise
+            return self._finish_transaction(command_name)
 
     def _advance_cluster_time(self, cluster_time):
         """Internal cluster time helper."""
