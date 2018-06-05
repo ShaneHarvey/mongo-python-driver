@@ -349,7 +349,14 @@ class ClientSession(object):
                 "Cannot call commitTransaction after calling abortTransaction")
 
         try:
-            self._finish_transaction("commitTransaction")
+            try:
+                self._finish_transaction("commitTransaction")
+            except ConnectionFailure as exc:
+                self._finish_transaction("commitTransaction")
+            except OperationFailure as exc:
+                if exc.code not in (7, 6, 89, 9001):
+                    raise
+                self._finish_transaction("commitTransaction")
         except ConnectionFailure as exc:
             _, _, exc_tb = sys.exc_info()
             exc._error_labels = tuple("UnknownTransactionCommitResult")
