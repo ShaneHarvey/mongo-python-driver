@@ -95,7 +95,8 @@ from pymongo import monotonic
 from pymongo.errors import (ConfigurationError,
                             ConnectionFailure,
                             InvalidOperation,
-                            OperationFailure)
+                            OperationFailure,
+                            ServerSelectionTimeoutError)
 from pymongo.read_concern import ReadConcern
 from pymongo.read_preferences import ReadPreference, _ServerMode
 from pymongo.write_concern import WriteConcern
@@ -351,7 +352,9 @@ class ClientSession(object):
         try:
             try:
                 self._finish_transaction("commitTransaction")
-            except ConnectionFailure as exc:
+            except ServerSelectionTimeoutError:
+                raise
+            except ConnectionFailure:
                 self._finish_transaction("commitTransaction")
             except OperationFailure as exc:
                 if exc.code not in (7, 6, 89, 9001):
