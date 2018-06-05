@@ -80,14 +80,6 @@ class TestTransactions(IntegrationTest):
                 exc.has_error_label(label),
                 msg='error labels should not contain %s' % (label,))
 
-    def setupDown(self):
-        self.client.admin.command('configureFailPoint', 'failCommand',
-                                  mode='off')
-
-    def tearDown(self):
-        self.client.admin.command('configureFailPoint', 'failCommand',
-                                  mode='off')
-
     def set_fail_point(self, command_args):
         cmd = SON([('configureFailPoint', 'failCommand')])
         cmd.update(command_args)
@@ -414,6 +406,8 @@ def create_test(scenario_def, test):
 
         if 'failPoint' in test:
             self.set_fail_point(test['failPoint'])
+            self.addCleanup(self.set_fail_point, {
+                'configureFailPoint': 'failCommand', 'mode': 'off'})
 
         listener.results.clear()
         collection = client[database_name][collection_name]
