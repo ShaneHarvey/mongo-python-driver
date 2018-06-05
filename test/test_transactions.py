@@ -347,11 +347,15 @@ def create_test(scenario_def, test):
         # with ScenarioDict.
         client = rs_client(event_listeners=[listener],
                            **dict(test['clientOptions']))
-        try:
-            client.admin.command('killAllSessions', [])
-        except OperationFailure:
-            # "operation was interrupted" by killing the command's own session.
-            pass
+        def kill_all_sessions():
+            try:
+                client.admin.command('killAllSessions', [])
+            except OperationFailure:
+                # "operation was interrupted" by killing the command's
+                # own session.
+                pass
+        kill_all_sessions()
+        self.addCleanup(kill_all_sessions)
 
         database_name = scenario_def['database_name']
         collection_name = scenario_def['collection_name']
@@ -430,7 +434,7 @@ def create_test(scenario_def, test):
                         context.exception,
                         expected_result['errorLabelsContain'])
                 if expect_error_labels_omit(expected_result):
-                    self.assertErrorLabelsContain(
+                    self.assertErrorLabelsOmit(
                         context.exception,
                         expected_result['errorLabelsOmit'])
             else:

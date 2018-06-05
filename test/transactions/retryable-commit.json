@@ -1435,9 +1435,6 @@
           "object": "session0",
           "result": {
             "errorCodeName": "Interrupted",
-            "errorLabelsContain": [
-              "UnknownTransactionCommitResult"
-            ],
             "errorLabelsOmit": [
               "TransientTransactionError"
             ]
@@ -1487,11 +1484,7 @@
       ],
       "outcome": {
         "collection": {
-          "data": [
-            {
-              "_id": 1
-            }
-          ]
+          "data": []
         }
       }
     }

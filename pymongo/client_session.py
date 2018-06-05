@@ -362,7 +362,7 @@ class ClientSession(object):
                 self._finish_transaction("commitTransaction")
         except ConnectionFailure as exc:
             _, _, exc_tb = sys.exc_info()
-            exc._error_labels = tuple("UnknownTransactionCommitResult")
+            exc._error_labels = ("UnknownTransactionCommitResult",)
             reraise_same(exc, trace=exc_tb)
         finally:
             self._transaction.state = _TxnState.COMMITTED
