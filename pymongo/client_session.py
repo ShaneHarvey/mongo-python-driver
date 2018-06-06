@@ -88,7 +88,6 @@ import uuid
 from bson.binary import Binary
 from bson.int64 import Int64
 from bson.py3compat import abc, reraise_same
-from bson.son import SON
 from bson.timestamp import Timestamp
 
 from pymongo import monotonic
@@ -97,6 +96,7 @@ from pymongo.errors import (ConfigurationError,
                             InvalidOperation,
                             OperationFailure,
                             ServerSelectionTimeoutError)
+from pymongo.helpers import _RETRYABLE_ERROR_CODES
 from pymongo.read_concern import ReadConcern
 from pymongo.read_preferences import ReadPreference, _ServerMode
 from pymongo.write_concern import WriteConcern
@@ -406,11 +406,7 @@ class ClientSession(object):
         except ConnectionFailure:
             return self._finish_transaction(command_name)
         except OperationFailure as exc:
-            if exc.code not in (7, 6, 89, 9001):
-                # HostNotFound, HostUnreachable, NetworkTimeout, and
-                # SocketException are temporary failures not considered
-                # "not master" or "node is recovering" errors but should
-                # nonetheless be retried.
+            if exc.code not in _RETRYABLE_ERROR_CODES:
                 raise
             return self._finish_transaction(command_name)
 
