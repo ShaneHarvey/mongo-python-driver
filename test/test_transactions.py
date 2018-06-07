@@ -347,6 +347,10 @@ def create_test(scenario_def, test):
         # with ScenarioDict.
         client = rs_client(event_listeners=[listener],
                            **dict(test['clientOptions']))
+
+        # Kill all sessions before and after each test to prevent an open
+        # transaction (from a test failure) from blocking collection/database
+        # operations during test set up and tear down.
         def kill_all_sessions():
             try:
                 client.admin.command('killAllSessions', [])
