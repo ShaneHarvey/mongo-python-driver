@@ -166,8 +166,8 @@ class TransactionOptions(object):
                                 (write_concern,))
             if not write_concern.acknowledged:
                 raise ConfigurationError(
-                    "transactions must use an acknowledged write concern, "
-                    "not: %r" % (write_concern,))
+                    "transactions do not support unacknowledged write concern"
+                    ": %r" % (write_concern,))
         if read_preference is not None:
             if not isinstance(read_preference, _ServerMode):
                 raise TypeError("%r is not valid for read_preference. See "

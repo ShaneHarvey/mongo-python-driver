@@ -100,7 +100,7 @@ class TestTransactions(IntegrationTest):
             TransactionOptions(write_concern={})
         with self.assertRaisesRegex(
                 ConfigurationError,
-                "transactions must use an acknowledged write concern"):
+                "transactions do not support unacknowledged write concern"):
             TransactionOptions(write_concern=WriteConcern(w=0))
         with self.assertRaisesRegex(
                 TypeError, "is not valid for read_preference"):
