@@ -25,10 +25,7 @@ except ImportError:
 class PyMongoError(Exception):
     """Base class for all PyMongo exceptions."""
     def __init__(self, message='', error_labels=None):
-        if error_labels is None:
-            self._error_labels = tuple()
-        else:
-            self._error_labels = tuple(error_labels)
+        self._error_labels = tuple(error_labels or [])
         Exception.__init__(self, message)
 
     def has_error_label(self, label):
@@ -47,6 +44,7 @@ class ConnectionFailure(PyMongoError):
     """Raised when a connection to the database cannot be made or is lost."""
     def __init__(self, message='', error_labels=None):
         if error_labels is None:
+            # Connection errors are transient errors by default.
             error_labels = ("TransientTransactionError",)
         PyMongoError.__init__(self, message, error_labels=error_labels)
 

@@ -352,9 +352,20 @@ class ClientSession(object):
         try:
             self._finish_transaction_with_retry("commitTransaction")
         except ConnectionFailure as exc:
-            _, _, exc_tb = sys.exc_info()
+            # Connection errors on commit are not transient because we do not
+            # know if the commit was successfully applied on the server, set
+            # the unknown commit error label.
             exc._error_labels = ("UnknownTransactionCommitResult",)
-            reraise_instance(exc, trace=exc_tb)
+            reraise_instance(exc, trace=sys.exc_info()[2])
+        except OperationFailure as exc:
+            if exc.code not in _RETRYABLE_ERROR_CODES:
+                # The server reports errorLabels in the case.
+                raise
+            # Retryable errors on commit are not transient because we do not
+            # know if the commit was successfully applied on the server, set
+            # the unknown commit error label.
+            exc._error_labels = ("UnknownTransactionCommitResult",)
+            reraise_instance(exc, trace=sys.exc_info()[2])
         finally:
             self._transaction.state = _TxnState.COMMITTED
 
