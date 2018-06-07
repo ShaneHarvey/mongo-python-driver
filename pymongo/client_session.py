@@ -352,18 +352,16 @@ class ClientSession(object):
         try:
             self._finish_transaction_with_retry("commitTransaction")
         except ConnectionFailure as exc:
-            # Connection errors on commit are not transient because we do not
-            # know if the commit was successfully applied on the server, set
-            # the unknown commit error label.
+            # We do not know if the commit was successfully applied on the
+            # server, set the unknown commit error label.
             exc._error_labels = ("UnknownTransactionCommitResult",)
             reraise_instance(exc, trace=sys.exc_info()[2])
         except OperationFailure as exc:
             if exc.code not in _RETRYABLE_ERROR_CODES:
                 # The server reports errorLabels in the case.
                 raise
-            # Retryable errors on commit are not transient because we do not
-            # know if the commit was successfully applied on the server, set
-            # the unknown commit error label.
+            # We do not know if the commit was successfully applied on the
+            # server, set the unknown commit error label.
             exc._error_labels = ("UnknownTransactionCommitResult",)
             reraise_instance(exc, trace=sys.exc_info()[2])
         finally:
@@ -414,12 +412,22 @@ class ClientSession(object):
             return self._finish_transaction(command_name)
         except ServerSelectionTimeoutError:
             raise
-        except ConnectionFailure:
-            return self._finish_transaction(command_name)
+        except ConnectionFailure as exc:
+            try:
+                return self._finish_transaction(command_name)
+            except ServerSelectionTimeoutError:
+                # Raise the original error so the application can infer that
+                # an attempt was made.
+                raise exc
         except OperationFailure as exc:
             if exc.code not in _RETRYABLE_ERROR_CODES:
                 raise
-            return self._finish_transaction(command_name)
+            try:
+                return self._finish_transaction(command_name)
+            except ServerSelectionTimeoutError:
+                # Raise the original error so the application can infer that
+                # an attempt was made.
+                raise exc
 
     def _advance_cluster_time(self, cluster_time):
         """Internal cluster time helper."""
