@@ -87,7 +87,7 @@ import uuid
 
 from bson.binary import Binary
 from bson.int64 import Int64
-from bson.py3compat import abc, reraise_same
+from bson.py3compat import abc, reraise_instance
 from bson.timestamp import Timestamp
 
 from pymongo import monotonic
@@ -354,7 +354,7 @@ class ClientSession(object):
         except ConnectionFailure as exc:
             _, _, exc_tb = sys.exc_info()
             exc._error_labels = ("UnknownTransactionCommitResult",)
-            reraise_same(exc, trace=exc_tb)
+            reraise_instance(exc, trace=exc_tb)
         finally:
             self._transaction.state = _TxnState.COMMITTED
 

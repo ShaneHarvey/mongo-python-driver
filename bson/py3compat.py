@@ -53,7 +53,7 @@ if PY3:
     def reraise(exctype, value, trace=None):
         raise exctype(str(value)).with_traceback(trace)
 
-    def reraise_same(exc_instance, trace=None):
+    def reraise_instance(exc_instance, trace=None):
         raise exc_instance.with_traceback(trace)
 
     def _unicode(s):
@@ -90,7 +90,7 @@ else:
     def reraise(exctype, value, trace=None):
         _reraise(exctype, str(value), trace)
 
-    def reraise_same(exc_instance, trace=None):
+    def reraise_instance(exc_instance, trace=None):
         _reraise(exc_instance, None, trace)
 
     # "raise x, y, z" raises SyntaxError in Python 3
