@@ -1247,26 +1247,25 @@ class _OpReply(object):
         # PYTHON-945: ignore starting_from field.
         flags, cursor_id, _, number_returned = cls.UNPACK(msg[:20])
 
-        documents = msg[20:]
-        if not isinstance(msg, bytes):
-            # msg is a memoryview in Python 3.
-            documents = documents.tobytes()
+        # Convert Python 3 memoryview to bytes. Note we should call
+        # memoryview.tobytes() if we start using memoryview in Python 2.7.
+        documents = bytes(msg[20:])
         return cls(flags, cursor_id, number_returned, documents)
 
 
 class _OpMsg(object):
     """A MongoDB OP_MSG response message."""
 
-    __slots__ = ("flags", "cursor_id", "number_returned", "documents")
+    __slots__ = ("flags", "cursor_id", "number_returned", "payload_document")
 
     UNPACK = struct.Struct("<Ibi").unpack
     OP_CODE = 2013
 
-    def __init__(self, flags, documents):
+    def __init__(self, flags, payload_document):
         self.flags = flags
         self.cursor_id = 0
         self.number_returned = 1
-        self.documents = documents
+        self.payload_document = payload_document
 
     def raw_response(self, cursor_id=None):
         raise NotImplemented
@@ -1288,7 +1287,7 @@ class _OpMsg(object):
           - `codec_options` (optional): an instance of
             :class:`~bson.codec_options.CodecOptions`
         """
-        return bson.decode_all(self.documents, codec_options)
+        return bson.decode_all(self.payload_document, codec_options)
 
     def command_response(self):
         """Unpack a command response."""
@@ -1306,7 +1305,11 @@ class _OpMsg(object):
 
         if len(msg) != first_payload_size + 5:
             raise ProtocolError("Unsupported OP_MSG reply: >1 section")
-        return cls(flags, msg[5:])
+
+        # Convert Python 3 memoryview to bytes. Note we should call
+        # memoryview.tobytes() if we start using memoryview in Python 2.7.
+        payload_document = bytes(msg[5:])
+        return cls(flags, payload_document)
 
 
 _UNPACK_REPLY = {
