@@ -108,7 +108,7 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
         compression_ctx = None
 
     if use_op_msg:
-        request_id, msg, size = message.op_msg(
+        request_id, msg, size = message._op_msg(
             0, spec, dbname, read_preference, slave_ok, codec_options,
             check_keys)
     else:

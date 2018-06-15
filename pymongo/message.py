@@ -308,8 +308,8 @@ class _Query(object):
         if use_cmd:
             spec = self.as_command(sock_info)[0]
             if sock_info.op_msg_enabled:
-                return op_msg(0, spec, self.db, self.read_preference,
-                              set_slave_ok, self.codec_options)
+                return _op_msg(0, spec, self.db, self.read_preference,
+                               set_slave_ok, self.codec_options)
             ns = _UJOIN % (self.db, "$cmd")
             ntoreturn = -1  # All DB commands return 1 document
         else:
@@ -383,8 +383,8 @@ class _GetMore(object):
         if use_cmd:
             spec = self.as_command(sock_info)[0]
             if sock_info.op_msg_enabled:
-                return op_msg(0, spec, self.db, ReadPreference.PRIMARY,
-                              False, self.codec_options)
+                return _op_msg(0, spec, self.db, ReadPreference.PRIMARY,
+                               False, self.codec_options)
             ns = _UJOIN % (self.db, "$cmd")
             return query(0, ns, 0, -1, spec, None, self.codec_options, ctx=ctx)
 
@@ -608,8 +608,8 @@ def _encode_with_cluster_time(doc, check_keys, opts):
     return encoded
 
 
-def _op_msg(flags, command, dbname, read_preference, slave_ok, opts,
-            check_keys=False):
+def _op_msg_no_header(flags, command, dbname, read_preference, slave_ok, opts,
+                      check_keys=False):
     """Get a OP_MSG message."""
     data = struct.pack("<IB", flags, 0)
     encoded = _encode_with_cluster_time(command, check_keys, opts)
@@ -632,7 +632,7 @@ def _op_msg(flags, command, dbname, read_preference, slave_ok, opts,
 def _op_msg_compressed(flags, command, dbname, read_preference, slave_ok,
                        opts, check_keys=False, ctx=None):
     """Internal OP_MSG message helper."""
-    msg, max_bson_size = _op_msg(
+    msg, max_bson_size = _op_msg_no_header(
         flags, command, dbname, read_preference, slave_ok, opts, check_keys)
     rid, msg = _compress(2013, msg, ctx)
     return rid, msg, max_bson_size
@@ -642,14 +642,14 @@ def _op_msg_compressed(flags, command, dbname, read_preference, slave_ok,
 def _op_msg_uncompressed(flags, command, dbname, read_preference, slave_ok,
                          opts, check_keys=False):
     """Internal compressed OP_MSG message helper."""
-    data, max_bson_size = _op_msg(
+    data, max_bson_size = _op_msg_no_header(
         flags, command, dbname, read_preference, slave_ok, opts, check_keys)
     request_id, query_message = __pack_message(2013, data)
     return request_id, query_message, max_bson_size
 
 
-def op_msg(flags, command, dbname, read_preference, slave_ok, opts,
-           check_keys=False, ctx=None):
+def _op_msg(flags, command, dbname, read_preference, slave_ok, opts,
+            check_keys=False, ctx=None):
     """Get a OP_MSG message."""
     if ctx:
         return _op_msg_compressed(
