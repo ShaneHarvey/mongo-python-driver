@@ -391,6 +391,7 @@ class _GetMore(object):
         return get_more(ns, self.ntoreturn, self.cursor_id, ctx)
 
 
+# TODO: Use OP_MSG once the server is able to respond with document streams.
 class _RawBatchQuery(_Query):
     def use_command(self, socket_info, exhaust):
         # Compatibility checks.
@@ -400,7 +401,6 @@ class _RawBatchQuery(_Query):
 
     def get_message(self, set_slave_ok, sock_info, use_cmd=False):
         # Always pass False for use_cmd.
-        # TODO: use OP_MSG when available.
         return super(_RawBatchQuery, self).get_message(
             set_slave_ok, sock_info, False)
 
@@ -411,7 +411,6 @@ class _RawBatchGetMore(_GetMore):
 
     def get_message(self, set_slave_ok, sock_info, use_cmd=False):
         # Always pass False for use_cmd.
-        # TODO: use OP_MSG when available.
         return super(_RawBatchGetMore, self).get_message(
             set_slave_ok, sock_info, False)
 
@@ -631,7 +630,7 @@ def _op_msg(flags, command, dbname, read_preference, slave_ok, opts,
 
 
 def _op_msg_compressed(flags, command, dbname, read_preference, slave_ok,
-                         opts, check_keys=False, ctx=None):
+                       opts, check_keys=False, ctx=None):
     """Internal OP_MSG message helper."""
     msg, max_bson_size = _op_msg(
         flags, command, dbname, read_preference, slave_ok, opts, check_keys)
@@ -640,8 +639,8 @@ def _op_msg_compressed(flags, command, dbname, read_preference, slave_ok,
 
 
 # TODO: Write C extension version.
-def _op_msg_uncompressed(flags, command, dbname, read_preference, slave_ok, opts,
-                         check_keys=False):
+def _op_msg_uncompressed(flags, command, dbname, read_preference, slave_ok,
+                         opts, check_keys=False):
     """Internal compressed OP_MSG message helper."""
     data, max_bson_size = _op_msg(
         flags, command, dbname, read_preference, slave_ok, opts, check_keys)
