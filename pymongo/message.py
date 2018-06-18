@@ -1265,8 +1265,6 @@ class _OpMsg(object):
 
     def __init__(self, flags, payload_document):
         self.flags = flags
-        self.cursor_id = 0
-        self.number_returned = 1
         self.payload_document = payload_document
 
     def raw_response(self, cursor_id=None):
@@ -1274,18 +1272,10 @@ class _OpMsg(object):
 
     def unpack_response(self, cursor_id=None,
                         codec_options=_UNICODE_REPLACE_CODEC_OPTIONS):
-        """Unpack a response from the database and decode the BSON document(s).
-
-        Check the response for errors and unpack, returning a dictionary
-        containing the response data.
-
-        Can raise CursorNotFound, NotMasterError, ExecutionTimeout, or
-        OperationFailure.
+        """Unpack a OP_MSG command response.
 
         :Parameters:
-          - `cursor_id` (optional): cursor_id we sent to get this response -
-            used for raising an informative exception when we get cursor id not
-            valid at server response
+          - `cursor_id` (optional): Ignored, for compatibility with _OpReply.
           - `codec_options` (optional): an instance of
             :class:`~bson.codec_options.CodecOptions`
         """
