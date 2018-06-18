@@ -600,7 +600,7 @@ def _encode_with_cluster_time(doc, check_keys, opts):
             extra = bson._name_value_to_bson(
                 b"$clusterTime\x00", cluster_time, False, opts)
             encoded = (
-                bson._PACK_INT(len(encoded) + len(extra))
+                _pack_int(len(encoded) + len(extra))
                 + encoded[4:-1] + extra + b'\x00')
             doc['$clusterTime'] = cluster_time
     else:
@@ -608,10 +608,13 @@ def _encode_with_cluster_time(doc, check_keys, opts):
     return encoded
 
 
+_pack_op_msg_flags_type = struct.Struct("<IB").pack
+
+
 def _op_msg_no_header(flags, command, dbname, read_preference, slave_ok, opts,
                       check_keys=False):
     """Get a OP_MSG message."""
-    data = struct.pack("<IB", flags, 0)
+    data = _pack_op_msg_flags_type(flags, 0)
     encoded = _encode_with_cluster_time(command, check_keys, opts)
     extra = bson._element_to_bson("$db", dbname, False, opts)
     if read_preference.mode and "$readPreference" not in command:
@@ -622,7 +625,7 @@ def _op_msg_no_header(flags, command, dbname, read_preference, slave_ok, opts,
             "$readPreference", ReadPreference.PRIMARY_PREFERRED.document,
             False, opts)
 
-    encoded = (bson._PACK_INT(len(encoded)+len(extra)) + encoded[4:-1] +
+    encoded = (_pack_int(len(encoded)+len(extra)) + encoded[4:-1] +
                extra + b'\x00')
     data += encoded
     max_bson_size = len(encoded)
@@ -1166,7 +1169,7 @@ class _OpReply(object):
 
     __slots__ = ("flags", "cursor_id", "number_returned", "documents")
 
-    UNPACK = struct.Struct("<iqii").unpack
+    UNPACK_FROM = struct.Struct("<iqii").unpack_from
     OP_CODE = 1
 
     def __init__(self, flags, cursor_id, number_returned, documents):
@@ -1244,7 +1247,7 @@ class _OpReply(object):
     def unpack(cls, msg):
         """Construct an _OpReply from raw bytes."""
         # PYTHON-945: ignore starting_from field.
-        flags, cursor_id, _, number_returned = cls.UNPACK(msg[:20])
+        flags, cursor_id, _, number_returned = cls.UNPACK_FROM(msg)
 
         # Convert Python 3 memoryview to bytes. Note we should call
         # memoryview.tobytes() if we start using memoryview in Python 2.7.
@@ -1257,7 +1260,7 @@ class _OpMsg(object):
 
     __slots__ = ("flags", "cursor_id", "number_returned", "payload_document")
 
-    UNPACK = struct.Struct("<Ibi").unpack
+    UNPACK_FROM = struct.Struct("<IBi").unpack_from
     OP_CODE = 2013
 
     def __init__(self, flags, payload_document):
@@ -1295,7 +1298,7 @@ class _OpMsg(object):
     @classmethod
     def unpack(cls, msg):
         """Construct an _OpMsg from raw bytes."""
-        flags, first_payload_type, first_payload_size = cls.UNPACK(msg[:9])
+        flags, first_payload_type, first_payload_size = cls.UNPACK_FROM(msg)
         if flags != 0:
             raise ProtocolError("Unsupported OP_MSG flags (%r)" % (flags,))
         if first_payload_type != 0:
