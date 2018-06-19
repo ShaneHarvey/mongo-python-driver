@@ -623,11 +623,11 @@ def _op_msg_no_header(flags, command, dbname, read_preference, slave_ok, opts,
     """Get a OP_MSG message."""
     command['$db'] = dbname
     if "$readPreference" not in command:
-        if read_preference.mode:
-            command["$readPreference"] = read_preference.document
-        elif slave_ok:
+        if slave_ok and not read_preference.mode:
             command["$readPreference"] = (
                 ReadPreference.PRIMARY_PREFERRED.document)
+        else:
+            command["$readPreference"] = read_preference.document
     name = next(iter(command))
     try:
         identifier = _OP_MSG_TYPE_ONE[name]
