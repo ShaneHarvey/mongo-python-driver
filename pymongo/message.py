@@ -609,27 +609,53 @@ def _encode_with_cluster_time(doc, check_keys, opts):
 
 
 _pack_op_msg_flags_type = struct.Struct("<IB").pack
+_pack_byte = struct.Struct("<B").pack
+
+_OP_MSG_TYPE_ONE = {
+    "insert": "documents",
+    "update": "updates",
+    "delete": "deletes",
+}
 
 
 def _op_msg_no_header(flags, command, dbname, read_preference, slave_ok, opts,
                       check_keys=False):
     """Get a OP_MSG message."""
-    data = _pack_op_msg_flags_type(flags, 0)
-    encoded = _encode_with_cluster_time(command, check_keys, opts)
-    extra = bson._element_to_bson("$db", dbname, False, opts)
-    if read_preference.mode and "$readPreference" not in command:
-        extra += bson._element_to_bson("$readPreference",
-                                       read_preference.document, False, opts)
-    elif slave_ok and "$readPreference" not in command:
-        extra += bson._element_to_bson(
-            "$readPreference", ReadPreference.PRIMARY_PREFERRED.document,
-            False, opts)
+    command['$db'] = dbname
+    if "$readPreference" not in command:
+        if read_preference.mode:
+            command["$readPreference"] = read_preference.document
+        elif slave_ok:
+            command["$readPreference"] = (
+                ReadPreference.PRIMARY_PREFERRED.document)
+    name = next(iter(command))
+    try:
+        identifier = _OP_MSG_TYPE_ONE[name]
+        docs = command.pop(identifier)
+        try:
+            encoded = _dict_to_bson(command, False, opts)
+        finally:
+            command[identifier] = docs
+    except KeyError:
+        identifier = None
+        docs = None
+        encoded = _dict_to_bson(command, False, opts)
 
-    encoded = (_pack_int(len(encoded)+len(extra)) + encoded[4:-1] +
-               extra + b'\x00')
-    data += encoded
+    flags_type = _pack_op_msg_flags_type(flags, 0)
     max_bson_size = len(encoded)
-    return data, max_bson_size
+    if identifier:
+        type_one = _pack_byte(1)
+        cstring = _make_c_string(identifier)
+        encoded_docs = [_dict_to_bson(doc, check_keys, opts) for doc in docs]
+        size = len(cstring) + sum(len(doc) for doc in encoded_docs) + 4
+        encoded_size = _pack_int(size)
+        max_bson_size = max(max(len(doc)for doc in encoded_docs),
+                            max_bson_size)
+        data = ([flags_type, encoded, type_one, encoded_size, cstring] +
+                encoded_docs)
+    else:
+        data = [flags_type, encoded]
+    return b''.join(data), max_bson_size
 
 
 def _op_msg_compressed(flags, command, dbname, read_preference, slave_ok,
