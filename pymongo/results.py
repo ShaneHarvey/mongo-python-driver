@@ -25,7 +25,7 @@ class _WriteResult(object):
     def __init__(self, acknowledged):
         self.__acknowledged = acknowledged
 
-    def __repr__(self):
+    def __str__(self):
         return '%s(%r)' % (self.__class__.__name__, self.__acknowledged)
 
     def _raise_if_unacknowledged(self, property_name):
@@ -66,7 +66,7 @@ class InsertOneResult(_WriteResult):
         self.__inserted_id = inserted_id
         super(InsertOneResult, self).__init__(acknowledged)
 
-    def __repr__(self):
+    def __str__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.__inserted_id,
                                self.acknowledged)
 
@@ -86,7 +86,7 @@ class InsertManyResult(_WriteResult):
         self.__inserted_ids = inserted_ids
         super(InsertManyResult, self).__init__(acknowledged)
 
-    def __repr__(self):
+    def __str__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.__inserted_ids,
                                self.acknowledged)
 
@@ -114,7 +114,7 @@ class UpdateResult(_WriteResult):
         self.__raw_result = raw_result
         super(UpdateResult, self).__init__(acknowledged)
 
-    def __repr__(self):
+    def __str__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.__raw_result,
                                self.acknowledged)
 
@@ -156,7 +156,7 @@ class DeleteResult(_WriteResult):
         self.__raw_result = raw_result
         super(DeleteResult, self).__init__(acknowledged)
 
-    def __repr__(self):
+    def __str__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.__raw_result,
                                self.acknowledged)
 
@@ -189,7 +189,7 @@ class BulkWriteResult(_WriteResult):
         self.__bulk_api_result = bulk_api_result
         super(BulkWriteResult, self).__init__(acknowledged)
 
-    def __repr__(self):
+    def __str__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.__bulk_api_result,
                                self.acknowledged)
 

@@ -1,4 +1,4 @@
-# Copyright 2017-present MongoDB, Inc.
+# Copyright 2018-present MongoDB, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,13 +29,13 @@ from test import unittest
 
 
 class TestResults(unittest.TestCase):
-    def repr_test(self, cls, result_arg):
+    def str_test(self, cls, result_arg):
         for acknowledged in (True, False):
             result = cls(result_arg, acknowledged)
-            expected_repr = '%s(%r, %r)' % (cls.__name__, result_arg,
-                                            acknowledged)
+            expected_str = '%s(%r, %r)' % (cls.__name__, result_arg,
+                                           acknowledged)
             self.assertEqual(acknowledged, result.acknowledged)
-            self.assertEqual(expected_repr, repr(result))
+            self.assertEqual(expected_str, str(result))
 
     def test_bulk_write_result(self):
         raw_result = {
@@ -51,7 +51,7 @@ class TestResults(unittest.TestCase):
                 {"index": 9, "_id": 2},
             ],
         }
-        self.repr_test(BulkWriteResult, raw_result)
+        self.str_test(BulkWriteResult, raw_result)
 
         result = BulkWriteResult(raw_result, True)
         self.assertEqual(raw_result, result.bulk_api_result)
@@ -80,7 +80,7 @@ class TestResults(unittest.TestCase):
 
     def test_delete_result(self):
         raw_result = {"n": 5}
-        self.repr_test(DeleteResult, {"n": 0})
+        self.str_test(DeleteResult, {"n": 0})
 
         result = DeleteResult(raw_result, True)
         self.assertEqual(raw_result, result.raw_result)
@@ -94,14 +94,14 @@ class TestResults(unittest.TestCase):
 
     def test_insert_many_result(self):
         inserted_ids = [1, 2, 3]
-        self.repr_test(InsertManyResult, inserted_ids)
+        self.str_test(InsertManyResult, inserted_ids)
 
         for acknowledged in (True, False):
             result = InsertManyResult(inserted_ids, acknowledged)
             self.assertEqual(inserted_ids, result.inserted_ids)
 
     def test_insert_one_result(self):
-        self.repr_test(InsertOneResult, 0)
+        self.str_test(InsertOneResult, 0)
 
         for acknowledged in (True, False):
             result = InsertOneResult(0, acknowledged)
@@ -113,7 +113,7 @@ class TestResults(unittest.TestCase):
             "nModified": 1,
             "upserted": None,
         }
-        self.repr_test(UpdateResult, raw_result)
+        self.str_test(UpdateResult, raw_result)
 
         result = UpdateResult(raw_result, True)
         self.assertEqual(raw_result, result.raw_result)
