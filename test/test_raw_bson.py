@@ -19,6 +19,9 @@ from bson import BSON
 from bson.binary import JAVA_LEGACY
 from bson.codec_options import CodecOptions
 from bson.raw_bson import RawBSONDocument
+
+from pymongo.operations import InsertOne, UpdateOne, DeleteOne
+
 from test import client_context, unittest
 
 
@@ -141,3 +144,7 @@ class TestRawBSONDocument(unittest.TestCase):
         coll.delete_many(self.document)
         coll.update_one(self.document, {'$set': {'a': 'b'}}, upsert=True)
         coll.update_many(self.document, {'$set': {'b': 'c'}})
+        coll.drop()
+        coll.bulk_write([InsertOne(self.document),
+                         UpdateOne(self.document, {'$set': {'a': 'b'}}),
+                         DeleteOne(self.document)])
