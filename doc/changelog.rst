@@ -1,6 +1,22 @@
 Changelog
 =========
 
+Changes in Version 3.7.2
+------------------------
+
+Version 3.7.2 fixes a few issues discovered since the release of 3.7.1.
+
+- Fixed a bug in retryable writes where a previous command's "txnNumber"
+  field would be sent leading to incorrect results.
+
+Issues Resolved
+...............
+
+See the `PyMongo 3.7.2 release notes in JIRA`_ for the list of resolved issues
+in this release.
+
+.. _PyMongo 3.7.2 release notes in JIRA: https://jira.mongodb.org/secure/ReleaseNote.jspa?projectId=10004&version=21519
+
 Changes in Version 3.7.1
 ------------------------
 
