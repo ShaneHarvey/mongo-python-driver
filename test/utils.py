@@ -703,8 +703,8 @@ def repl_set_step_down(client, **kwargs):
     cmd.update(kwargs)
 
     # Unfreeze a secondary to ensure a speedy election.
-    client.admin.command(
-        'replSetFreeze', 0, read_preference=ReadPreference.SECONDARY)
+    # client.admin.command(
+    #     'replSetFreeze', 0, read_preference=ReadPreference.SECONDARY)
     client.admin.command(cmd)
 
 def is_mongos(client):

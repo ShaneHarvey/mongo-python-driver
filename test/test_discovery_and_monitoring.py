@@ -425,7 +425,23 @@ def create_spec_test(scenario_def, test, name):
     return run_scenario
 
 
-test_creator = TestCreator(create_spec_test, TestIntegration, TestIntegration.TEST_PATH)
+class SDAMTestCreator(TestCreator):
+
+    def tests(self, scenario_def):
+        """Duplicate 'Rediscover quickly after replSetStepDown' test."""
+        tests = super(SDAMTestCreator, self).tests(scenario_def)
+        if tests and tests[0]['description'] == 'Rediscover quickly after replSetStepDown':
+            import copy
+            for i in range(1, 30):
+                test = copy.deepcopy(tests[0])
+                test['description'] = '%s %s' % (test['description'], i)
+                tests.append(test)
+            return tests
+
+        return tests
+
+
+test_creator = SDAMTestCreator(create_spec_test, TestIntegration, TestIntegration.TEST_PATH)
 test_creator.create_tests()
 
 
