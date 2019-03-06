@@ -428,5 +428,9 @@ setup(
               "doc": doc,
               "test": test},
     extras_require=extras_require,
+    package_data={
+        'bson': ['bson/py.typed', 'bson/*.pyi'],
+        'pymongo': ['bson/py.typed', 'bson/*.pyi'],
+    },
     **extra_opts
 )
