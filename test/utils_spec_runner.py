@@ -177,6 +177,25 @@ class SpecRunner(IntegrationTest):
         """
         return op['object']
 
+    @staticmethod
+    def parse_options(opts):
+        if 'readPreference' in opts:
+            opts['read_preference'] = parse_read_preference(
+                opts.pop('readPreference'))
+
+        if 'writeConcern' in opts:
+            opts['write_concern'] = WriteConcern(
+                **dict(opts.pop('writeConcern')))
+
+        if 'readConcern' in opts:
+            opts['read_concern'] = ReadConcern(
+                **dict(opts.pop('readConcern')))
+
+        if 'maxTimeMS' in opts:
+            opts['max_time_ms'] = opts.pop('maxTimeMS')
+
+        return dict(opts)
+
     def run_operation(self, sessions, collection, operation):
         original_collection = collection
         name = camel_to_snake(operation['name'])
@@ -187,25 +206,11 @@ class SpecRunner(IntegrationTest):
         elif name == 'download':
             name = 'open_download_stream'
 
-        def parse_options(opts):
-            if 'readPreference' in opts:
-                opts['read_preference'] = parse_read_preference(
-                    opts.pop('readPreference'))
-
-            if 'writeConcern' in opts:
-                opts['write_concern'] = WriteConcern(
-                    **dict(opts.pop('writeConcern')))
-
-            if 'readConcern' in opts:
-                opts['read_concern'] = ReadConcern(
-                    **dict(opts.pop('readConcern')))
-            return opts
-
         database = collection.database
         collection = database.get_collection(collection.name)
         if 'collectionOptions' in operation:
             collection = collection.with_options(
-                **dict(parse_options(operation['collectionOptions'])))
+                **dict(self.parse_options(operation['collectionOptions'])))
 
         object_name = self.get_object_name(operation)
         if object_name == 'gridfsbucket':
@@ -227,7 +232,7 @@ class SpecRunner(IntegrationTest):
         # Combine arguments with options and handle special cases.
         arguments = operation.get('arguments', {})
         arguments.update(arguments.pop("options", {}))
-        parse_options(arguments)
+        self.parse_options(arguments)
 
         cmd = getattr(obj, name)
 
@@ -264,6 +269,11 @@ class SpecRunner(IntegrationTest):
                 arguments['command'] = ordered_command
             elif name == 'open_download_stream' and arg_name == 'id':
                 arguments['file_id'] = arguments.pop(arg_name)
+            elif (name not in ('find', 'start_transaction', 'with_transaction')
+                    and c2s == 'max_time_ms'):
+                # All other methods take kwargs which must use the server's
+                # camelCase format.
+                arguments['maxTimeMS'] = arguments.pop('max_time_ms')
             elif name == 'with_transaction' and arg_name == 'callback':
                 callback_ops = arguments[arg_name]['operations']
                 arguments['callback'] = lambda _: self.run_operations(
@@ -464,29 +474,9 @@ class SpecRunner(IntegrationTest):
             session_name = 'session%d' % i
             opts = camel_to_snake_args(test['sessionOptions'][session_name])
             if 'default_transaction_options' in opts:
-                txn_opts = opts['default_transaction_options']
-                if 'readConcern' in txn_opts:
-                    read_concern = ReadConcern(
-                        **dict(txn_opts['readConcern']))
-                else:
-                    read_concern = None
-                if 'writeConcern' in txn_opts:
-                    write_concern = WriteConcern(
-                        **dict(txn_opts['writeConcern']))
-                else:
-                    write_concern = None
-
-                if 'readPreference' in txn_opts:
-                    read_pref = parse_read_preference(
-                        txn_opts['readPreference'])
-                else:
-                    read_pref = None
-
-                txn_opts = client_session.TransactionOptions(
-                    read_concern=read_concern,
-                    write_concern=write_concern,
-                    read_preference=read_pref,
-                )
+                txn_opts = self.parse_options(
+                    opts['default_transaction_options'])
+                txn_opts = client_session.TransactionOptions(**txn_opts)
                 opts['default_transaction_options'] = txn_opts
 
             s = client.start_session(**dict(opts))
