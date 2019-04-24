@@ -642,7 +642,7 @@ class ClientSession(object):
             wc_doc.setdefault("wtimeout", 10000)
             wc = WriteConcern(**wc_doc)
         cmd = SON([(command_name, 1)])
-        if self._transaction.recovery_token and is_commit:
+        if self._transaction.recovery_token:
             cmd['recoveryToken'] = self._transaction.recovery_token
         with self._client._socket_for_writes(self) as sock_info:
             return self._client.admin._command(
