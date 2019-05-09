@@ -194,6 +194,9 @@ class SpecRunner(IntegrationTest):
         if 'maxTimeMS' in opts:
             opts['max_time_ms'] = opts.pop('maxTimeMS')
 
+        if 'maxCommitTimeMS' in opts:
+            opts['max_commit_time_ms'] = opts.pop('maxCommitTimeMS')
+
         return dict(opts)
 
     def run_operation(self, sessions, collection, operation):
