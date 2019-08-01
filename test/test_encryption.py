@@ -34,6 +34,12 @@ from pymongo.encryption_options import AutoEncryptionOpts, _HAVE_PYMONGOCRYPT
 from test import unittest, IntegrationTest, PyMongoTestCase, client_context
 
 
+if _HAVE_PYMONGOCRYPT:
+    # Load the mongocrypt library.
+    from pymongocrypt.binding import init
+    init(os.environ.get('MONGOCRYPT_LIB', 'mongocrypt'))
+
+
 def get_client_opts(client):
     return client._MongoClient__options
 
