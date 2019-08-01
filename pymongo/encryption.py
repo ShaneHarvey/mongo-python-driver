@@ -75,13 +75,13 @@ class _EncryptionIO(MongoCryptCallback):
                            ssl_context=ctx)
         try:
             conn = _configured_socket((endpoint, _HTTPS_PORT), opts)
-            conn.sendall(message)
+            with conn:
+                conn.sendall(message)
+                while kms_context.bytes_needed > 0:
+                    data = conn.recv(kms_context.bytes_needed)
+                    kms_context.feed(data)
         except Exception as exc:
             raise MongoCryptError(str(exc))
-
-        while kms_context.bytes_needed > 0:
-            data = conn.recv(kms_context.bytes_needed)
-            kms_context.feed(data)
 
     def collection_info(self, database, filter):
         """Get the collection info for a namespace.
