@@ -1565,10 +1565,10 @@ _batched_write_command(
         /* We have enough data, return this batch.
          * max_cmd_size accounts for the two trailing null bytes.
          */
-        enough_data = (buffer_get_position(buffer) > max_cmd_size);
+        cur_size = buffer_get_position(buffer) - cur_doc_begin;
+        enough_data = (cur_size > max_bson_size ||
+                       buffer_get_position(buffer) > max_cmd_size);
         if (enough_data) {
-            cur_size = buffer_get_position(buffer) - cur_doc_begin;
-
             /* This single document is too large for the command. */
             if (!idx) {
                 if (op == _INSERT) {

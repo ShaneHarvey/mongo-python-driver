@@ -127,6 +127,8 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
         request_id, msg, size, max_doc_size = message._op_msg(
             flags, spec, dbname, read_preference, slave_ok, check_keys,
             codec_options, ctx=compression_ctx)
+        # TODO: is this correct? Will the server report an error or just close
+        # the connection?
         # If this is an unacknowledged write then make sure the encoded doc(s)
         # are small enough, otherwise rely on the server to return an error.
         if (unacknowledged and max_bson_size is not None and

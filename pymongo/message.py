@@ -1020,15 +1020,14 @@ class _EncryptedBulkWriteContext(_BulkWriteContext):
 
     def _batch_command(self, docs):
         namespace = self.db_name + '.$cmd'
-        request_id, msg, to_send = _batched_write_command(
+        msg, to_send = _encode_batched_write_command(
             namespace, self.op_type, self.command, docs, self.check_keys,
             self.codec, self)
         if not to_send:
             raise InvalidOperation("cannot do an empty bulk write")
 
-        # Chop off the 16 byte message header and the OP_QUERY header to get
-        # a properly batched write command.
-        cmd_start = msg.index(b"\x00", 20) + 9
+        # Chop off the OP_QUERY header to get a properly batched write command.
+        cmd_start = msg.index(b"\x00", 4) + 9
         cmd = _inflate_bson(memoryview(msg)[cmd_start:],
                             DEFAULT_RAW_BSON_OPTIONS)
         return cmd, to_send
@@ -1201,6 +1200,8 @@ def _batched_op_msg_impl(
         value = _dict_to_bson(doc, check_keys, opts)
         doc_length = len(value)
         new_message_size = buf.tell() + doc_length
+        # TODO: is this correct? Will the server report an error or just close
+        # the connection?
         # Does first document exceed max_message_size?
         doc_too_large = (idx == 0 and (new_message_size > max_message_size))
         # When OP_MSG is used unacknowleged we have to check
@@ -1422,9 +1423,10 @@ def _batched_write_command_impl(
         value = bson.BSON.encode(doc, check_keys, opts)
         # Is there enough room to add this document? max_cmd_size accounts for
         # the two trailing null bytes.
+        doc_too_large = len(value) > max_bson_size
         enough_data = (buf.tell() + len(key) + len(value)) >= max_cmd_size
         enough_documents = (idx >= max_write_batch_size)
-        if enough_data or enough_documents:
+        if doc_too_large or enough_data or enough_documents:
             if not idx:
                 write_op = list(_FIELD_MAP.keys())[operation]
                 _raise_document_too_large(

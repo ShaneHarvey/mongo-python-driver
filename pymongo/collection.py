@@ -17,6 +17,7 @@
 import datetime
 import warnings
 
+from bson import encode
 from bson.code import Code
 from bson.objectid import ObjectId
 from bson.py3compat import (_unicode,
@@ -43,7 +44,9 @@ from pymongo.errors import (BulkWriteError,
                             OperationFailure)
 from pymongo.helpers import (_check_write_command_response,
                              _raise_last_error)
-from pymongo.message import _UNICODE_REPLACE_CODEC_OPTIONS
+from pymongo.message import (_UNICODE_REPLACE_CODEC_OPTIONS,
+                             _raise_document_too_large,
+                             _MAX_ENC_BSON_SIZE)
 from pymongo.operations import IndexModel
 from pymongo.read_preferences import ReadPreference
 from pymongo.results import (BulkWriteResult,
@@ -557,12 +560,28 @@ class Collection(common.BaseObject):
             check_keys, manipulate, write_concern, op_id, bypass_doc_val,
             session):
         """Internal helper for inserting a single document."""
+        is_raw = isinstance(doc, RawBSONDocument)
         if manipulate:
             doc = self.__database._apply_incoming_manipulators(doc, self)
-            if not isinstance(doc, RawBSONDocument) and '_id' not in doc:
+            if not is_raw and '_id' not in doc:
                 doc['_id'] = ObjectId()
             doc = self.__database._apply_incoming_copying_manipulators(doc,
                                                                        self)
+
+        inserted_id = None
+        if not is_raw:
+            inserted_id = doc.get('_id')
+
+        # Encryption reduces the maxBsonObjectSize.
+        # PYTHON-1833 might help abstract this.
+        if self.__database.client._encrypter:
+            if not is_raw:
+                doc = RawBSONDocument(
+                    encode(doc, check_keys, self.codec_options))
+            if len(doc.raw) > _MAX_ENC_BSON_SIZE:
+                _raise_document_too_large(
+                    'insert', len(doc.raw), _MAX_ENC_BSON_SIZE)
+
         write_concern = write_concern or self.write_concern
         acknowledged = write_concern.acknowledged
         command = SON([('insert', self.name),
@@ -598,8 +617,7 @@ class Collection(common.BaseObject):
         self.__database.client._retryable_write(
             acknowledged, _insert_command, session)
 
-        if not isinstance(doc, RawBSONDocument):
-            return doc.get('_id')
+        return inserted_id
 
     def _insert(self, docs, ordered=True, check_keys=True,
                 manipulate=False, write_concern=None, op_id=None,

@@ -14,6 +14,7 @@
 
 """Test client side encryption spec."""
 
+import base64
 import os
 import socket
 import sys
@@ -27,13 +28,17 @@ from bson.json_util import JSONOptions
 from bson.raw_bson import RawBSONDocument
 from bson.son import SON
 
-from pymongo.errors import ConfigurationError
+from pymongo.errors import ConfigurationError, DocumentTooLarge
 from pymongo.mongo_client import MongoClient
+from pymongo.operations import InsertOne
 from pymongo.encryption_options import AutoEncryptionOpts, _HAVE_PYMONGOCRYPT
 from pymongo.write_concern import WriteConcern
 
 from test import unittest, IntegrationTest, PyMongoTestCase, client_context
-from test.utils import TestCreator, camel_to_snake_args, wait_until
+from test.utils import (camel_to_snake_args,
+                        OvertCommandListener,
+                        TestCreator,
+                        wait_until)
 from test.utils_spec_runner import SpecRunner
 
 
@@ -128,11 +133,14 @@ class EncryptionIntegrationTest(IntegrationTest):
     def setUpClass(cls):
         super(EncryptionIntegrationTest, cls).setUpClass()
 
+    def assertEncrypted(self, val):
+        self.assertIsInstance(val, Binary)
+        self.assertEqual(val.subtype, 6)
+
 
 # Location of JSON test files.
 BASE = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), 'client-side-encryption')
-CUSTOM_PATH = os.path.join(BASE, 'custom')
 SPEC_PATH = os.path.join(BASE, 'spec')
 
 OPTS = CodecOptions(uuid_representation=STANDARD)
@@ -141,17 +149,17 @@ OPTS = CodecOptions(uuid_representation=STANDARD)
 JSON_OPTS = JSONOptions(document_class=SON, uuid_representation=STANDARD)
 
 
-def read(filename):
-    with open(os.path.join(CUSTOM_PATH, filename)) as fp:
+def read(*paths):
+    with open(os.path.join(BASE, *paths)) as fp:
         return fp.read()
 
 
-def json_data(filename):
-    return json_util.loads(read(filename), json_options=JSON_OPTS)
+def json_data(*paths):
+    return json_util.loads(read(*paths), json_options=JSON_OPTS)
 
 
-def bson_data(filename):
-    return BSON.encode(json_data(filename), codec_options=OPTS)
+def bson_data(*paths):
+    return BSON.encode(json_data(*paths), codec_options=OPTS)
 
 
 class TestClientSimple(EncryptionIntegrationTest):
@@ -163,7 +171,8 @@ class TestClientSimple(EncryptionIntegrationTest):
         # Create the encrypted field's data key.
         key_vault = self.client.admin.get_collection(
             'datakeys', codec_options=OPTS)
-        data_key = RawBSONDocument(bson_data('key-document-local.json'))
+        data_key = RawBSONDocument(
+            bson_data('custom', 'key-document-local.json'))
         key_vault.insert_one(data_key)
         self.addCleanup(key_vault.drop)
 
@@ -212,12 +221,11 @@ class TestClientSimple(EncryptionIntegrationTest):
         # Make sure the field is actually encrypted.
         for encrypted_doc in self.db.test.find():
             self.assertIsInstance(encrypted_doc['_id'], int)
-            self.assertIsInstance(encrypted_doc['ssn'], Binary)
-            self.assertEqual(encrypted_doc['ssn'].subtype, 6)
+            self.assertEncrypted(encrypted_doc['ssn'])
 
     def test_auto_encrypt(self):
         # Configure the encrypted field via jsonSchema.
-        json_schema = json_data('schema.json')
+        json_schema = json_data('custom', 'schema.json')
         coll = self.db.create_collection(
             'test', validator={'$jsonSchema': json_schema}, codec_options=OPTS)
         self.addCleanup(coll.drop)
@@ -227,7 +235,7 @@ class TestClientSimple(EncryptionIntegrationTest):
 
     def test_auto_encrypt_local_schema_map(self):
         # Configure the encrypted field via the local schema_map option.
-        schemas = {'pymongo_test.test': json_data('schema.json')}
+        schemas = {'pymongo_test.test': json_data('custom', 'schema.json')}
         opts = AutoEncryptionOpts(
             KMS_PROVIDERS, 'admin.datakeys', schema_map=schemas)
 
@@ -331,6 +339,104 @@ def create_test(scenario_def, test, name):
 
 test_creator = TestCreator(create_test, TestSpec, SPEC_PATH)
 test_creator.create_tests()
+
+
+# Prose Tests
+LOCAL_MASTER_KEY = base64.b64decode(
+    b'Mng0NCt4ZHVUYUJCa1kxNkVyNUR1QURhZ2h2UzR2d2RrZzh0cFBwM3R6NmdWMDFBMUN3YkQ'
+    b'5aXRRMkhGRGdQV09wOGVNYUMxT2k3NjZKelhaQmRCZGJkTXVyZG9uSjFk')
+
+
+class TestBsonSizeBatches(EncryptionIntegrationTest):
+    """Prose tests for BSON size limits and batch splitting."""
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestBsonSizeBatches, cls).setUpClass()
+        db = client_context.client.db
+        cls.coll = db.coll
+        cls.coll.drop()
+        # Configure the encrypted 'db.coll' collection via jsonSchema.
+        json_schema = json_data('limits', 'limits-schema.json')
+        db.create_collection(
+            'coll', validator={'$jsonSchema': json_schema}, codec_options=OPTS,
+            write_concern=WriteConcern(w='majority'))
+
+        # Create the key vault.
+        coll = client_context.client.get_database(
+            'admin',
+            write_concern=WriteConcern(w='majority'),
+            codec_options=OPTS)['datakeys']
+        coll.drop()
+        coll.insert_one(json_data('limits', 'limits-key.json'))
+
+        opts = AutoEncryptionOpts(
+            {'local': {'key': LOCAL_MASTER_KEY}}, 'admin.datakeys')
+        cls.listener = OvertCommandListener()
+        cls.client_encrypted = MongoClient(
+            auto_encryption_opts=opts, event_listeners=[cls.listener])
+        cls.coll_encrypted = cls.client_encrypted.db.coll
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.coll_encrypted.drop()
+        cls.client_encrypted.close()
+        super(TestBsonSizeBatches, cls).tearDownClass()
+
+    def test_01_insert_succeeds_under_2MiB(self):
+        doc = {'_id': 'no_encryption_under_2mib',
+               'unencrypted': 'a' * ((2**21) - 1000)}
+        self.coll_encrypted.insert_one(doc)
+
+        # Same with bulk_write.
+        doc = {'_id': 'no_encryption_under_2mib_bulk',
+               'unencrypted': 'a' * ((2**21) - 1000)}
+        self.coll_encrypted.bulk_write([InsertOne(doc)])
+
+    def test_02_insert_fails_over_2MiB(self):
+        # TODO: shouldn't libmongocrypt or mongocryptd enforce this size limit?
+        doc = {'_id': 'no_encryption_over_2mib',
+               'unencrypted': 'a' * (2**21)}
+
+        with self.assertRaises(DocumentTooLarge):
+            self.coll_encrypted.insert_one(doc)
+        with self.assertRaises(DocumentTooLarge):
+            self.coll_encrypted.insert_many([doc])
+        with self.assertRaises(DocumentTooLarge):
+            self.coll_encrypted.bulk_write([InsertOne(doc)])
+
+    def test_03_insert_succeeds_over_2MiB_post_encryption(self):
+        doc = {'_id': 'encryption_exceeds_2mib',
+               'unencrypted': 'a' * ((2**21) - 2000)}
+        doc.update(json_data('limits', 'limits-doc.json'))
+        self.coll_encrypted.insert_one(doc)
+
+        # Same with bulk_write.
+        doc['_id'] = 'encryption_exceeds_2mib_bulk'
+        self.coll_encrypted.bulk_write([InsertOne(doc)])
+
+    def test_04_bulk_batch_split(self):
+        doc1 = {'_id': 'no_encryption_under_2mib_1',
+                'unencrypted': 'a' * ((2**21) - 1000)}
+        doc2 = {'_id': 'no_encryption_under_2mib_2',
+                'unencrypted': 'a' * ((2**21) - 1000)}
+        self.listener.reset()
+        self.coll_encrypted.bulk_write([InsertOne(doc1), InsertOne(doc2)])
+        self.assertEqual(
+            self.listener.started_command_names(), ['insert', 'insert'])
+
+    def test_05_bulk_batch_split(self):
+        limits_doc = json_data('limits', 'limits-doc.json')
+        doc1 = {'_id': 'encryption_exceeds_2mib_1',
+                'unencrypted': 'a' * ((2**21) - 2000)}
+        doc1.update(limits_doc)
+        doc2 = {'_id': 'encryption_exceeds_2mib_2',
+                'unencrypted': 'a' * ((2**21) - 2000)}
+        doc2.update(limits_doc)
+        self.listener.reset()
+        self.coll_encrypted.bulk_write([InsertOne(doc1), InsertOne(doc2)])
+        self.assertEqual(
+            self.listener.started_command_names(), ['insert', 'insert'])
 
 
 if __name__ == "__main__":
