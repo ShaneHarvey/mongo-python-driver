@@ -277,10 +277,10 @@ class _Encrypter(object):
         # check_keys.
         cluster_time = check_keys and cmd.pop('$clusterTime', None)
         encoded_cmd = _dict_to_bson(cmd, check_keys, codec_options)
-        max_cmd_size = _MAX_ENC_BSON_SIZE + _COMMAND_OVERHEAD
-        if len(encoded_cmd) > max_cmd_size:
-            raise _raise_document_too_large(
-                next(iter(cmd)), len(encoded_cmd), max_cmd_size)
+        # max_cmd_size = _MAX_ENC_BSON_SIZE + _COMMAND_OVERHEAD
+        # if len(encoded_cmd) > max_cmd_size:
+        #     raise _raise_document_too_large(
+        #         next(iter(cmd)), len(encoded_cmd), max_cmd_size)
         with _wrap_encryption_errors():
             encrypted_cmd = self._auto_encrypter.encrypt(database, encoded_cmd)
             # TODO: PYTHON-1922 avoid decoding the encrypted_cmd.

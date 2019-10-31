@@ -929,6 +929,11 @@ class _BulkWriteContext(object):
         """A proxy for SockInfo.max_write_batch_size."""
         return self.sock_info.max_write_batch_size
 
+    @property
+    def max_split_size(self):
+        """A proxy for max_bson_size."""
+        return self.max_bson_size
+
     def legacy_bulk_insert(
             self, request_id, msg, max_doc_size, acknowledged, docs, compress):
         if compress:
@@ -1049,14 +1054,11 @@ class _EncryptedBulkWriteContext(_BulkWriteContext):
         return to_send
 
     @property
-    def max_bson_size(self):
-        """A proxy for SockInfo.max_bson_size."""
-        return min(self.sock_info.max_bson_size, _MAX_ENC_BSON_SIZE)
-
-    @property
-    def max_message_size(self):
-        """A proxy for SockInfo.max_message_size."""
-        return min(self.sock_info.max_message_size, _MAX_ENC_MESSAGE_SIZE)
+    def max_split_size(self):
+        """Use a reduced batch write split size."""
+        # We reduce the splitting size to 2MiB to account for the fact that
+        # encrypted fields increase the size of the message.
+        return 2097152  # 2MiB
 
 
 def _raise_document_too_large(operation, doc_size, max_size):
@@ -1388,6 +1390,7 @@ def _batched_write_command_impl(
     # Max BSON object size + 16k - 2 bytes for ending NUL bytes.
     # Server guarantees there is enough room: SERVER-10643.
     max_cmd_size = max_bson_size + _COMMAND_OVERHEAD
+    max_split_size = ctx.max_split_size
 
     # No options
     buf.write(_ZERO_32)
@@ -1424,7 +1427,8 @@ def _batched_write_command_impl(
         # Is there enough room to add this document? max_cmd_size accounts for
         # the two trailing null bytes.
         doc_too_large = len(value) > max_cmd_size
-        enough_data = (buf.tell() + len(key) + len(value)) >= max_cmd_size
+        enough_data = (idx >= 1 and
+                       (buf.tell() + len(key) + len(value)) >= max_split_size)
         enough_documents = (idx >= max_write_batch_size)
         if doc_too_large:
             write_op = list(_FIELD_MAP.keys())[operation]
