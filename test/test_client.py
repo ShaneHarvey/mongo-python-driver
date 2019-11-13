@@ -422,6 +422,15 @@ class ClientUnitTest(unittest.TestCase):
 
 class TestClient(IntegrationTest):
 
+    @client_context.require_version_min(3, 4)
+    def test_metadata_too_long(self):
+        client = rs_or_single_client(
+            appname='test_metadata_too_long',
+            driver=DriverInfo('long'*512))
+        with self.assertRaises(OperationFailure) as ctx:
+            client.admin.command('ping')
+        self.assertEqual(185, ctx.exception.code)
+
     def test_max_idle_time_reaper(self):
         with client_knobs(kill_cursor_frequency=0.1):
             # Assert reaper doesn't remove sockets when maxIdleTimeMS not set

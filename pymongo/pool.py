@@ -505,6 +505,7 @@ class SocketInfo(object):
     def ismaster(self, metadata, cluster_time):
         cmd = SON([('ismaster', 1)])
         if not self.performed_handshake:
+            self.performed_handshake = True
             cmd['client'] = metadata
             if self.compression_settings:
                 cmd['compression'] = self.compression_settings.compressors
@@ -526,7 +527,6 @@ class SocketInfo(object):
                 ismaster.compressors)
             self.compression_context = ctx
 
-        self.performed_handshake = True
         self.op_msg_enabled = ismaster.max_wire_version >= 6
         return ismaster
 
