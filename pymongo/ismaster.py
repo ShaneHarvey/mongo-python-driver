@@ -156,3 +156,7 @@ class IsMaster(object):
     @property
     def compressors(self):
         return self._doc.get('compression')
+
+    @property
+    def topology_version(self):
+        return self._doc.get('topologyVersion')

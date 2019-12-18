@@ -502,12 +502,17 @@ class SocketInfo(object):
         self.pool_id = pool.pool_id
         self.ready = False
 
-    def ismaster(self, metadata, cluster_time):
+    def ismaster(self, metadata, cluster_time, topology_version):
         cmd = SON([('ismaster', 1)])
-        if not self.performed_handshake:
+        performing_handshake = not self.performed_handshake
+        if performing_handshake:
+            self.performed_handshake = True
             cmd['client'] = metadata
             if self.compression_settings:
                 cmd['compression'] = self.compression_settings.compressors
+        elif topology_version is not None:
+            cmd['topologyVersion'] = topology_version
+            cmd['maxAwaitTimeMS'] = 10000
 
         if self.max_wire_version >= 6 and cluster_time is not None:
             cmd['$clusterTime'] = cluster_time
@@ -521,12 +526,11 @@ class SocketInfo(object):
         self.supports_sessions = (
             ismaster.logical_session_timeout_minutes is not None)
         self.is_mongos = ismaster.server_type == SERVER_TYPE.Mongos
-        if not self.performed_handshake and self.compression_settings:
+        if performing_handshake and self.compression_settings:
             ctx = self.compression_settings.get_compression_context(
                 ismaster.compressors)
             self.compression_context = ctx
 
-        self.performed_handshake = True
         self.op_msg_enabled = ismaster.max_wire_version >= 6
         return ismaster
 
@@ -1099,7 +1103,7 @@ class Pool:
 
         sock_info = SocketInfo(sock, self, self.address, conn_id)
         if self.handshake:
-            sock_info.ismaster(self.opts.metadata, None)
+            sock_info.ismaster(self.opts.metadata, None, None)
             self.is_writable = sock_info.is_writable
 
         return sock_info

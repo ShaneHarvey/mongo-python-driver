@@ -105,14 +105,20 @@ class Monitor(MonitorBase):
         self._pool.reset()
 
     def _run(self):
+        """Return True when using awaitable isMaster."""
         try:
-            self._server_description = self._check_with_retry()
+            self._server_description = self._check_with_retry(long_poll=False)
             self._topology.on_change(self._server_description)
+            if self._server_description.topology_version is not None:
+                self._server_description = self._check_with_retry(long_poll=True)
+                self._topology.on_change(self._server_description)
+                # TODO: remove 500ms sleep hear
+                self.request_check()
         except ReferenceError:
             # Topology was garbage-collected.
             self.close()
 
-    def _check_with_retry(self):
+    def _check_with_retry(self, long_poll):
         """Call ismaster once or twice. Reset server's pool on error.
 
         Returns a ServerDescription.
@@ -127,7 +133,7 @@ class Monitor(MonitorBase):
 
         start = _time()
         try:
-            return self._check_once()
+            return self._check_once(long_poll)
         except ReferenceError:
             raise
         except Exception as error:
@@ -146,7 +152,7 @@ class Monitor(MonitorBase):
             # Always send metadata: this is a new connection.
             start = _time()
             try:
-                return self._check_once()
+                return self._check_once(long_poll=False)
             except ReferenceError:
                 raise
             except Exception as error:
@@ -157,7 +163,7 @@ class Monitor(MonitorBase):
                 self._avg_round_trip_time.reset()
                 return default
 
-    def _check_once(self):
+    def _check_once(self, long_poll):
         """A single attempt to call ismaster.
 
         Returns a ServerDescription, or raises an exception.
@@ -166,8 +172,10 @@ class Monitor(MonitorBase):
         if self._publish:
             self._listeners.publish_server_heartbeat_started(address)
         with self._pool.get_socket({}) as sock_info:
-            response, round_trip_time = self._check_with_socket(sock_info)
-            self._avg_round_trip_time.add_sample(round_trip_time)
+            response, round_trip_time = self._check_with_socket(
+                sock_info, long_poll)
+            if not long_poll:
+                self._avg_round_trip_time.add_sample(round_trip_time)
             sd = ServerDescription(
                 address=address,
                 ismaster=response,
@@ -178,15 +186,20 @@ class Monitor(MonitorBase):
 
             return sd
 
-    def _check_with_socket(self, sock_info):
+    def _check_with_socket(self, sock_info, long_poll):
         """Return (IsMaster, round_trip_time).
 
         Can raise ConnectionFailure or OperationFailure.
         """
+        if long_poll:
+            topology_version = self._server_description.topology_version
+        else:
+            topology_version = None
         start = _time()
         try:
             return (sock_info.ismaster(self._pool.opts.metadata,
-                                       self._topology.max_cluster_time()),
+                                       self._topology.max_cluster_time(),
+                                       topology_version),
                     _time() - start)
         except OperationFailure as exc:
             # Update max cluster time even when isMaster fails.
