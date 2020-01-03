@@ -439,7 +439,6 @@ class Topology(object):
 
     def close(self):
         """Clear pools and terminate monitors. Topology reopens on demand."""
-        print('Topology.close')
         with self._lock:
             for server in self._servers.values():
                 server.close()
@@ -534,9 +533,6 @@ class Topology(object):
                                       SRV_POLLING_TOPOLOGIES):
                 self._srv_monitor.open()
 
-        print('Topology._ensure_opened: ', self._servers)
-        import traceback
-        traceback.print_stack()
         # Ensure that the monitors are open.
         for server in itervalues(self._servers):
             server.open()
