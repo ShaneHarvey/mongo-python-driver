@@ -46,6 +46,7 @@ class Server(object):
 
         Multiple calls have no effect.
         """
+        print('Server.open: ', self)
         self._monitor.open()
 
     def reset(self):
@@ -57,6 +58,7 @@ class Server(object):
 
         Reconnect with open().
         """
+        print('Server.close: ', repr(self))
         if self._publish:
             self._events.put((self._listener.publish_server_closed,
                               (self._description.address, self._topology_id)))

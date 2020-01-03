@@ -96,23 +96,39 @@ class Monitor(MonitorBase):
         # Avoid cycles. When self or topology is freed, stop executor soon.
         self_ref = weakref.ref(self, executor.close)
         self._topology = weakref.proxy(topology, executor.close)
+        self.sock_info = None
+        self._open = False
+
+    def open(self):
+        # TODO: This is racy?
+        self._open = True
+        super(Monitor, self).open()
+        print('open')
 
     def close(self):
+        # TODO: This is racy?
+        self._open = False
         super(Monitor, self).close()
 
         # Increment the pool_id and maybe close the socket. If the executor
         # thread has the socket checked out, it will be closed when checked in.
         self._pool.reset()
+        if self.sock_info:
+            print('Close sock_info')
+            self.sock_info.close_socket(None)
+        print('close')
 
     def _run(self):
         """Return True when using awaitable isMaster."""
         try:
             self._server_description = self._check_with_retry(long_poll=False)
             self._topology.on_change(self._server_description)
+            if not self._open:
+                return
             if self._server_description.topology_version is not None:
                 self._server_description = self._check_with_retry(long_poll=True)
                 self._topology.on_change(self._server_description)
-                # TODO: remove 500ms sleep hear
+                # TODO: remove 500ms sleep here
                 self.request_check()
         except ReferenceError:
             # Topology was garbage-collected.
@@ -137,6 +153,8 @@ class Monitor(MonitorBase):
         except ReferenceError:
             raise
         except Exception as error:
+            if not self._open:
+                return ServerDescription(address, error=error)
             error_time = _time() - start
             if self._publish:
                 self._listeners.publish_server_heartbeat_failed(
@@ -169,9 +187,15 @@ class Monitor(MonitorBase):
         Returns a ServerDescription, or raises an exception.
         """
         address = self._server_description.address
+        if not self._open:
+            return ServerDescription(address=address)
         if self._publish:
             self._listeners.publish_server_heartbeat_started(address)
         with self._pool.get_socket({}) as sock_info:
+            self.sock_info = sock_info
+            if not self._open:
+                # TODO: publish event?
+                return ServerDescription(address=address)
             response, round_trip_time = self._check_with_socket(
                 sock_info, long_poll)
             if not long_poll:
