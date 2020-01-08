@@ -234,10 +234,18 @@ class TestPooling(_TestPoolingBase):
 
         with cx_pool.get_socket({}) as sock_info:
             # Simulate a closed socket without telling the SocketInfo it's
-            # closed.
-            sock_info.sock.close()
+            # # closed.
+            # sock_info.sock.close()
+            # self.assertTrue(
+            #     cx_pool.socket_checker.socket_closed(sock_info.sock))
+            # print('recv on closed socket: ', sock_info.sock.recv(1))
+
+            from socket import SHUT_RD
+            sock_info.sock.shutdown(SHUT_RD)
             self.assertTrue(
                 cx_pool.socket_checker.socket_closed(sock_info.sock))
+            print('recv on SHUT_RD socket: ', sock_info.sock.recv(1))
+            print('recv on SHUT_RD socket: ', sock_info.sock.recv(1))
 
         with cx_pool.get_socket({}) as new_sock_info:
             self.assertEqual(0, len(cx_pool.sockets))

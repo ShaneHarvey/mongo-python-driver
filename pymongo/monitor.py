@@ -96,9 +96,13 @@ class Monitor(MonitorBase):
         # Avoid cycles. When self or topology is freed, stop executor soon.
         self_ref = weakref.ref(self, executor.close)
         self._topology = weakref.proxy(topology, executor.close)
+        self.current_sock = None
 
     def close(self):
         super(Monitor, self).close()
+        sock = self.current_sock
+        if sock:
+            sock.close_socket(None)
 
         # Increment the pool_id and maybe close the socket. If the executor
         # thread has the socket checked out, it will be closed when checked in.
@@ -172,6 +176,7 @@ class Monitor(MonitorBase):
         if self._publish:
             self._listeners.publish_server_heartbeat_started(address)
         with self._pool.get_socket({}) as sock_info:
+            self.current_sock = sock_info
             response, round_trip_time = self._check_with_socket(
                 sock_info, long_poll)
             if not long_poll:

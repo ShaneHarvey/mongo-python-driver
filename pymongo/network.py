@@ -221,18 +221,26 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
     return unpack_reply(data)
 
 
+def _wait_for_read(sock):
+    timeout = sock.gettimeout()
+    rd, _, exc = select.select([sock], [], [sock], timeout)
+
 # memoryview was introduced in Python 2.7 but we only use it on Python 3
 # because before 2.7.4 the struct module did not support memoryview:
 # https://bugs.python.org/issue10212.
 # In Jython, using slice assignment on a memoryview results in a
 # NullPointerException.
 if not PY3:
+    def _recv(sock, length):
+        _wait_for_read(sock)
+        return sock.recv(length)
+
     def _receive_data_on_socket(sock, length):
         buf = bytearray(length)
         i = 0
         while length:
             try:
-                chunk = sock.recv(length)
+                chunk = _recv(sock, length)
             except (IOError, OSError) as exc:
                 if _errno_from_exception(exc) == errno.EINTR:
                     continue
@@ -246,13 +254,17 @@ if not PY3:
 
         return bytes(buf)
 else:
+    def _recv_into(sock, buf):
+        _wait_for_read(sock)
+        return sock.recv_into(buf)
+
     def _receive_data_on_socket(sock, length):
         buf = bytearray(length)
         mv = memoryview(buf)
         bytes_read = 0
         while bytes_read < length:
             try:
-                chunk_length = sock.recv_into(mv[bytes_read:])
+                chunk_length = _recv_into(sock, mv[bytes_read:])
             except (IOError, OSError) as exc:
                 if _errno_from_exception(exc) == errno.EINTR:
                     continue
