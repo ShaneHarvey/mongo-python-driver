@@ -174,4 +174,4 @@ def _shutdown_executors():
 
     executor = None
 
-atexit.register(_shutdown_executors)
+# atexit.register(_shutdown_executors)

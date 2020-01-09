@@ -501,6 +501,7 @@ class SocketInfo(object):
         # created before the last reset.
         self.pool_id = pool.pool_id
         self.ready = False
+        _register_sock(self)
 
     def ismaster(self, metadata, cluster_time, topology_version):
         cmd = SON([('ismaster', 1)])
@@ -1276,3 +1277,37 @@ class Pool:
         # not safe to acquire a lock in __del__.
         for sock_info in self.sockets:
             sock_info.close_socket(None)
+
+import weakref
+import atexit
+_SOCKS = set()
+
+
+def _register_sock(sock):
+    ref = weakref.ref(sock, _on_sock_deleted)
+    _SOCKS.add(ref)
+
+
+def _on_sock_deleted(ref):
+    _SOCKS.remove(ref)
+
+
+def _shutdown_socks():
+    if _SOCKS is None:
+        return
+
+    # Copy the set. Stopping threads has the side effect of removing socks.
+    socks = list(_SOCKS)
+
+    # Close all socks.
+    for ref in socks:
+        sock = ref()
+        if sock:
+            sock.close_socket(None)
+
+    sock = None
+
+
+from pymongo.periodic_executor import _shutdown_executors
+atexit.register(_shutdown_executors)
+atexit.register(_shutdown_socks)
