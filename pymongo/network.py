@@ -224,6 +224,10 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
 def _wait_for_read(sock):
     timeout = sock.gettimeout()
     rd, _, exc = select.select([sock], [], [sock], timeout)
+    if not rd and not exc:
+        # select timed out. Raise a Timeout.
+        from pymongo.errors import NetworkTimeout
+        raise NetworkTimeout('select timed out: %s' % (timeout,))
 
 # memoryview was introduced in Python 2.7 but we only use it on Python 3
 # because before 2.7.4 the struct module did not support memoryview:
