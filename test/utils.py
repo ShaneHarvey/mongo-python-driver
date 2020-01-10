@@ -188,6 +188,9 @@ class MockSocketInfo(object):
     def close(self):
         pass
 
+    def close_socket(self, reason):
+        pass
+
     def __enter__(self):
         return self
 

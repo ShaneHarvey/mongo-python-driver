@@ -289,6 +289,11 @@ class TopologyDescription(object):
         """
         return self.has_readable_server(ReadPreference.PRIMARY)
 
+    def topology_version_for(self, address):
+        if self.has_server(address):
+            return self._server_descriptions[address].topology_version
+        return None
+
 
 # If topology type is Unknown and we receive an ismaster response, what should
 # the new topology type be?

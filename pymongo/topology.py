@@ -276,7 +276,7 @@ class Topology(object):
         new_pid, new_counter = get_pid_counter(server_description.topology_version)
         if old_pid is not None and new_pid is not None:
             if old_pid == new_pid and old_counter > new_counter:
-                print('DELAYED error:')
+                print('DELAYED _process_change:')
                 print('old tv:', old_sd.topology_version)
                 print('new tv:', server_description.topology_version)
                 # This is a delayed repsonse. Ignore it.
@@ -424,24 +424,24 @@ class Topology(object):
             if server:
                 server.pool.reset()
 
-    def reset_server(self, address):
+    def reset_server(self, address, error=None):
         """Clear our pool for a server and mark it Unknown.
 
         Do *not* request an immediate check.
         """
         with self._lock:
-            self._reset_server(address, reset_pool=True)
+            self._reset_server(address, reset_pool=True, error=error)
 
-    def reset_server_and_request_check(self, address):
+    def reset_server_and_request_check(self, address, error=None):
         """Clear our pool for a server, mark it Unknown, and check it soon."""
         with self._lock:
-            self._reset_server(address, reset_pool=True)
+            self._reset_server(address, reset_pool=True, error=error)
             self._request_check(address)
 
-    def mark_server_unknown_and_request_check(self, address):
+    def mark_server_unknown_and_request_check(self, address, error=None):
         """Mark a server Unknown, and check it soon."""
         with self._lock:
-            self._reset_server(address, reset_pool=False)
+            self._reset_server(address, reset_pool=False, error=error)
             self._request_check(address)
 
     def update_pool(self):
@@ -554,15 +554,38 @@ class Topology(object):
         for server in itervalues(self._servers):
             server.open()
 
-    def _reset_server(self, address, reset_pool):
+    def _reset_server(self, address, reset_pool, error=None):
         """Mark a server Unknown and optionally reset it's pool.
 
         Hold the lock when calling this. Does *not* request an immediate check.
         """
         server = self._servers.get(address)
 
+        def get_tv(error):
+            if error and hasattr(error, 'details'):
+                details = error.details
+                if isinstance(details, dict):
+                    return details.get('topologyVersion')
+
+            return None
+
+        def get_pid_counter(tv):
+            if tv:
+                return tv.get('processId'),  tv.get('counter')
+            return None, 0
+
         # "server" is None if another thread removed it from the topology.
         if server:
+            cur_pid, cur_counter = get_pid_counter(self._description.topology_version_for(address))
+            error_pid, error_counter = get_pid_counter(get_tv(error))
+            if cur_pid is not None and error_pid is not None:
+                if cur_pid == error_pid and cur_counter > error_counter:
+                    # Outdated error.
+                    print('DELAYED error:', error)
+                    print('current tv:', self._description.topology_version_for(address))
+                    print('error tv:', get_tv(error))
+                    return
+
             if reset_pool:
                 server.reset()
 
