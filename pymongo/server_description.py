@@ -44,7 +44,8 @@ class ServerDescription(object):
             address,
             ismaster=None,
             round_trip_time=None,
-            error=None):
+            error=None,
+            topology_version=None):
         self._address = address
         if not ismaster:
             ismaster = IsMaster({})
@@ -69,7 +70,10 @@ class ServerDescription(object):
         self._me = ismaster.me
         self._last_update_time = _time()
         self._error = error
-        self._topology_version = ismaster.topology_version
+        if topology_version is not None:
+            self._topology_version = topology_version
+        else:
+            self._topology_version = ismaster.topology_version
 
         if ismaster.last_write_date:
             # Convert from datetime to seconds.
@@ -216,6 +220,10 @@ class ServerDescription(object):
     @property
     def topology_version(self):
         return self._topology_version
+
+    def to_unknown(self):
+        return ServerDescription(
+            self.address, topology_version=self.topology_version)
 
     # For unittesting only. Use under no circumstances!
     _host_to_round_trip_time = {}

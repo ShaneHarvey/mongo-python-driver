@@ -146,7 +146,9 @@ class Monitor(MonitorBase):
                 self._listeners.publish_server_heartbeat_failed(
                     address, error_time, error)
             self._topology.reset_pool(address)
-            default = ServerDescription(address, error=error)
+            default = ServerDescription(
+                address, error=error,
+                topology_version=self._server_description.topology_version)
             if not retry:
                 self._avg_round_trip_time.reset()
                 # Server type defaults to Unknown.

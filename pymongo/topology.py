@@ -263,12 +263,29 @@ class Topology(object):
         Hold the lock when calling this.
         """
         td_old = self._description
+
+        def get_pid_counter(tv):
+            if tv:
+                return tv.get('processId'),  tv.get('counter')
+            return None, 0
+
+        # topologyVersion checks:
+        old_sd = td_old._server_descriptions[
+            server_description.address]
+        old_pid, old_counter = get_pid_counter(old_sd.topology_version)
+        new_pid, new_counter = get_pid_counter(server_description.topology_version)
+        if old_pid is not None and new_pid is not None:
+            if old_pid == new_pid and old_counter > new_counter:
+                print('DELAYED error:')
+                print('old tv:', old_sd.topology_version)
+                print('new tv:', server_description.topology_version)
+                # This is a delayed repsonse. Ignore it.
+                return
+
         if self._publish_server:
-            old_server_description = td_old._server_descriptions[
-                server_description.address]
             self._events.put((
                 self._listeners.publish_server_description_changed,
-                (old_server_description, server_description,
+                (old_sd, server_description,
                  server_description.address, self._topology_id)))
 
         self._description = updated_topology_description(
