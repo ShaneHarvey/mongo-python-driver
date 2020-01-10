@@ -34,7 +34,7 @@ from test.utils import MockPool, parse_read_preference
 
 class MockMonitor(object):
     def __init__(self, server_description, topology, pool, topology_settings):
-        pass
+        self.current_sock = None
 
     def open(self):
         pass

@@ -193,6 +193,7 @@ def create_test(scenario_def):
                     options = self._settings._pool_options
                     self._listeners = options.event_listeners
                     self._publish = self._listeners is not None
+                    self.current_sock = None
 
                     def target():
                         monitor = self_ref()
