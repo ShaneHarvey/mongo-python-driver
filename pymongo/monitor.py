@@ -113,7 +113,8 @@ class Monitor(MonitorBase):
         try:
             self._server_description = self._check_with_retry(long_poll=False)
             self._topology.on_change(self._server_description)
-            if self._server_description.topology_version is not None:
+            unknown = (self._server_description.server_type == SERVER_TYPE.Unknown)
+            if not unknown and self._server_description.topology_version is not None:
                 self._server_description = self._check_with_retry(long_poll=True)
                 self._topology.on_change(self._server_description)
                 # TODO: remove 500ms sleep hear

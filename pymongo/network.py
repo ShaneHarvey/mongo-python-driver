@@ -222,6 +222,7 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
 
 
 def _wait_for_read(sock):
+    # TODO: this calls raise OSError(9, 'Bad file descriptor') at shutdown.
     timeout = sock.gettimeout()
     rd, _, exc = select.select([sock], [], [sock], timeout)
     if not rd and not exc:
