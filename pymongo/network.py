@@ -225,9 +225,12 @@ def _wait_for_read(sock):
     # SSLSocket can have buffered data which won't be caught by select:
     if hasattr(sock, 'pending') and sock.pending() > 0:
         return
-    # TODO: this calls raise OSError(9, 'Bad file descriptor') at shutdown.
-    timeout = sock.gettimeout()
-    rd, _, exc = select.select([sock], [], [sock], timeout)
+    try:
+        timeout = sock.gettimeout()
+        rd, _, exc = select.select([sock], [], [sock], timeout)
+    except ValueError as exc:
+        # TODO: this calls raises OSError(9, 'Bad file descriptor') at shutdown.
+        raise OSError(exc)
     if not rd and not exc:
         # select timed out. Raise a Timeout.
         from pymongo.errors import NetworkTimeout

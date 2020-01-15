@@ -1633,8 +1633,7 @@ class TestExhaustCursor(IntegrationTest):
 
         # Cause a network error.
         sock_info = cursor._Cursor__exhaust_mgr.sock
-        from socket import SHUT_RDWR
-        sock_info.sock.shutdown(SHUT_RDWR)
+        sock_info.sock.close()
 
         # A getmore fails.
         self.assertRaises(ConnectionFailure, list, cursor)
