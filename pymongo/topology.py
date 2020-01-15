@@ -32,7 +32,8 @@ from pymongo.pool import PoolOptions
 from pymongo.topology_description import (updated_topology_description,
                                           _updated_topology_description_srv_polling,
                                           TopologyDescription,
-                                          SRV_POLLING_TOPOLOGIES, TOPOLOGY_TYPE)
+                                          SRV_POLLING_TOPOLOGIES, TOPOLOGY_TYPE,
+                                          compare_topology_version)
 from pymongo.errors import ServerSelectionTimeoutError, ConfigurationError
 from pymongo.monitor import SrvMonitor
 from pymongo.monotonic import time as _time
@@ -264,23 +265,18 @@ class Topology(object):
         """
         td_old = self._description
 
-        def get_pid_counter(tv):
-            if tv:
-                return tv.get('processId'),  tv.get('counter')
-            return None, 0
-
-        # topologyVersion checks:
+        # topologyVersion check, ignore error when old_tv > new_tv:
+        # We can't ignore when old_tv == new_tv because then we would ignore
+        # normal isMaster checks when the topologyVersion remains the same.
         old_sd = td_old._server_descriptions[
             server_description.address]
-        old_pid, old_counter = get_pid_counter(old_sd.topology_version)
-        new_pid, new_counter = get_pid_counter(server_description.topology_version)
-        if old_pid is not None and new_pid is not None:
-            if old_pid == new_pid and old_counter > new_counter:
-                print('DELAYED _process_change:')
-                print('old tv:', old_sd.topology_version)
-                print('new tv:', server_description.topology_version)
-                # This is a delayed repsonse. Ignore it.
-                return
+        if compare_topology_version(old_sd.topology_version,
+                                    server_description.topology_version) == 1:
+            # This is a delayed response. Ignore it.
+            print('DELAYED _process_change:')
+            print('old tv:', old_sd.topology_version)
+            print('new tv:', server_description.topology_version)
+            return
 
         if self._publish_server:
             self._events.put((
@@ -569,22 +565,16 @@ class Topology(object):
 
             return None
 
-        def get_pid_counter(tv):
-            if tv:
-                return tv.get('processId'),  tv.get('counter')
-            return None, 0
-
         # "server" is None if another thread removed it from the topology.
         if server:
-            cur_pid, cur_counter = get_pid_counter(self._description.topology_version_for(address))
-            error_pid, error_counter = get_pid_counter(get_tv(error))
-            if cur_pid is not None and error_pid is not None:
-                if cur_pid == error_pid and cur_counter > error_counter:
-                    # Outdated error.
-                    print('DELAYED error:', error)
-                    print('current tv:', self._description.topology_version_for(address))
-                    print('error tv:', get_tv(error))
-                    return
+            # topologyVersion check, ignore error when cur_tv >= error_tv:
+            cur_tv = self._description.topology_version_for(address)
+            if compare_topology_version(cur_tv, get_tv(error)) >= 0:
+                # Outdated error. Ignore it.
+                print('DELAYED error:', error)
+                print('current tv:', self._description.topology_version_for(address))
+                print('error tv:', get_tv(error))
+                return
 
             if reset_pool:
                 server.reset()

@@ -586,3 +586,26 @@ def _check_has_primary(sds):
             return TOPOLOGY_TYPE.ReplicaSetWithPrimary
     else:
         return TOPOLOGY_TYPE.ReplicaSetNoPrimary
+
+
+def compare_topology_version(tv1, tv2):
+    """Return -1 if tv1<tv2, 0 if tv1==tv2, 1 if tv1>tv2"""
+    if tv1 is None or tv2 is None:
+        # Assume greater.
+        return -1
+    pid1 = tv1['processId']
+    pid2 = tv2['processId']
+    if pid1 == pid2:
+        counter1 = tv1['counter']
+        counter2 = tv2['counter']
+        if counter1 == counter2:
+            return 0
+        elif counter1 < counter2:
+            return -1
+        else:
+            return 1
+    elif pid1 < pid2:
+        # Use ObjectId comparison.
+        return -1
+    else:
+        return 1
