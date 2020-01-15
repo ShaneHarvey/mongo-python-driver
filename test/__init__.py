@@ -215,6 +215,8 @@ class ClientContext(object):
             self.connection_attempts.append(
                 'failed to connect client %r: %s' % (client, exc))
             return None
+        finally:
+            client.close()
 
     def _init_client(self):
         self.client = self._connect(host, port)
