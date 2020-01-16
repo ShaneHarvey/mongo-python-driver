@@ -97,9 +97,13 @@ class Monitor(MonitorBase):
         self_ref = weakref.ref(self, executor.close)
         self._topology = weakref.proxy(topology, executor.close)
         self.current_sock = None
+        import threading
+        self.interrupted = threading.Event()
 
     def interrupt_check(self):
         """Interrupt a concurrent isMaster check by closing the socket."""
+        # TODO: race conditions
+        self.interrupted.set()
         sock = self.current_sock
         if sock:
             sock.close_socket(None)
@@ -116,10 +120,16 @@ class Monitor(MonitorBase):
         """Return True when using awaitable isMaster."""
         try:
             self._server_description = self._check_with_retry(long_poll=False)
+            if self.interrupted.set():
+                self.interrupted.clear()
+                return
             self._topology.on_change(self._server_description)
             unknown = (self._server_description.server_type == SERVER_TYPE.Unknown)
             if not unknown and self._server_description.topology_version is not None:
                 self._server_description = self._check_with_retry(long_poll=True)
+                if self.interrupted.set():
+                    self.interrupted.clear()
+                    return
                 self._topology.on_change(self._server_description)
                 # TODO: remove 500ms sleep hear
                 self.request_check()
@@ -146,6 +156,8 @@ class Monitor(MonitorBase):
         except ReferenceError:
             raise
         except Exception as error:
+            if self.interrupted.is_set():
+                return self._server_description
             error_time = _time() - start
             if self._publish:
                 self._listeners.publish_server_heartbeat_failed(
@@ -170,6 +182,8 @@ class Monitor(MonitorBase):
             except ReferenceError:
                 raise
             except Exception as error:
+                if self.interrupted.is_set():
+                    return self._server_description
                 error_time = _time() - start
                 if self._publish:
                     self._listeners.publish_server_heartbeat_failed(
