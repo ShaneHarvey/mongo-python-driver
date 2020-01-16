@@ -98,11 +98,15 @@ class Monitor(MonitorBase):
         self._topology = weakref.proxy(topology, executor.close)
         self.current_sock = None
 
-    def close(self):
-        super(Monitor, self).close()
+    def interrupt_check(self):
+        """Interrupt a concurrent isMaster check by closing the socket."""
         sock = self.current_sock
         if sock:
             sock.close_socket(None)
+
+    def close(self):
+        super(Monitor, self).close()
+        self.interrupt_check()
 
         # Increment the pool_id and maybe close the socket. If the executor
         # thread has the socket checked out, it will be closed when checked in.
@@ -147,6 +151,9 @@ class Monitor(MonitorBase):
                 self._listeners.publish_server_heartbeat_failed(
                     address, error_time, error)
             self._topology.reset_pool(address)
+            # TODO: is it correct to include both error and topology_version?
+            # For command errors I think not.
+            # For connection errors, maybe? Consider case study.
             default = ServerDescription(
                 address, error=error,
                 topology_version=self._server_description.topology_version)

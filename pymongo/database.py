@@ -1135,7 +1135,7 @@ class Database(common.BaseObject):
             # doing so already.
             primary = self.__client.primary
             if primary:
-                self.__client._reset_server_and_request_check(primary)
+                self.__client._reset_server_and_request_check(primary, None)
         return error
 
     def last_status(self):

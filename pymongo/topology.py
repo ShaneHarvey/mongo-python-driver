@@ -38,6 +38,7 @@ from pymongo.errors import ServerSelectionTimeoutError, ConfigurationError
 from pymongo.monitor import SrvMonitor
 from pymongo.monotonic import time as _time
 from pymongo.server import Server
+from pymongo.server_description import ServerDescription
 from pymongo.server_selectors import (any_server_selector,
                                       arbiter_server_selector,
                                       secondary_server_selector,
@@ -569,19 +570,29 @@ class Topology(object):
         if server:
             # topologyVersion check, ignore error when cur_tv >= error_tv:
             cur_tv = self._description.topology_version_for(address)
-            if compare_topology_version(cur_tv, get_tv(error)) >= 0:
+            error_tv = get_tv(error)
+            if compare_topology_version(cur_tv, error_tv) >= 0:
                 # Outdated error. Ignore it.
                 print('DELAYED error:', error)
                 print('current tv:', self._description.topology_version_for(address))
-                print('error tv:', get_tv(error))
+                print('error tv:', error_tv)
                 return
 
             if reset_pool:
                 server.reset()
 
             # Mark this server Unknown.
-            self._description = self._description.reset_server(address)
-            self._update_servers()
+            unknown_sd = ServerDescription(address, error=error)
+            self._process_change(unknown_sd)
+
+            # TODO: this is a hack but we need to restart the monitoring
+            # process. Deals with any time that the application reset SDAM
+            # state while the Monitor is waiting for an awaitable isMaster.
+            # - Retryable reads/writes spec tests which use failCommand.
+            # - A spurious network error which occurs on an application
+            #   connection but not the monitoring connection.
+            # - Black holed monitoring connection?
+            server._monitor.interrupt_check()
 
     def _request_check(self, address):
         """Wake one monitor. Hold the lock when calling this."""
