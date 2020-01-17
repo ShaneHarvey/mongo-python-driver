@@ -44,6 +44,9 @@ class MockMonitor(object):
         self._topology = topology
         self.current_sock = None
 
+    def interrupt_check(self):
+        pass
+
     def open(self):
         pass
 

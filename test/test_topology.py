@@ -47,6 +47,9 @@ class MockMonitor(object):
         self.opened = False
         self.current_sock = None
 
+    def interrupt_check(self):
+        pass
+
     def open(self):
         self.opened = True
 

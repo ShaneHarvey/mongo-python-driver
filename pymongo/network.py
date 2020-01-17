@@ -43,7 +43,9 @@ from pymongo.compression_support import decompress, _NO_COMPRESSION
 from pymongo.errors import (AutoReconnect,
                             NotMasterError,
                             OperationFailure,
-                            ProtocolError)
+                            ProtocolError,
+                            NetworkTimeout,
+                            _MonitorCheckCancelled)
 from pymongo.message import _UNPACK_REPLY
 
 
@@ -220,90 +222,74 @@ def receive_message(sock_info, request_id, max_message_size=MAX_MESSAGE_SIZE):
                             "%r" % (op_code, _UNPACK_REPLY.keys()))
     return unpack_reply(data)
 
+import time
 
-def _wait_for_read(sock_info):
-    sock = sock_info.sock
-    # SSLSocket can have buffered data which won't be caught by select:
-    if hasattr(sock, 'pending') and sock.pending() > 0:
-        return
-    event = sock_info.pollable_event
-    if event:
-        inputs = [sock, event]
-    else:
-        inputs = [sock]
-
-    try:
-        timeout = sock.gettimeout()
-        rd, _, _ = select.select(inputs, [], [], timeout)
-    except ValueError as exc:
-        # TODO: this calls raises OSError(9, 'Bad file descriptor') at shutdown.
-        raise OSError(exc)
-    if not rd:
-        # select timed out. Raise a Timeout.
-        from pymongo.errors import NetworkTimeout
-        raise NetworkTimeout('select timed out: %s' % (timeout,))
-    if event and event in rd:
-        event.clear()
-        raise AutoReconnect('select interrupted by Monitor event!')
-
-
-import socket
 
 try:
-    from socket import socketpair as _socketpair
+    from ssl import SSLWantReadError as _SSLWantReadError
 except ImportError:
-    # Windows <= Python 3.4,
-    # Backport from CPython with minor changes for Python 2.7 support:
-    # Origin: https://gist.github.com/4325783, by Geert Jansen.  Public domain.
-    def _socketpair():
-        # We create a connected TCP socket. Note the trick with
-        # setblocking(False) that prevents us from having to create a thread.
-        lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            lsock.bind(('127.0.0.1', 0))
-            lsock.listen()
-            # On IPv6, ignore flow_info and scope_id
-            addr, port = lsock.getsockname()[:2]
-            csock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    class _SSLWantReadError(OSError):
+        pass
+
+def non_blocking_recv(sock_info, recv):
+    """Block until at least one byte is read, or a timeout, or a cancel."""
+    sock = sock_info.sock
+    context = sock_info.cancel_context
+    timeout = sock.gettimeout()
+    time_left = timeout
+    sock.setblocking(False)
+    start = time.time()
+
+    try:
+        while True:
             try:
-                csock.setblocking(False)
-                try:
-                    csock.connect((addr, port))
-                except (BlockingIOError, InterruptedError):
-                    pass
-                except socket.error as exc:
-                    if exc.errno not in (errno.EWOULDBLOCK, getattr(errno, 'WSAEWOULDBLOCK', 0)):
-                        raise
-                csock.setblocking(True)
-                ssock, _ = lsock.accept()
-            except:
-                csock.close()
-                raise
-        finally:
-            lsock.close()
-        return (ssock, csock)
+                return recv()
+            except _SSLWantReadError:
+                pass
+            except (IOError, OSError) as exc:
+                _errno = _errno_from_exception(exc)
+                if _errno == errno.EINTR:
+                    continue
+                if _errno != errno.EAGAIN:
+                    raise
+            # Wait for a read to be available, check for timeouts and cancels.
+            duration = time.time() - start
+            context and context.check_cancelled(duration)
+            # Poll the socket for a short while
+            while True:
+                poll_timeout = .1 if timeout is None else min(time_left, .1)
+                rds, _, _ = select.select([sock], [], [], poll_timeout)
+                duration = time.time() - start
+                context and context.check_cancelled(duration)
+                if rds:
+                    break
+                elif timeout is not None:
+                    time_left = timeout - duration
+                    if time_left <= 0:
+                        raise NetworkTimeout('recv timed out: %s' % (timeout,))
+    finally:
+        sock.setblocking(True)
+        if timeout is not None:
+            sock.settimeout(timeout)
 
 
-class PollableEvent(object):
+class _CancellationContext(object):
     def __init__(self):
-        # Create a pair of connected sockets
-        self._writesocket, self._recvsocket = _socketpair()
+        self._cancelled = False
 
-    def fileno(self):
-        """Support for select/poll."""
-        return self._recvsocket.fileno()
+    def cancel(self):
+        """Cancel this context."""
+        self._cancelled = True
 
-    def set(self):
-        """Set the event."""
-        self._writesocket.sendall(b'1')
+    def cancelled(self):
+        """Is this context cancelled?"""
+        return self._cancelled
 
-    def clear(self):
-        """Clear the event."""
-        self._recvsocket.recv(1)
-
-    def close(self):
-        self._writesocket.close()
-        self._recvsocket.close()
+    def check_cancelled(self, duration):
+        """Raise an error if we're cancelled."""
+        if self._cancelled:
+            raise _MonitorCheckCancelled(
+                'isMaster cancelled after %s', duration)
 
 
 # memoryview was introduced in Python 2.7 but we only use it on Python 3
@@ -313,8 +299,7 @@ class PollableEvent(object):
 # NullPointerException.
 if not PY3:
     def _recv(sock_info, length):
-        _wait_for_read(sock_info)
-        return sock_info.sock.recv(length)
+        return non_blocking_recv(sock_info, lambda: sock_info.sock.recv(length))
 
     def _receive_data_on_socket(sock_info, length):
         buf = bytearray(length)
@@ -336,8 +321,7 @@ if not PY3:
         return bytes(buf)
 else:
     def _recv_into(sock_info, buf):
-        _wait_for_read(sock_info)
-        return sock_info.sock.recv_into(buf)
+        return non_blocking_recv(sock_info, lambda: sock_info.sock.recv_into(buf))
 
     def _receive_data_on_socket(sock_info, length):
         buf = bytearray(length)

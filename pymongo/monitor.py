@@ -17,7 +17,7 @@
 import weakref
 
 from pymongo import common, periodic_executor
-from pymongo.errors import OperationFailure
+from pymongo.errors import OperationFailure, _MonitorCheckCancelled
 from pymongo.monotonic import time as _time
 from pymongo.read_preferences import MovingAverage
 from pymongo.server_description import ServerDescription
@@ -97,16 +97,12 @@ class Monitor(MonitorBase):
         self_ref = weakref.ref(self, executor.close)
         self._topology = weakref.proxy(topology, executor.close)
         self.current_sock = None
-        import threading
-        self.interrupted = threading.Event()
 
     def interrupt_check(self):
         """Interrupt a concurrent isMaster check by closing the socket."""
-        # TODO: race conditions
-        self.interrupted.set()
         sock = self.current_sock
         if sock:
-            sock.close_socket(None)
+            sock.cancel_context.cancel()
 
     def close(self):
         super(Monitor, self).close()
@@ -120,19 +116,16 @@ class Monitor(MonitorBase):
         """Return True when using awaitable isMaster."""
         try:
             self._server_description = self._check_with_retry(long_poll=False)
-            if self.interrupted.is_set():
-                self.interrupted.clear()
-                return
             self._topology.on_change(self._server_description)
             unknown = (self._server_description.server_type == SERVER_TYPE.Unknown)
             if not unknown and self._server_description.topology_version is not None:
                 self._server_description = self._check_with_retry(long_poll=True)
-                if self.interrupted.is_set():
-                    self.interrupted.clear()
-                    return
                 self._topology.on_change(self._server_description)
                 # TODO: remove 500ms sleep hear
                 self.request_check()
+        except _MonitorCheckCancelled:
+            # TODO: remove 500ms sleep hear
+            self.request_check()
         except ReferenceError:
             # Topology was garbage-collected.
             self.close()
@@ -153,11 +146,9 @@ class Monitor(MonitorBase):
         start = _time()
         try:
             return self._check_once(long_poll)
-        except ReferenceError:
+        except (ReferenceError, _MonitorCheckCancelled):
             raise
         except Exception as error:
-            if self.interrupted.is_set():
-                return self._server_description
             error_time = _time() - start
             if self._publish:
                 self._listeners.publish_server_heartbeat_failed(
@@ -179,11 +170,9 @@ class Monitor(MonitorBase):
             start = _time()
             try:
                 return self._check_once(long_poll=False)
-            except ReferenceError:
+            except (ReferenceError, _MonitorCheckCancelled):
                 raise
             except Exception as error:
-                if self.interrupted.is_set():
-                    return self._server_description
                 error_time = _time() - start
                 if self._publish:
                     self._listeners.publish_server_heartbeat_failed(

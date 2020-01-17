@@ -67,7 +67,7 @@ from pymongo.monitoring import (ConnectionCheckOutFailedReason,
 from pymongo.network import (command,
                              receive_message,
                              SocketChecker,
-                             PollableEvent)
+                             _CancellationContext)
 from pymongo.read_preferences import ReadPreference
 from pymongo.server_type import SERVER_TYPE
 # Always use our backport so we always have support for IP address matching
@@ -503,10 +503,10 @@ class SocketInfo(object):
         self.pool_id = pool.pool_id
         self.ready = False
         _register_sock(self)
-        self.pollable_event = None
+        self.cancel_context = None
         if not pool.handshake:
             # This is a Monitor connection.
-            self.pollable_event = PollableEvent()
+            self.cancel_context = _CancellationContext()
 
     def ismaster(self, metadata, cluster_time, topology_version):
         cmd = SON([('ismaster', 1)])
@@ -765,12 +765,6 @@ class SocketInfo(object):
             self.sock.close()
         except Exception:
             pass
-
-        if self.pollable_event:
-            try:
-                self.pollable_event.close()
-            except Exception:
-                pass
 
         if reason and self.enabled_for_cmap:
             self.listeners.publish_connection_closed(
