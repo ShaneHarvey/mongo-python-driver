@@ -120,14 +120,14 @@ class Monitor(MonitorBase):
         """Return True when using awaitable isMaster."""
         try:
             self._server_description = self._check_with_retry(long_poll=False)
-            if self.interrupted.set():
+            if self.interrupted.is_set():
                 self.interrupted.clear()
                 return
             self._topology.on_change(self._server_description)
             unknown = (self._server_description.server_type == SERVER_TYPE.Unknown)
             if not unknown and self._server_description.topology_version is not None:
                 self._server_description = self._check_with_retry(long_poll=True)
-                if self.interrupted.set():
+                if self.interrupted.is_set():
                     self.interrupted.clear()
                     return
                 self._topology.on_change(self._server_description)

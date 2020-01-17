@@ -50,7 +50,7 @@ from pymongo.message import _UNPACK_REPLY
 _UNPACK_HEADER = struct.Struct("<iiii").unpack
 
 
-def command(sock, dbname, spec, slave_ok, is_mongos,
+def command(sock_info, dbname, spec, slave_ok, is_mongos,
             read_preference, codec_options, session, client, check=True,
             allowable_errors=None, address=None,
             check_keys=False, listeners=None, max_bson_size=None,
@@ -148,13 +148,13 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
         start = datetime.datetime.now()
 
     try:
-        sock.sendall(msg)
+        sock_info.sock.sendall(msg)
         if use_op_msg and unacknowledged:
             # Unacknowledged, fake a successful command response.
             reply = None
             response_doc = {"ok": 1}
         else:
-            reply = receive_message(sock, request_id)
+            reply = receive_message(sock_info, request_id)
             unpacked_docs = reply.unpack_response(
                 codec_options=codec_options, user_fields=user_fields)
 
@@ -189,11 +189,11 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
 
 _UNPACK_COMPRESSION_HEADER = struct.Struct("<iiB").unpack
 
-def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
+def receive_message(sock_info, request_id, max_message_size=MAX_MESSAGE_SIZE):
     """Receive a raw BSON message or raise socket.error."""
     # Ignore the response's request id.
     length, _, response_to, op_code = _UNPACK_HEADER(
-        _receive_data_on_socket(sock, 16))
+        _receive_data_on_socket(sock_info, 16))
     # No request_id for exhaust cursor "getMore".
     if request_id is not None:
         if request_id != response_to:
@@ -207,11 +207,11 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
                             "message size (%r)" % (length, max_message_size))
     if op_code == 2012:
         op_code, _, compressor_id = _UNPACK_COMPRESSION_HEADER(
-            _receive_data_on_socket(sock, 9))
+            _receive_data_on_socket(sock_info, 9))
         data = decompress(
-            _receive_data_on_socket(sock, length - 25), compressor_id)
+            _receive_data_on_socket(sock_info, length - 25), compressor_id)
     else:
-        data = _receive_data_on_socket(sock, length - 16)
+        data = _receive_data_on_socket(sock_info, length - 16)
 
     try:
         unpack_reply = _UNPACK_REPLY[op_code]
@@ -221,20 +221,90 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
     return unpack_reply(data)
 
 
-def _wait_for_read(sock):
+def _wait_for_read(sock_info):
+    sock = sock_info.sock
     # SSLSocket can have buffered data which won't be caught by select:
     if hasattr(sock, 'pending') and sock.pending() > 0:
         return
+    event = sock_info.pollable_event
+    if event:
+        inputs = [sock, event]
+    else:
+        inputs = [sock]
+
     try:
         timeout = sock.gettimeout()
-        rd, _, exc = select.select([sock], [], [sock], timeout)
+        rd, _, _ = select.select(inputs, [], [], timeout)
     except ValueError as exc:
         # TODO: this calls raises OSError(9, 'Bad file descriptor') at shutdown.
         raise OSError(exc)
-    if not rd and not exc:
+    if not rd:
         # select timed out. Raise a Timeout.
         from pymongo.errors import NetworkTimeout
         raise NetworkTimeout('select timed out: %s' % (timeout,))
+    if event and event in rd:
+        event.clear()
+        raise AutoReconnect('select interrupted by Monitor event!')
+
+
+import socket
+
+try:
+    from socket import socketpair as _socketpair
+except ImportError:
+    # Windows <= Python 3.4,
+    # Backport from CPython with minor changes for Python 2.7 support:
+    # Origin: https://gist.github.com/4325783, by Geert Jansen.  Public domain.
+    def _socketpair():
+        # We create a connected TCP socket. Note the trick with
+        # setblocking(False) that prevents us from having to create a thread.
+        lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            lsock.bind(('127.0.0.1', 0))
+            lsock.listen()
+            # On IPv6, ignore flow_info and scope_id
+            addr, port = lsock.getsockname()[:2]
+            csock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                csock.setblocking(False)
+                try:
+                    csock.connect((addr, port))
+                except (BlockingIOError, InterruptedError):
+                    pass
+                except socket.error as exc:
+                    if exc.errno not in (errno.EWOULDBLOCK, getattr(errno, 'WSAEWOULDBLOCK', 0)):
+                        raise
+                csock.setblocking(True)
+                ssock, _ = lsock.accept()
+            except:
+                csock.close()
+                raise
+        finally:
+            lsock.close()
+        return (ssock, csock)
+
+
+class PollableEvent(object):
+    def __init__(self):
+        # Create a pair of connected sockets
+        self._writesocket, self._recvsocket = _socketpair()
+
+    def fileno(self):
+        """Support for select/poll."""
+        return self._recvsocket.fileno()
+
+    def set(self):
+        """Set the event."""
+        self._writesocket.sendall(b'1')
+
+    def clear(self):
+        """Clear the event."""
+        self._recvsocket.recv(1)
+
+    def close(self):
+        self._writesocket.close()
+        self._recvsocket.close()
+
 
 # memoryview was introduced in Python 2.7 but we only use it on Python 3
 # because before 2.7.4 the struct module did not support memoryview:
@@ -242,16 +312,16 @@ def _wait_for_read(sock):
 # In Jython, using slice assignment on a memoryview results in a
 # NullPointerException.
 if not PY3:
-    def _recv(sock, length):
-        _wait_for_read(sock)
-        return sock.recv(length)
+    def _recv(sock_info, length):
+        _wait_for_read(sock_info)
+        return sock_info.sock.recv(length)
 
-    def _receive_data_on_socket(sock, length):
+    def _receive_data_on_socket(sock_info, length):
         buf = bytearray(length)
         i = 0
         while length:
             try:
-                chunk = _recv(sock, length)
+                chunk = _recv(sock_info, length)
             except (IOError, OSError) as exc:
                 if _errno_from_exception(exc) == errno.EINTR:
                     continue
@@ -265,17 +335,17 @@ if not PY3:
 
         return bytes(buf)
 else:
-    def _recv_into(sock, buf):
-        _wait_for_read(sock)
-        return sock.recv_into(buf)
+    def _recv_into(sock_info, buf):
+        _wait_for_read(sock_info)
+        return sock_info.sock.recv_into(buf)
 
-    def _receive_data_on_socket(sock, length):
+    def _receive_data_on_socket(sock_info, length):
         buf = bytearray(length)
         mv = memoryview(buf)
         bytes_read = 0
         while bytes_read < length:
             try:
-                chunk_length = _recv_into(sock, mv[bytes_read:])
+                chunk_length = _recv_into(sock_info, mv[bytes_read:])
             except (IOError, OSError) as exc:
                 if _errno_from_exception(exc) == errno.EINTR:
                     continue

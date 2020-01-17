@@ -66,7 +66,8 @@ from pymongo.monitoring import (ConnectionCheckOutFailedReason,
                                 ConnectionClosedReason)
 from pymongo.network import (command,
                              receive_message,
-                             SocketChecker)
+                             SocketChecker,
+                             PollableEvent)
 from pymongo.read_preferences import ReadPreference
 from pymongo.server_type import SERVER_TYPE
 # Always use our backport so we always have support for IP address matching
@@ -502,6 +503,10 @@ class SocketInfo(object):
         self.pool_id = pool.pool_id
         self.ready = False
         _register_sock(self)
+        self.pollable_event = None
+        if not pool.handshake:
+            # This is a Monitor connection.
+            self.pollable_event = PollableEvent()
 
     def ismaster(self, metadata, cluster_time, topology_version):
         cmd = SON([('ismaster', 1)])
@@ -605,7 +610,7 @@ class SocketInfo(object):
         if self.op_msg_enabled:
             self._raise_if_not_writable(unacknowledged)
         try:
-            return command(self.sock, dbname, spec, slave_ok,
+            return command(self, dbname, spec, slave_ok,
                            self.is_mongos, read_preference, codec_options,
                            session, client, check, allowable_errors,
                            self.address, check_keys, listeners,
@@ -645,8 +650,7 @@ class SocketInfo(object):
         If any exception is raised, the socket is closed.
         """
         try:
-            return receive_message(self.sock, request_id,
-                                   self.max_message_size)
+            return receive_message(self, request_id, self.max_message_size)
         except BaseException as error:
             self._raise_connection_failure(error)
 
@@ -761,6 +765,12 @@ class SocketInfo(object):
             self.sock.close()
         except Exception:
             pass
+
+        if self.pollable_event:
+            try:
+                self.pollable_event.close()
+            except Exception:
+                pass
 
         if reason and self.enabled_for_cmap:
             self.listeners.publish_connection_closed(
