@@ -137,6 +137,14 @@ class Topology(object):
         if self._settings.fqdn is not None:
             self._srv_monitor = SrvMonitor(self, self._settings)
 
+    def __del__(self):
+        # TODO: this prevents GC from waiting for 10 seconds isMaster
+        # Ensure this is safe: must not take locks.
+        # See test_cleanup_executors_on_client_del.
+        if self._opened:
+            for s in self._servers.values():
+                s._monitor.interrupt_check()
+
     def open(self):
         """Start monitoring, or restart after a fork.
 

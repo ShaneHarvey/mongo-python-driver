@@ -126,11 +126,16 @@ class TestMaxStaleness(unittest.TestCase):
         server = client._topology.select_server(writable_server_selector)
         last_write = server.description.last_write_date
         self.assertTrue(last_write)
+        time.sleep(1)
         client.pymongo_test.test.insert_one({})
-        time.sleep(2)
+        if client_context.version.at_least(4, 3):
+            # TODO: Awaitable isMaster can take 10 seconds.
+            time.sleep(11)
+        else:
+            time.sleep(2)
         server = client._topology.select_server(writable_server_selector)
         self.assertGreater(server.description.last_write_date, last_write)
-        self.assertLess(server.description.last_write_date, last_write + 10)
+        self.assertLess(server.description.last_write_date, last_write + 15)
 
     @client_context.require_version_max(3, 3)
     def test_last_write_date_absent(self):
