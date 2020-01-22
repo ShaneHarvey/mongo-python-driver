@@ -231,6 +231,8 @@ except ImportError:
     class _SSLWantReadError(OSError):
         pass
 
+POLL_TIMEOUT = 0.5
+
 def non_blocking_recv(sock_info, recv):
     """Block until at least one byte is read, or a timeout, or a cancel."""
     sock = sock_info.sock
@@ -257,7 +259,7 @@ def non_blocking_recv(sock_info, recv):
             context and context.check_cancelled(duration)
             # Poll the socket for a short while
             while True:
-                poll_timeout = .1 if timeout is None else min(time_left, .1)
+                poll_timeout = POLL_TIMEOUT if timeout is None else min(time_left, POLL_TIMEOUT)
                 rds, _, _ = select.select([sock], [], [], poll_timeout)
                 duration = time.time() - start
                 context and context.check_cancelled(duration)
