@@ -304,7 +304,8 @@ class _CancellationContext(object):
 # NullPointerException.
 if not PY3:
     def _recv(sock_info, length):
-        return non_blocking_recv(sock_info, lambda: sock_info.sock.recv(length))
+        return sock_info.sock.recv(length)
+        #return non_blocking_recv(sock_info, lambda: sock_info.sock.recv(length))
 
     def _receive_data_on_socket(sock_info, length):
         buf = bytearray(length)
@@ -326,7 +327,8 @@ if not PY3:
         return bytes(buf)
 else:
     def _recv_into(sock_info, buf):
-        return non_blocking_recv(sock_info, lambda: sock_info.sock.recv_into(buf))
+        return sock_info.sock.recv_into(buf)
+        #return non_blocking_recv(sock_info, lambda: sock_info.sock.recv_into(buf))
 
     def _receive_data_on_socket(sock_info, length):
         buf = bytearray(length)
