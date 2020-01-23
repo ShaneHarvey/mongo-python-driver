@@ -294,14 +294,6 @@ class _CancellationContext(object):
                 'isMaster cancelled after %s', duration)
 
 
-def _wait_for_read(sock):
-    timeout = sock.gettimeout()
-    try:
-        _ReadChecker().readable(sock, timeout)
-    except Exception as exc:
-        print('_ReadChecker().readable error: %r' % exc)
-        raise
-
 # memoryview was introduced in Python 2.7 but we only use it on Python 3
 # because before 2.7.4 the struct module did not support memoryview:
 # https://bugs.python.org/issue10212.
@@ -309,9 +301,7 @@ def _wait_for_read(sock):
 # NullPointerException.
 if not PY3:
     def _recv(sock_info, length):
-        _wait_for_read(sock_info.sock)
-        return sock_info.sock.recv(length)
-        #return non_blocking_recv(sock_info, lambda: sock_info.sock.recv(length))
+        return non_blocking_recv(sock_info, lambda: sock_info.sock.recv(length))
 
     def _receive_data_on_socket(sock_info, length):
         buf = bytearray(length)
@@ -333,9 +323,7 @@ if not PY3:
         return bytes(buf)
 else:
     def _recv_into(sock_info, buf):
-        _wait_for_read(sock_info.sock)
-        return sock_info.sock.recv_into(buf)
-        #return non_blocking_recv(sock_info, lambda: sock_info.sock.recv_into(buf))
+        return non_blocking_recv(sock_info, lambda: sock_info.sock.recv_into(buf))
 
     def _receive_data_on_socket(sock_info, length):
         buf = bytearray(length)
@@ -409,73 +397,3 @@ class SocketChecker(object):
                 # or invalid socket.
                 return True
             return len(rd) > 0
-
-
-def _mask(name):
-    return getattr(select, name, 0)
-
-_READ_MASK = (
-        _mask("POLLIN") |    # There is data to read
-        _mask("POLLPRI") |   # There is urgent data to read
-        _mask("POLLERR") |   # Error condition of some sort
-        _mask("POLLHUP") |   # Hung up
-        _mask("POLLRDHUP") | # Stream socket peer closed connection,
-                             # or shut down writing half of connection
-        _mask("POLLNVAL")    # Invalid request: descriptor not open
-)
-
-
-class _ReadChecker(object):
-    def __init__(self):
-        if _HAS_POLL:
-            self._poller = poll()
-        else:
-            self._poller = None
-
-    def readable(self, sock, timeout):
-        """Block until a timeout occurs or the socket is readable."""
-        while True:
-            try:
-                fd = sock.fileno()
-                if self._poller:
-                    # Poll timeout is milliseconds, select timeout is seconds.
-                    if timeout:
-                        timeout *= 1000
-                    self._poller.register(fd, _READ_MASK)
-                    try:
-                        print('polling socket: %r' % (fd,))
-                        event = self._poller.poll(timeout)
-                    finally:
-                        print('polling socket done: %r' % (fd,))
-                        self._poller.unregister(fd)
-                else:
-                    print('selecting socket: %r' % (fd,))
-                    try:
-                        rds, _, errs = select.select([fd], [], [fd], timeout)
-                    finally:
-                        print('selecting socket done: %r' % (fd,))
-                    event = bool(rds or errs)
-            except (RuntimeError, KeyError):
-                # RuntimeError is raised during a concurrent poll. KeyError
-                # is raised by unregister if the socket is not in the poller.
-                # These errors should not be possible since we protect the
-                # poller with a mutex.
-                raise
-            except ValueError:
-                # ValueError is raised by register/unregister/select if the
-                # socket file descriptor is negative or outside the range for
-                # select (> 1023).
-                return
-            except (_SELECT_ERROR, IOError) as exc:
-                if _errno_from_exception(exc) in (errno.EINTR, errno.EAGAIN):
-                    continue
-                return
-            except Exception:
-                # Any other exceptions should be attributed to a closed
-                # or invalid socket.
-                return
-
-            if event:
-                return
-            else:
-                raise NetworkTimeout('recv timed out: %s' % (timeout,))

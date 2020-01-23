@@ -102,9 +102,7 @@ class Monitor(MonitorBase):
         """Interrupt a concurrent isMaster check by closing the socket."""
         sock = self.current_sock
         if sock:
-            print('Closing socket: %r' % (sock.sock,))
-            sock.close_socket(None)
-        #     sock.cancel_context.cancel()
+            sock.cancel_context.cancel()
 
     def close(self):
         super(Monitor, self).close()
