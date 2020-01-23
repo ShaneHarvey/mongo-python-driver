@@ -237,6 +237,9 @@ def non_blocking_recv(sock_info, recv):
     """Block until at least one byte is read, or a timeout, or a cancel."""
     sock = sock_info.sock
     context = sock_info.cancel_context
+    # Only Monitor connections can be cancelled.
+    if not context:
+        return recv()
     timeout = sock.gettimeout()
     time_left = timeout
     sock.setblocking(False)
