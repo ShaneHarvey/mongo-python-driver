@@ -122,7 +122,7 @@ class Monitor(MonitorBase):
                 self._server_description = self._check_with_retry(long_poll=True)
                 self._topology.on_change(self._server_description)
                 # TODO: remove 500ms sleep hear
-                # self.request_check()
+                self.request_check()
         except _MonitorCheckCancelled:
             # TODO: remove 500ms sleep hear
             self.request_check()

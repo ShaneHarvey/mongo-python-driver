@@ -518,7 +518,7 @@ class SocketInfo(object):
                 cmd['compression'] = self.compression_settings.compressors
         elif topology_version is not None:
             cmd['topologyVersion'] = topology_version
-            cmd['maxAwaitTimeMS'] = 100
+            cmd['maxAwaitTimeMS'] = 10000
 
         if self.max_wire_version >= 6 and cluster_time is not None:
             cmd['$clusterTime'] = cluster_time
