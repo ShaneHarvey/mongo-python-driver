@@ -103,6 +103,7 @@ class Monitor(MonitorBase):
         sock = self.current_sock
         if sock:
             sock.cancel_context.cancel()
+            # sock.close_socket(None)
 
     def close(self):
         super(Monitor, self).close()

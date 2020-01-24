@@ -765,6 +765,15 @@ class SocketInfo(object):
             self.sock.close()
         except Exception:
             pass
+        # Avoid exceptions on interpreter shutdown.
+        try:
+            self.cancel_context.cancel()
+        except Exception:
+            pass
+        try:
+            self.cancel_context.close()
+        except Exception:
+            pass
 
         if reason and self.enabled_for_cmap:
             self.listeners.publish_connection_closed(
