@@ -600,6 +600,8 @@ class Topology(object):
             # - A spurious network error which occurs on an application
             #   connection but not the monitoring connection.
             # - Black holed monitoring connection?
+            import logging
+            logging.info('Interrupting monitor check for %s' % (address,))
             server._monitor.interrupt_check()
 
     def _request_check(self, address):
