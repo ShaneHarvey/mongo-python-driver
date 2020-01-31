@@ -218,7 +218,8 @@ class Monitor(MonitorBase):
         try:
             return (sock_info.ismaster(self._pool.opts.metadata,
                                        self._topology.max_cluster_time(),
-                                       topology_version),
+                                       topology_version,
+                                       self._settings.heartbeat_frequency),
                     _time() - start)
         except OperationFailure as exc:
             # Update max cluster time even when isMaster fails.

@@ -508,7 +508,8 @@ class SocketInfo(object):
             # This is a Monitor connection.
             self.cancel_context = _CancellationContext()
 
-    def ismaster(self, metadata, cluster_time, topology_version):
+    def ismaster(self, metadata, cluster_time, topology_version,
+                 heartbeat_frequency):
         cmd = SON([('ismaster', 1)])
         performing_handshake = not self.performed_handshake
         if performing_handshake:
@@ -518,7 +519,7 @@ class SocketInfo(object):
                 cmd['compression'] = self.compression_settings.compressors
         elif topology_version is not None:
             cmd['topologyVersion'] = topology_version
-            cmd['maxAwaitTimeMS'] = 10000
+            cmd['maxAwaitTimeMS'] = int(heartbeat_frequency*1000)
 
         if self.max_wire_version >= 6 and cluster_time is not None:
             cmd['$clusterTime'] = cluster_time
@@ -1117,7 +1118,7 @@ class Pool:
 
         sock_info = SocketInfo(sock, self, self.address, conn_id)
         if self.handshake:
-            sock_info.ismaster(self.opts.metadata, None, None)
+            sock_info.ismaster(self.opts.metadata, None, None, None)
             self.is_writable = sock_info.is_writable
 
         return sock_info
