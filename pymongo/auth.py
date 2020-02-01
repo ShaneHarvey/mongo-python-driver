@@ -51,6 +51,7 @@ MECHANISMS = frozenset(
     ['GSSAPI',
      'MONGODB-CR',
      'MONGODB-X509',
+     'MONGODB-IAM',
      'PLAIN',
      'SCRAM-SHA-1',
      'SCRAM-SHA-256',
@@ -100,6 +101,11 @@ GSSAPIProperties = namedtuple('GSSAPIProperties',
 """Mechanism properties for GSSAPI authentication."""
 
 
+MongoDBIAMProperties = namedtuple('MongoDBIAMProperties',
+                                  ['aws_session_token'])
+"""Mechanism properties for MONGODB-IAM authentication."""
+
+
 def _build_credentials_tuple(mech, source, user, passwd, extra, database):
     """Build and return a mechanism specific credentials tuple.
     """
@@ -126,8 +132,22 @@ def _build_credentials_tuple(mech, source, user, passwd, extra, database):
             raise ValueError(
                 "authentication source must be "
                 "$external or None for MONGODB-X509")
-        # user can be None.
+        # Source is always $external, user can be None.
         return MongoCredential(mech, '$external', user, None, None, None)
+    elif mech == 'MONGODB-IAM':
+        if user is None and passwd is None:
+            raise ConfigurationError(
+                "username without a password is not supported by MONGODB-IAM")
+        if source is not None and source != '$external':
+            raise ConfigurationError(
+                "authentication source must be "
+                "$external or None for MONGODB-IAM")
+
+        properties = extra.get('authmechanismproperties', {})
+        aws_session_token = properties.get('AWS_SESSION_TOKEN')
+        props = MongoDBIAMProperties(aws_session_token=aws_session_token)
+        # user can be None for temporary link-local EC2 credentials.
+        return MongoCredential(mech, '$external', user, passwd, props, None)
     elif mech == 'PLAIN':
         source_database = source or database or '$external'
         return MongoCredential(mech, source_database, user, passwd, None, None)
@@ -507,6 +527,285 @@ def _authenticate_x509(credentials, sock_info):
     sock_info.command('$external', query)
 
 
+import datetime
+
+import requests
+
+import bson
+
+_AWS_REL_URI = 'http://169.254.170.2/'
+_AWS_EC2_URI = 'http://169.254.169.254'
+_AWS_EC2_PATH = '/latest/meta-data/iam/security-credentials/'
+
+
+def _aws_temp_credentials():
+    """Construct temporary MONGODB-IAM credentials.
+    """
+    # If the environment variable
+    # AWS_CONTAINER_CREDENTIALS_RELATIVE_URI is set then drivers MUST
+    # assume that it was set by an AWS ECS agent and use the URI
+    # http://169.254.170.2/$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI to
+    # obtain temporary credentials.
+    relative_uri = os.environ.get('AWS_CONTAINER_CREDENTIALS_RELATIVE_URI')
+    if relative_uri is not None:
+        try:
+            res = requests.get(_AWS_REL_URI+relative_uri, timeout=5)
+            res_json = res.json()
+        except (ValueError, requests.exceptions.RequestException):
+            raise OperationFailure(
+                'temporary MONGODB-IAM credentials could not be obtained')
+    else:
+        # If the environment variable AWS_CONTAINER_CREDENTIALS_RELATIVE_URI is
+        # not set drivers MUST assume we are on an EC2 instance and use the
+        # endpoint
+        # http://169.254.169.254/latest/meta-data/iam/security-credentials
+        # /<role-name>
+        # whereas role-name can be obtained from querying the URI
+        # http://169.254.169.254/latest/meta-data/iam/security-credentials/.
+        try:
+            # Get token
+            headers = {'X-aws-ec2-metadata-token-ttl-seconds': "30"}
+            res = requests.post(_AWS_EC2_URI+'/latest/api/token',
+                                headers=headers, timeout=5)
+            token = res.content
+            # Get role name
+            headers = {'X-aws-ec2-metadata-token': token}
+            res = requests.get(_AWS_EC2_URI+_AWS_EC2_PATH, headers=headers,
+                               timeout=5)
+            role = res.text
+            # Get temp creds
+            res = requests.get(_AWS_EC2_URI+_AWS_EC2_PATH+role,
+                               headers=headers, timeout=5)
+            res_json = res.json()
+        except (ValueError, requests.exceptions.RequestException):
+            raise OperationFailure(
+                'temporary MONGODB-IAM credentials could not be obtained')
+
+    try:
+        temp_user = res_json['AccessKeyId']
+        temp_password = res_json['SecretAccessKey']
+        token = res_json['Token']
+    except KeyError:
+        # If temporary credentials cannot be obtained then drivers MUST
+        # fail authentication and raise an error.
+        raise OperationFailure(
+            'temporary MONGODB-IAM credentials could not be obtained')
+
+    return MongoCredential(
+        'MONGODB-IAM', '$external', temp_user, temp_password,
+        MongoDBIAMProperties(aws_session_token=token), None)
+
+
+_AWS4_HMAC_SHA256 = 'AWS4-HMAC-SHA256'
+_AWS_SERVICE = 'sts'
+
+
+def _get_region(sts_host):
+    """"""
+    parts = sts_host.split('.')
+    if len(parts) == 1 or sts_host == 'sts.amazonaws.com':
+        return 'us-east-1'  # Default
+
+    if len(parts) > 2 or not all(parts):
+        raise OperationFailure("Server returned an invalid sts host")
+
+    return parts[1]
+
+
+def _aws_auth_header(credentials, server_nonce, sts_host):
+    """Signature Version 4 Signing Process to construct the authorization header
+    """
+    # TODO: See https://github.com/bazile-clyde/mongo-java-driver/pull/1/files#diff-359d970a7b7f1b82f5844b14f7c23688R46
+    # Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights
+    # Reserved.
+    #
+    # This file is licensed under the Apache License, Version 2.0 (the
+    # "License").
+    # You may not use this file except in compliance with the License. A
+    # copy of the
+    # License is located at
+    #
+    # http://aws.amazon.com/apache2.0/
+    #
+    # This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+    # CONDITIONS
+    # OF ANY KIND, either express or implied. See the License for the specific
+    # language governing permissions and limitations under the License.
+    #
+    # ABOUT THIS PYTHON SAMPLE: This sample is part of the AWS General
+    # Reference
+    # Signing AWS API Requests top available at
+    # https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request
+    # -examples.html
+    #
+
+    # AWS Version 4 signing example
+
+    # EC2 API GetCallerIdentity
+
+    # See: http://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html
+    # This version makes a POST request and passes request parameters
+    # in the body (payload) of the request. Auth information is passed in
+    # an Authorization header.
+    import sys, os, base64, datetime, hashlib, hmac
+
+    if PY3:
+        from urllib.parse import quote
+    else:
+        from urllib import quote
+
+    import requests # pip install requests
+
+    # ************* REQUEST VALUES *************
+    method = 'POST'
+    service = 'ec2'
+    region = _get_region(sts_host)
+
+    access_key = credentials.username
+    secret_key = credentials.password
+    token = credentials.mechanism_properties.aws_session_token
+
+    t = datetime.datetime.utcnow()
+    amzdate = t.strftime('%Y%m%dT%H%M%SZ')
+    datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
+
+    request_parameters = 'Action=GetCallerIdentity&Version=2011-06-15'
+    request_headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': str(len(request_parameters)),
+        'Host': sts_host,
+        'X-Amz-Date': amzdate,
+        'X-MongoDB-Server-Nonce': str(standard_b64encode(server_nonce)),
+        'X-MongoDB-GS2-CB-Flag': 'n',
+    }
+    if token:
+        request_headers['X-Amz-Security-Token'] = str(token)
+
+    # Key derivation functions. See:
+    # http://docs.aws.amazon.com/general/latest/gr/signature-v4-examples.html#signature-v4-examples-python
+    def sign(key, msg):
+        return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
+
+    def getSignatureKey(key, date_stamp, regionName, serviceName):
+        kDate = sign(('AWS4' + key).encode('utf-8'), date_stamp)
+        kRegion = sign(kDate, regionName)
+        kService = sign(kRegion, serviceName)
+        kSigning = sign(kService, 'aws4_request')
+        return kSigning
+
+
+    # ************* TASK 1: CREATE A CANONICAL REQUEST *************
+    # http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
+
+    # Step 1 is to define the verb (GET, POST, etc.)--already done.
+
+    # Step 2: Create canonical URI--the part of the URI from domain to query
+    # string (use '/' if no path)
+    canonical_uri = '/'
+
+    # Step 3: Create the canonical query string. In this example, request
+    # parameters are passed in the body of the request and the query string
+    # is blank.
+    canonical_querystring = ''
+
+    # Step 4: Create the canonical headers and signed headers. Header names
+    # must be trimmed and lowercase, and sorted in code point order from
+    # low to high. Note that there is a trailing \n.
+    canonical_headers = '\n'.join(sorted(
+        quote(key.lower().strip())+':'+quote(val.strip()) for key, val in request_headers.items())) + '\n'
+
+    # Step 5: Create the list of signed headers. This lists the headers
+    # in the canonical_headers list, delimited with ";" and in alpha order.
+    signed_headers = ';'.join(sorted(key.lower() for key in request_headers))
+
+    # Step 6: Create payload hash (hash of the request body content).
+    payload_hash = hashlib.sha256(
+        request_parameters.encode('utf-8')).hexdigest()
+
+    # Step 7: Combine elements to create canonical request
+    canonical_request = '\n'.join([
+        method, canonical_uri, canonical_querystring, canonical_headers,
+        signed_headers, payload_hash])
+
+    # ************* TASK 2: CREATE THE STRING TO SIGN*************
+    # Match the algorithm to the hashing algorithm you use, either SHA-1 or
+    # SHA-256 (recommended)
+    algorithm = 'AWS4-HMAC-SHA256'
+    credential_scope = '/'.join([datestamp, region, service, 'aws4_request'])
+    string_to_sign = '\n'.join([
+        algorithm, amzdate, credential_scope,
+        hashlib.sha256(canonical_request.encode('utf-8')).hexdigest()])
+
+    # ************* TASK 3: CALCULATE THE SIGNATURE *************
+    # Create the signing key using the function defined above.
+    signing_key = getSignatureKey(secret_key, datestamp, region, service)
+
+    # Sign the string_to_sign using the signing_key
+    signature = hmac.new(signing_key, string_to_sign.encode('utf-8'),
+                         hashlib.sha256).hexdigest()
+
+    # ************* TASK 4: ADD SIGNING INFORMATION TO THE REQUEST
+    # *************
+    # The signing information can be either in a query string value or in
+    # a header named Authorization. This code shows how to use a header.
+    # Create authorization header and add to request headers
+    authorization_header = (algorithm + ' ' + 'Credential=' + access_key +
+                            '/' + credential_scope + ', ' + 'SignedHeaders='
+                            + signed_headers + ', ' + 'Signature=' + signature)
+
+    # The request can include any headers, but MUST include "host",
+    # "x-amz-date",
+    # and (for this scenario) "Authorization". "host" and "x-amz-date" must
+    # be included in the canonical_headers and signed_headers, as noted
+    # earlier. Order here is not significant.
+    # Python note: The 'host' header is added automatically by the Python
+    # 'requests' library.
+    final = {'a': authorization_header, 'd': amzdate}
+    if token:
+        final['t'] = token
+    return final
+
+
+def _authenticate_iam(credentials, sock_info):
+    """Authenticate using MONGODB-IAM.
+    """
+    if sock_info.max_wire_version < 9:
+        # TODO: Add the actual server version to the error message.
+        raise ConfigurationError(
+            "MONGODB-IAM authentication requires MongoDB version 4.4 or later")
+
+    # If a username and password are not provided, drivers MUST query
+    # a link-local AWS address for temporary credentials.
+    if credentials.username is None:
+        credentials = _aws_temp_credentials()
+
+    # Client first.
+    client_nonce = os.urandom(32)
+    payload = {'r': client_nonce, 'p': 110}
+    client_first = SON([('saslStart', 1),
+                        ('mechanism', 'MONGODB-IAM'),
+                        ('payload', Binary(bson.encode(payload)))])
+    server_first = sock_info.command('$external', client_first)
+
+    server_payload = bson.decode(server_first['payload'])
+    server_nonce = server_payload['s']
+    if len(server_nonce) != 64 or not server_nonce.startswith(client_nonce):
+        raise OperationFailure("Server returned an invalid nonce.")
+    sts_host = server_payload['h']
+    if len(sts_host) < 1 or len(sts_host) > 255 or '..' in sts_host:
+        # Drivers must also validate that the host is greater than 0 and less
+        # than or equal to 255 bytes per RFC 1035.
+        raise OperationFailure("Server returned an invalid sts host.")
+
+    payload = _aws_auth_header(credentials, server_nonce, sts_host)
+    client_second = SON([('saslContinue', 1),
+                         ('conversationId', server_first['conversationId']),
+                         ('payload', Binary(bson.encode(payload)))])
+    res = sock_info.command('$external', client_second)
+    if not res['done']:
+        raise OperationFailure('MONGODB-IAM conversation failed to complete.')
+
+
 def _authenticate_mongo_cr(credentials, sock_info):
     """Authenticate using MONGODB-CR.
     """
@@ -549,6 +848,7 @@ _AUTH_MAP = {
     'GSSAPI': _authenticate_gssapi,
     'MONGODB-CR': _authenticate_mongo_cr,
     'MONGODB-X509': _authenticate_x509,
+    'MONGODB-IAM': _authenticate_iam,
     'PLAIN': _authenticate_plain,
     'SCRAM-SHA-1': functools.partial(
         _authenticate_scram, mechanism='SCRAM-SHA-1'),

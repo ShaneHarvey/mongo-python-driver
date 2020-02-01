@@ -401,7 +401,8 @@ def validate_read_preference_tags(name, value):
 
 _MECHANISM_PROPS = frozenset(['SERVICE_NAME',
                               'CANONICALIZE_HOST_NAME',
-                              'SERVICE_REALM'])
+                              'SERVICE_REALM',
+                              'AWS_SESSION_TOKEN'])
 
 
 def validate_auth_mechanism_properties(option, value):
