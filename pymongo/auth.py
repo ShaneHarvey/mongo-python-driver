@@ -624,39 +624,24 @@ def _aws_auth_header(credentials, server_nonce, sts_host):
     secret_key = credentials.password
     token = credentials.mechanism_properties.aws_session_token
 
-    t = datetime.datetime.utcnow()
-    amzdate = t.strftime('%Y%m%dT%H%M%SZ')
-
     request_parameters = 'Action=GetCallerIdentity&Version=2011-06-15'
+    encoded_nonce = standard_b64encode(server_nonce).decode('utf8')
     request_headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Content-Length': str(len(request_parameters)),
         'Host': sts_host,
-        'X-Amz-Date': amzdate,
-        'X-MongoDB-Server-Nonce': str(standard_b64encode(server_nonce)),
+        'X-MongoDB-Server-Nonce': encoded_nonce,
         'X-MongoDB-GS2-CB-Flag': 'n',
     }
-    if token:
-        request_headers['X-Amz-Security-Token'] = str(token)
-
     request = AWSRequest(method="POST", url="/", data=request_parameters,
                          headers=request_headers)
-    # SigV4Auth assumes this header exists even though it is not required by
-    # the algorithm
-    request.context['timestamp'] = request_headers['X-Amz-Date']
-
-    credentials = Credentials(access_key, secret_key)
+    credentials = Credentials(access_key, secret_key, token=token)
     auth = SigV4Auth(credentials, "sts", region)
-    signed_headers = auth.signed_headers(request_headers)
-    credential_scope = auth.credential_scope(request)
-    string_to_sign = auth.string_to_sign(request, auth.canonical_request(request))
-    signature = auth.signature(string_to_sign, request)
-    authorization_header = (
-        _AWS4_HMAC_SHA256 + ' ' + 'Credential=' + access_key + '/' +
-        credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' +
-        'Signature=' + signature)
-
-    final = {'a': authorization_header, 'd': amzdate}
+    auth.add_auth(request)
+    final = {
+        'a': request.headers['Authorization'],
+        'd': request.headers['X-Amz-Date']
+    }
     if token:
         final['t'] = token
     return final
@@ -677,7 +662,7 @@ def _authenticate_iam(credentials, sock_info):
 
     # Client first.
     client_nonce = os.urandom(32)
-    payload = {'r': client_nonce, 'p': 110}
+    payload = {'r': Binary(client_nonce), 'p': 110}
     client_first = SON([('saslStart', 1),
                         ('mechanism', 'MONGODB-IAM'),
                         ('payload', Binary(bson.encode(payload)))])
