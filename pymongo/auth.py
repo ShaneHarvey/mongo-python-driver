@@ -658,7 +658,6 @@ def _aws_auth_header(credentials, server_nonce, sts_host):
 
     # ************* REQUEST VALUES *************
     method = 'POST'
-    service = 'ec2'
     region = _get_region(sts_host)
 
     access_key = credentials.username
@@ -731,14 +730,14 @@ def _aws_auth_header(credentials, server_nonce, sts_host):
     # Match the algorithm to the hashing algorithm you use, either SHA-1 or
     # SHA-256 (recommended)
     algorithm = 'AWS4-HMAC-SHA256'
-    credential_scope = '/'.join([datestamp, region, service, 'aws4_request'])
+    credential_scope = '/'.join([datestamp, region, _AWS_SERVICE, 'aws4_request'])
     string_to_sign = '\n'.join([
-        algorithm, amzdate, credential_scope,
+        _AWS4_HMAC_SHA256, amzdate, credential_scope,
         hashlib.sha256(canonical_request.encode('utf-8')).hexdigest()])
 
     # ************* TASK 3: CALCULATE THE SIGNATURE *************
     # Create the signing key using the function defined above.
-    signing_key = getSignatureKey(secret_key, datestamp, region, service)
+    signing_key = getSignatureKey(secret_key, datestamp, region, _AWS_SERVICE)
 
     # Sign the string_to_sign using the signing_key
     signature = hmac.new(signing_key, string_to_sign.encode('utf-8'),
@@ -749,9 +748,10 @@ def _aws_auth_header(credentials, server_nonce, sts_host):
     # The signing information can be either in a query string value or in
     # a header named Authorization. This code shows how to use a header.
     # Create authorization header and add to request headers
-    authorization_header = (algorithm + ' ' + 'Credential=' + access_key +
-                            '/' + credential_scope + ', ' + 'SignedHeaders='
-                            + signed_headers + ', ' + 'Signature=' + signature)
+    authorization_header = (
+        _AWS4_HMAC_SHA256 + ' ' + 'Credential=' + access_key + '/' +
+        credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' +
+        'Signature=' + signature)
 
     # The request can include any headers, but MUST include "host",
     # "x-amz-date",
