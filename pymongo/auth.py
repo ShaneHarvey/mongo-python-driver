@@ -615,58 +615,17 @@ def _get_region(sts_host):
 def _aws_auth_header(credentials, server_nonce, sts_host):
     """Signature Version 4 Signing Process to construct the authorization header
     """
-    # TODO: See https://github.com/bazile-clyde/mongo-java-driver/pull/1/files#diff-359d970a7b7f1b82f5844b14f7c23688R46
-    # Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights
-    # Reserved.
-    #
-    # This file is licensed under the Apache License, Version 2.0 (the
-    # "License").
-    # You may not use this file except in compliance with the License. A
-    # copy of the
-    # License is located at
-    #
-    # http://aws.amazon.com/apache2.0/
-    #
-    # This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-    # CONDITIONS
-    # OF ANY KIND, either express or implied. See the License for the specific
-    # language governing permissions and limitations under the License.
-    #
-    # ABOUT THIS PYTHON SAMPLE: This sample is part of the AWS General
-    # Reference
-    # Signing AWS API Requests top available at
-    # https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request
-    # -examples.html
-    #
+    from botocore.auth import SigV4Auth, S3SigV4Auth
+    from botocore.awsrequest import AWSRequest
+    from botocore.credentials import Credentials
 
-    # AWS Version 4 signing example
-
-    # EC2 API GetCallerIdentity
-
-    # See: http://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html
-    # This version makes a POST request and passes request parameters
-    # in the body (payload) of the request. Auth information is passed in
-    # an Authorization header.
-    import sys, os, base64, datetime, hashlib, hmac
-
-    if PY3:
-        from urllib.parse import quote
-    else:
-        from urllib import quote
-
-    import requests # pip install requests
-
-    # ************* REQUEST VALUES *************
-    method = 'POST'
     region = _get_region(sts_host)
-
     access_key = credentials.username
     secret_key = credentials.password
     token = credentials.mechanism_properties.aws_session_token
 
     t = datetime.datetime.utcnow()
     amzdate = t.strftime('%Y%m%dT%H%M%SZ')
-    datestamp = t.strftime('%Y%m%d')  # Date w/o time, used in credential scope
 
     request_parameters = 'Action=GetCallerIdentity&Version=2011-06-15'
     request_headers = {
@@ -680,86 +639,23 @@ def _aws_auth_header(credentials, server_nonce, sts_host):
     if token:
         request_headers['X-Amz-Security-Token'] = str(token)
 
-    # Key derivation functions. See:
-    # http://docs.aws.amazon.com/general/latest/gr/signature-v4-examples.html#signature-v4-examples-python
-    def sign(key, msg):
-        return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
+    request = AWSRequest(method="POST", url="/", data=request_parameters,
+                         headers=request_headers)
+    # SigV4Auth assumes this header exists even though it is not required by
+    # the algorithm
+    request.context['timestamp'] = request_headers['X-Amz-Date']
 
-    def getSignatureKey(key, date_stamp, regionName, serviceName):
-        kDate = sign(('AWS4' + key).encode('utf-8'), date_stamp)
-        kRegion = sign(kDate, regionName)
-        kService = sign(kRegion, serviceName)
-        kSigning = sign(kService, 'aws4_request')
-        return kSigning
-
-
-    # ************* TASK 1: CREATE A CANONICAL REQUEST *************
-    # http://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
-
-    # Step 1 is to define the verb (GET, POST, etc.)--already done.
-
-    # Step 2: Create canonical URI--the part of the URI from domain to query
-    # string (use '/' if no path)
-    canonical_uri = '/'
-
-    # Step 3: Create the canonical query string. In this example, request
-    # parameters are passed in the body of the request and the query string
-    # is blank.
-    canonical_querystring = ''
-
-    # Step 4: Create the canonical headers and signed headers. Header names
-    # must be trimmed and lowercase, and sorted in code point order from
-    # low to high. Note that there is a trailing \n.
-    canonical_headers = '\n'.join(sorted(
-        quote(key.lower().strip())+':'+quote(val.strip()) for key, val in request_headers.items())) + '\n'
-
-    # Step 5: Create the list of signed headers. This lists the headers
-    # in the canonical_headers list, delimited with ";" and in alpha order.
-    signed_headers = ';'.join(sorted(key.lower() for key in request_headers))
-
-    # Step 6: Create payload hash (hash of the request body content).
-    payload_hash = hashlib.sha256(
-        request_parameters.encode('utf-8')).hexdigest()
-
-    # Step 7: Combine elements to create canonical request
-    canonical_request = '\n'.join([
-        method, canonical_uri, canonical_querystring, canonical_headers,
-        signed_headers, payload_hash])
-
-    # ************* TASK 2: CREATE THE STRING TO SIGN*************
-    # Match the algorithm to the hashing algorithm you use, either SHA-1 or
-    # SHA-256 (recommended)
-    algorithm = 'AWS4-HMAC-SHA256'
-    credential_scope = '/'.join([datestamp, region, _AWS_SERVICE, 'aws4_request'])
-    string_to_sign = '\n'.join([
-        _AWS4_HMAC_SHA256, amzdate, credential_scope,
-        hashlib.sha256(canonical_request.encode('utf-8')).hexdigest()])
-
-    # ************* TASK 3: CALCULATE THE SIGNATURE *************
-    # Create the signing key using the function defined above.
-    signing_key = getSignatureKey(secret_key, datestamp, region, _AWS_SERVICE)
-
-    # Sign the string_to_sign using the signing_key
-    signature = hmac.new(signing_key, string_to_sign.encode('utf-8'),
-                         hashlib.sha256).hexdigest()
-
-    # ************* TASK 4: ADD SIGNING INFORMATION TO THE REQUEST
-    # *************
-    # The signing information can be either in a query string value or in
-    # a header named Authorization. This code shows how to use a header.
-    # Create authorization header and add to request headers
+    credentials = Credentials(access_key, secret_key)
+    auth = SigV4Auth(credentials, "sts", region)
+    signed_headers = auth.signed_headers(request_headers)
+    credential_scope = auth.credential_scope(request)
+    string_to_sign = auth.string_to_sign(request, auth.canonical_request(request))
+    signature = auth.signature(string_to_sign, request)
     authorization_header = (
         _AWS4_HMAC_SHA256 + ' ' + 'Credential=' + access_key + '/' +
         credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' +
         'Signature=' + signature)
 
-    # The request can include any headers, but MUST include "host",
-    # "x-amz-date",
-    # and (for this scenario) "Authorization". "host" and "x-amz-date" must
-    # be included in the canonical_headers and signed_headers, as noted
-    # earlier. Order here is not significant.
-    # Python note: The 'host' header is added automatically by the Python
-    # 'requests' library.
     final = {'a': authorization_header, 'd': amzdate}
     if token:
         final['t'] = token
