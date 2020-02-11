@@ -1731,6 +1731,7 @@ class TestMongoClientFailover(MockClientTest):
                 mongoses=[],
                 host='b:2',  # Pass a secondary.
                 replicaSet='rs')
+            self.addCleanup(c.close)
 
             wait_until(lambda: len(c.nodes) == 3, 'connect')
             self.assertEqual(c.address, ('a', 1))
@@ -1761,6 +1762,7 @@ class TestMongoClientFailover(MockClientTest):
             host='b:2',  # Pass a secondary.
             replicaSet='rs',
             retryReads=False)
+        self.addCleanup(c.close)
 
         wait_until(lambda: len(c.nodes) == 3, 'connect')
 
@@ -1790,6 +1792,7 @@ class TestMongoClientFailover(MockClientTest):
                 replicaSet='rs',
                 connect=False,
                 retryReads=False)
+            self.addCleanup(c.close)
 
             # Set host-specific information so we can test whether it is reset.
             c.set_wire_version_range('a:1', 2, 6)

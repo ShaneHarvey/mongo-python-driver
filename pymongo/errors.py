@@ -276,3 +276,9 @@ class EncryptionError(PyMongoError):
     def cause(self):
         """The exception that caused this encryption or decryption error."""
         return self.__cause
+
+
+class _MonitorCheckCancelled(AutoReconnect):
+    """Raised when a Monitor isMaster check is cancelled.
+    """
+    pass

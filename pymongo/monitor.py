@@ -17,7 +17,7 @@
 import weakref
 
 from pymongo import common, periodic_executor
-from pymongo.errors import OperationFailure
+from pymongo.errors import OperationFailure, _MonitorCheckCancelled
 from pymongo.monotonic import time as _time
 from pymongo.read_preferences import MovingAverage
 from pymongo.server_description import ServerDescription
@@ -49,9 +49,17 @@ class MonitorBase(object):
 
         self._executor = executor
 
+        def _on_topology_gc(dummy=None):
+            # This prevents GC from waiting 10 seconds for isMaster to complete
+            # See test_cleanup_executors_on_client_del.
+            monitor = self_ref()
+            if monitor:
+                monitor._executor.close()
+                monitor.interrupt_check()
+
         # Avoid cycles. When self or topology is freed, stop executor soon.
         self_ref = weakref.ref(self, executor.close)
-        self._topology = weakref.proxy(topology, executor.close)
+        self._topology = weakref.proxy(topology, _on_topology_gc)
 
     def open(self):
         """Start monitoring, or restart after a fork.
@@ -74,6 +82,10 @@ class MonitorBase(object):
     def request_check(self):
         """If the monitor is sleeping, wake it soon."""
         self._executor.wake()
+
+    def interrupt_check(self):
+        """Override this method to interrupt the _run method."""
+        pass
 
 
 class Monitor(MonitorBase):
@@ -99,13 +111,34 @@ class Monitor(MonitorBase):
         self._server_description = server_description
         self._pool = pool
         self._settings = topology_settings
-        self._avg_round_trip_time = MovingAverage()
         self._listeners = self._settings._pool_options.event_listeners
         pub = self._listeners is not None
         self._publish = pub and self._listeners.enabled_for_server_heartbeat
+        self._rtt_executor = None
+        self.current_sock = None
+        self._avg_round_trip_time = RttMonitor(
+            topology, topology_settings, self)
+        self.heartbeater = None
+
+    def interrupt_check(self):
+        """Interrupt a concurrent isMaster check by closing the socket.
+
+        Note: this is called from a weakref.proxy callback and MUST NOT take
+        any locks.
+        """
+        sock = self.current_sock
+        if sock:
+            sock.cancel_context.cancel()
+            # sock.close_socket(None)
+
+    def _start_rtt_monitor(self):
+        """Start an RttMonitor that periodically runs ping."""
+        self._avg_round_trip_time.open()
 
     def close(self):
         super(Monitor, self).close()
+        self._avg_round_trip_time.close()
+        self.interrupt_check()
 
         # Increment the generation and maybe close the socket. If the executor
         # thread has the socket checked out, it will be closed when checked in.
@@ -113,13 +146,24 @@ class Monitor(MonitorBase):
 
     def _run(self):
         try:
-            self._server_description = self._check_with_retry()
+            self._server_description = self._check_with_retry(long_poll=False)
             self._topology.on_change(self._server_description)
+            while (not self._executor._stopped and
+                   self._server_description.is_server_type_known and
+                   self._server_description.topology_version):
+                self._start_rtt_monitor()
+                self._server_description = self._check_with_retry(long_poll=True)
+                self._topology.on_change(self._server_description)
+        except _MonitorCheckCancelled:
+            # TODO: streaming bug: after _MonitorCheckCancelled we MUST run
+            # a regular non-awaitable isMaster.
+            self._pool.reset()
+            pass
         except ReferenceError:
             # Topology was garbage-collected.
             self.close()
 
-    def _check_with_retry(self):
+    def _check_with_retry(self, long_poll):
         """Call ismaster once or twice. Reset server's pool on error.
 
         Returns a ServerDescription.
@@ -134,8 +178,8 @@ class Monitor(MonitorBase):
 
         start = _time()
         try:
-            return self._check_once()
-        except ReferenceError:
+            return self._check_once(long_poll)
+        except (ReferenceError, _MonitorCheckCancelled):
             raise
         except Exception as error:
             error_time = _time() - start
@@ -143,6 +187,9 @@ class Monitor(MonitorBase):
                 self._listeners.publish_server_heartbeat_failed(
                     address, error_time, error)
             self._topology.reset_pool(address)
+            # TODO: is it correct to include both error and topology_version?
+            # For command errors I think not.
+            # For connection errors, maybe? Consider case study.
             default = ServerDescription(address, error=error)
             if not retry:
                 self._avg_round_trip_time.reset()
@@ -153,8 +200,8 @@ class Monitor(MonitorBase):
             # Always send metadata: this is a new connection.
             start = _time()
             try:
-                return self._check_once()
-            except ReferenceError:
+                return self._check_once(long_poll=False)
+            except (ReferenceError, _MonitorCheckCancelled):
                 raise
             except Exception as error:
                 error_time = _time() - start
@@ -164,7 +211,7 @@ class Monitor(MonitorBase):
                 self._avg_round_trip_time.reset()
                 return default
 
-    def _check_once(self):
+    def _check_once(self, long_poll):
         """A single attempt to call ismaster.
 
         Returns a ServerDescription, or raises an exception.
@@ -172,34 +219,45 @@ class Monitor(MonitorBase):
         address = self._server_description.address
         if self._publish:
             self._listeners.publish_server_heartbeat_started(address)
-        with self._pool.get_socket({}) as sock_info:
-            response, round_trip_time = self._check_with_socket(sock_info)
+
+        if self.heartbeater and self.heartbeater.done:
+            self._pool.return_socket(self.heartbeater.sock_info)
+            self.heartbeater = None
+
+        if not self.heartbeater:
+            with self._pool.get_socket({}, checkout=True) as sock_info:
+                self.current_sock = sock_info
+                self.heartbeater = Heartbeater(
+                    sock_info, self._server_description.topology_version,
+                    self._settings)
+
+        response, round_trip_time = self._check_with_socket(self.heartbeater)
+        if not response.awaitable:
             self._avg_round_trip_time.add_sample(round_trip_time)
-            sd = ServerDescription(
-                address=address,
-                ismaster=response,
-                round_trip_time=self._avg_round_trip_time.get())
-            if self._publish:
-                self._listeners.publish_server_heartbeat_succeeded(
-                    address, round_trip_time, response)
+        sd = ServerDescription(
+            address=address,
+            ismaster=response,
+            round_trip_time=self._avg_round_trip_time.get())
+        if self._publish:
+            self._listeners.publish_server_heartbeat_succeeded(
+                address, round_trip_time, response)
 
-            return sd
+        return sd
 
-    def _check_with_socket(self, sock_info):
+    def _check_with_socket(self, heartbeater):
         """Return (IsMaster, round_trip_time).
 
         Can raise ConnectionFailure or OperationFailure.
         """
         start = _time()
         try:
-            return (sock_info.ismaster(self._pool.opts.metadata,
-                                       self._topology.max_cluster_time()),
-                    _time() - start)
+            response = heartbeater.check(self._topology.max_cluster_time())
         except OperationFailure as exc:
             # Update max cluster time even when isMaster fails.
             self._topology.receive_cluster_time(
                 exc.details.get('$clusterTime'))
             raise
+        return response, _time() - start
 
 
 class SrvMonitor(MonitorBase):
@@ -250,3 +308,111 @@ class SrvMonitor(MonitorBase):
             self._executor.update_interval(
                 max(ttl, common.MIN_SRV_RESCAN_INTERVAL))
             return seedlist
+
+
+class RttMonitor(MonitorBase):
+    def __init__(self, topology, topology_settings, monitor):
+        """Maintain round trip times for a server.
+
+        The Topology is weakly referenced.
+        """
+        super(RttMonitor, self).__init__(
+            topology,
+            "pymongo_server_rtt_thread",
+            topology_settings.heartbeat_frequency,
+            common.MIN_HEARTBEAT_INTERVAL)
+
+        # We weakly reference the monitor and it strongly references us.
+        self._monitor = weakref.proxy(monitor)
+        self._avg_round_trip_time = MovingAverage()
+
+    def add_sample(self, sample):
+        """Add a RTT sample."""
+        self._avg_round_trip_time.add_sample(sample)
+
+    def get(self):
+        """Get the calculated average, or None if no samples yet."""
+        return self._avg_round_trip_time.get()
+
+    def reset(self):
+        """Reset the average RTT."""
+        # TODO: Call this method when a server is reset from an app error.
+        return self._avg_round_trip_time.reset()
+
+    def _run(self):
+        try:
+            # NOTE: Only run when when using the streaming heartbeat protocol.
+            # TODO: skip check if the server is unknown.
+            # TODO: shutdown if the server is downgraded.
+            rtt = self._ping()
+            self.add_sample(rtt)
+        except ReferenceError:
+            # Topology was garbage-collected.
+            self.close()
+        except Exception as error:
+            # TODO: handle errors with _MongoClientErrorHandler
+            pass
+
+    def _ping(self):
+        """Run a "ping" command.
+
+        Returns the RTT of the ping.
+        """
+        with self._monitor._pool.get_socket({}) as sock_info:
+            start = _time()
+            self._ping_with_socket(sock_info)
+            return _time() - start
+
+    def _ping_with_socket(self, sock_info):
+        """Return (IsMaster, round_trip_time).
+
+        Can raise ConnectionFailure or OperationFailure.
+        """
+        # TODO: Use ping instead of isMaster
+        # TODO: $clusterTime?
+        return sock_info.ismaster()
+
+
+class Heartbeater(object):
+    START = 1
+    STREAM = 2
+    DONE = 3
+
+    def __init__(self, sock_info, topology_version, topology_settings):
+        self.sock_info = sock_info
+        self.state = None
+        self.topology_version = topology_version
+        self._settings = topology_settings
+        self._gen = None
+
+    def check(self, cluster_time):
+        """Run the next heartbeat check and return the response."""
+        if self.state == self.DONE:
+            assert False, 'invalid state DONE'
+
+        # Run the next heartbeat
+        try:
+            response = None
+            if self._gen:
+                try:
+                    response = next(self._gen)
+                except StopIteration:
+                    self._gen = None
+            if response is None:
+                self._gen = self.sock_info.multi_ismaster(
+                    cluster_time,
+                    self.topology_version,
+                    self._settings.heartbeat_frequency,
+                    None)
+                response = next(self._gen)
+        except:
+            self.state = self.DONE
+            raise
+
+        self.topology_version = response.topology_version
+        return response
+
+    @property
+    def done(self):
+        """Are we done?"""
+        return self.state == self.DONE

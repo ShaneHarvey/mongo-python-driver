@@ -213,6 +213,10 @@ class ServerDescription(object):
         return self._max_wire_version >= 6
 
     @property
+    def streamable(self):
+        return self._topology_version is not None
+
+    @property
     def topology_version(self):
         return self._topology_version
 

@@ -595,6 +595,14 @@ class Topology(object):
             self._process_change(ServerDescription(address, error=error))
             # Clear the pool.
             server.reset()
+            # TODO: this is a hack but we need to restart the monitoring
+            # process. Deals with any time that the application reset SDAM
+            # state while the Monitor is waiting for an awaitable isMaster.
+            # - Retryable reads/writes spec tests which use failCommand.
+            # - A spurious network error which occurs on an application
+            #   connection but not the monitoring connection.
+            # - Black holed monitoring connection?
+            server._monitor.interrupt_check()
         elif issubclass(exc_type, OperationFailure):
             # Do not request an immediate check since the server is likely
             # shutting down.

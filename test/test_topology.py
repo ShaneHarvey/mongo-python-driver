@@ -44,6 +44,10 @@ class MockMonitor(object):
         self._server_description = server_description
         self._topology = topology
         self.opened = False
+        self.current_sock = None
+
+    def interrupt_check(self):
+        pass
 
     def open(self):
         self.opened = True
