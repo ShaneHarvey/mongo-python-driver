@@ -38,7 +38,7 @@ _NON_RESUMABLE_GETMORE_ERRORS = frozenset([
     237,    # CursorKilled
     None,   # No error code was returned.
 ])
-
+_RESUMABLE_GETMORE_ERRORS = frozenset([6])
 
 class ChangeStream(object):
     """The internal abstract base class for change stream cursors.
@@ -284,12 +284,14 @@ class ChangeStream(object):
         try:
             change = self._cursor._try_next(True)
         except ConnectionFailure:
+            print('RESUME')
             self._resume()
             change = self._cursor._try_next(False)
         except OperationFailure as exc:
-            if (exc.code in _NON_RESUMABLE_GETMORE_ERRORS or
-                    exc.has_error_label("NonResumableChangeStreamError")):
+            if (not exc.has_error_label("ResumableChangeStreamError")
+                    and exc.code not in _RESUMABLE_GETMORE_ERRORS):
                 raise
+            print('RESUME')
             self._resume()
             change = self._cursor._try_next(False)
 

@@ -1075,7 +1075,7 @@ class TestAllScenarios(unittest.TestCase):
     @classmethod
     @client_context.require_connection
     def setUpClass(cls):
-        cls.listener = WhiteListEventListener("aggregate")
+        cls.listener = WhiteListEventListener("aggregate", "getMore", "killCursors")
         cls.client = rs_or_single_client(event_listeners=[cls.listener])
 
     @classmethod
@@ -1152,6 +1152,7 @@ def assert_dict_is_subset(superdict, subdict):
     exempt_fields = ["documentKey", "_id"]
     for key, value in iteritems(subdict):
         if key not in superdict:
+            import pdb;pdb.set_trace()
             assert False
         if isinstance(value, dict):
             assert_dict_is_subset(superdict[key], value)
@@ -1192,6 +1193,7 @@ def create_test(scenario_def, test):
                 # there are no changes.
                 if is_error and not changes:
                     change_stream.next()
+                print(changes)
 
         except OperationFailure as exc:
             if not is_error:
@@ -1208,11 +1210,17 @@ def create_test(scenario_def, test):
         finally:
             # Check for expected events
             results = self.listener.results
-            for expectation in test.get("expectations", []):
-                for idx, (event_type, event_desc) in enumerate(iteritems(expectation)):
-                    results_key = event_type.split("_")[1]
-                    event = results[results_key][idx] if len(results[results_key]) > idx else None
-                    check_event(event, event_desc)
+            print(self.listener.results)
+
+            # Give a nicer message when there are missing or extra events
+            cmds = [event.command for event in results['started']]
+            self.assertEqual(
+                len(results['started']), len(test['expectations']), cmds)
+            for idx, expectation in enumerate(test.get("expectations", [])):
+                event_type, event_desc = next(iteritems(expectation))
+                results_key = event_type.split("_")[1]
+                event = results[results_key][idx]
+                check_event(event, event_desc)
 
     return run_scenario
 
