@@ -116,17 +116,21 @@ class Monitor(MonitorBase):
     def _run(self):
         """Return True when using awaitable isMaster."""
         try:
-            self._server_description = self._check_with_retry(long_poll=False)
-            self._topology.on_change(self._server_description)
-            unknown = (self._server_description.server_type == SERVER_TYPE.Unknown)
-            if not unknown and self._server_description.topology_version is not None:
-                self._server_description = self._check_with_retry(long_poll=True)
-                self._topology.on_change(self._server_description)
-                # TODO: remove 500ms sleep hear
-                self.request_check()
-        except _MonitorCheckCancelled:
-            # TODO: remove 500ms sleep hear
-            self.request_check()
+            while not self._executor._stopped:
+                try:
+                    self._server_description = self._check_with_retry(long_poll=False)
+                    self._topology.on_change(self._server_description)
+                    unknown = (self._server_description.server_type == SERVER_TYPE.Unknown)
+                    if not unknown and self._server_description.topology_version is not None:
+                        self._server_description = self._check_with_retry(long_poll=True)
+                        self._topology.on_change(self._server_description)
+                        unknown = (self._server_description.server_type == SERVER_TYPE.Unknown)
+                        if not unknown and self._server_description.topology_version is not None:
+                            # Perform the next check immediately
+                            continue
+                    break
+                except _MonitorCheckCancelled:
+                    continue
         except ReferenceError:
             # Topology was garbage-collected.
             self.close()

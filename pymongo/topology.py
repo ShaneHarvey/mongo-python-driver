@@ -602,7 +602,9 @@ class Topology(object):
             # - Black holed monitoring connection?
             import logging
             logging.info('Interrupting monitor check for %s' % (address,))
-            server._monitor.interrupt_check()
+            from pymongo.errors import ConnectionFailure
+            if isinstance(error, ConnectionFailure):
+                server._monitor.interrupt_check()
 
     def _request_check(self, address):
         """Wake one monitor. Hold the lock when calling this."""
