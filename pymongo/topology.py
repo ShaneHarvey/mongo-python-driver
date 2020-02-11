@@ -32,7 +32,8 @@ from pymongo.pool import PoolOptions
 from pymongo.topology_description import (updated_topology_description,
                                           _updated_topology_description_srv_polling,
                                           TopologyDescription,
-                                          SRV_POLLING_TOPOLOGIES, TOPOLOGY_TYPE)
+                                          SRV_POLLING_TOPOLOGIES, TOPOLOGY_TYPE,
+                                          compare_topology_version)
 from pymongo.errors import ServerSelectionTimeoutError, ConfigurationError
 from pymongo.monitor import SrvMonitor
 from pymongo.monotonic import time as _time
@@ -264,14 +265,25 @@ class Topology(object):
         Hold the lock when calling this.
         """
         td_old = self._description
-        old_server_description = td_old._server_descriptions[
+        # topologyVersion check, ignore error when old_tv > new_tv:
+        # We can't ignore when old_tv == new_tv because then we would ignore
+        # normal isMaster checks when the topologyVersion remains the same.
+        old_sd = td_old._server_descriptions[
             server_description.address]
+        if compare_topology_version(old_sd.topology_version,
+                                    server_description.topology_version) == 1:
+            # This is a delayed response. Ignore it.
+            print('DELAYED _process_change:')
+            print('old tv:', old_sd.topology_version)
+            print('new tv:', server_description.topology_version)
+            return
+
         suppress_event = ((self._publish_server or self._publish_tp)
-                          and old_server_description == server_description)
+                          and old_sd == server_description)
         if self._publish_server and not suppress_event:
             self._events.put((
                 self._listeners.publish_server_description_changed,
-                (old_server_description, server_description,
+                (old_sd, server_description,
                  server_description.address, self._topology_id)))
 
         self._description = updated_topology_description(
@@ -547,13 +559,44 @@ class Topology(object):
         """
         server = self._servers.get(address)
 
+        def get_tv(error):
+            if error and hasattr(error, 'details'):
+                details = error.details
+                if isinstance(details, dict):
+                    return details.get('topologyVersion')
+
+            return None
+
         # "server" is None if another thread removed it from the topology.
         if server:
+            # topologyVersion check, ignore error when cur_tv >= error_tv:
+            cur_tv = self._description.topology_version_for(address)
+            error_tv = get_tv(error)
+            if compare_topology_version(cur_tv, error_tv) >= 0:
+                # Outdated error. Ignore it.
+                print('DELAYED error:', error)
+                print('current tv:', self._description.topology_version_for(address))
+                print('error tv:', error_tv)
+                return
+
             if reset_pool:
                 server.reset()
 
             # Mark this server Unknown.
             self._process_change(ServerDescription(address, error=error))
+
+            # TODO: this is a hack but we need to restart the monitoring
+            # process. Deals with any time that the application reset SDAM
+            # state while the Monitor is waiting for an awaitable isMaster.
+            # - Retryable reads/writes spec tests which use failCommand.
+            # - A spurious network error which occurs on an application
+            #   connection but not the monitoring connection.
+            # - Black holed monitoring connection?
+            import logging
+            logging.info('Interrupting monitor check for %s' % (address,))
+            from pymongo.errors import ConnectionFailure
+            if isinstance(error, ConnectionFailure):
+                server._monitor.interrupt_check()
 
     def _request_check(self, address):
         """Wake one monitor. Hold the lock when calling this."""

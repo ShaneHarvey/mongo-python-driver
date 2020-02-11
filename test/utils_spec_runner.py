@@ -58,7 +58,8 @@ class SpecRunner(IntegrationTest):
         cls.mongos_clients = []
 
         # Speed up the tests by decreasing the heartbeat frequency.
-        cls.knobs = client_knobs(min_heartbeat_interval=0.1)
+        cls.knobs = client_knobs(heartbeat_frequency=0.1,
+                                 min_heartbeat_interval=0.1)
         cls.knobs.enable()
 
     @classmethod

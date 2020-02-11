@@ -56,7 +56,8 @@ from pymongo.monotonic import time as _time
 from pymongo.monitoring import (ConnectionCheckOutFailedReason,
                                 ConnectionClosedReason)
 from pymongo.network import (command,
-                             receive_message)
+                             receive_message,
+                             _CancellationContext)
 from pymongo.read_preferences import ReadPreference
 from pymongo.server_type import SERVER_TYPE
 from pymongo.socket_checker import SocketChecker
@@ -492,13 +493,24 @@ class SocketInfo(object):
         # created before the last reset.
         self.pool_id = pool.pool_id
         self.ready = False
+        _register_sock(self)
+        self.cancel_context = None
+        if not pool.handshake:
+            # This is a Monitor connection.
+            self.cancel_context = _CancellationContext()
 
-    def ismaster(self, metadata, cluster_time):
+    def ismaster(self, metadata, cluster_time, topology_version,
+                 heartbeat_frequency):
         cmd = SON([('ismaster', 1)])
-        if not self.performed_handshake:
+        performing_handshake = not self.performed_handshake
+        if performing_handshake:
+            self.performed_handshake = True
             cmd['client'] = metadata
             if self.compression_settings:
                 cmd['compression'] = self.compression_settings.compressors
+        elif topology_version is not None:
+            cmd['topologyVersion'] = topology_version
+            cmd['maxAwaitTimeMS'] = int(heartbeat_frequency*1000)
 
         if self.max_wire_version >= 6 and cluster_time is not None:
             cmd['$clusterTime'] = cluster_time
@@ -512,12 +524,11 @@ class SocketInfo(object):
         self.supports_sessions = (
             ismaster.logical_session_timeout_minutes is not None)
         self.is_mongos = ismaster.server_type == SERVER_TYPE.Mongos
-        if not self.performed_handshake and self.compression_settings:
+        if performing_handshake and self.compression_settings:
             ctx = self.compression_settings.get_compression_context(
                 ismaster.compressors)
             self.compression_context = ctx
 
-        self.performed_handshake = True
         self.op_msg_enabled = ismaster.max_wire_version >= 6
         return ismaster
 
@@ -591,7 +602,7 @@ class SocketInfo(object):
         if self.op_msg_enabled:
             self._raise_if_not_writable(unacknowledged)
         try:
-            return command(self.sock, dbname, spec, slave_ok,
+            return command(self, dbname, spec, slave_ok,
                            self.is_mongos, read_preference, codec_options,
                            session, client, check, allowable_errors,
                            self.address, check_keys, listeners,
@@ -631,8 +642,7 @@ class SocketInfo(object):
         If any exception is raised, the socket is closed.
         """
         try:
-            return receive_message(self.sock, request_id,
-                                   self.max_message_size)
+            return receive_message(self, request_id, self.max_message_size)
         except BaseException as error:
             self._raise_connection_failure(error)
 
@@ -745,6 +755,15 @@ class SocketInfo(object):
         # Avoid exceptions on interpreter shutdown.
         try:
             self.sock.close()
+        except Exception:
+            pass
+        # Avoid exceptions on interpreter shutdown.
+        try:
+            self.cancel_context.cancel()
+        except Exception:
+            pass
+        try:
+            self.cancel_context.close()
         except Exception:
             pass
 
@@ -1088,7 +1107,7 @@ class Pool:
 
         sock_info = SocketInfo(sock, self, self.address, conn_id)
         if self.handshake:
-            sock_info.ismaster(self.opts.metadata, None)
+            sock_info.ismaster(self.opts.metadata, None, None, None)
             self.is_writable = sock_info.is_writable
 
         return sock_info
@@ -1261,3 +1280,37 @@ class Pool:
         # not safe to acquire a lock in __del__.
         for sock_info in self.sockets:
             sock_info.close_socket(None)
+
+import weakref
+import atexit
+_SOCKS = set()
+
+
+def _register_sock(sock):
+    ref = weakref.ref(sock, _on_sock_deleted)
+    _SOCKS.add(ref)
+
+
+def _on_sock_deleted(ref):
+    _SOCKS.remove(ref)
+
+
+def _shutdown_socks():
+    if _SOCKS is None:
+        return
+
+    # Copy the set. Stopping threads has the side effect of removing socks.
+    socks = list(_SOCKS)
+
+    # Close all socks.
+    for ref in socks:
+        sock = ref()
+        if sock:
+            sock.close_socket(None)
+
+    sock = None
+
+
+from pymongo.periodic_executor import _shutdown_executors
+atexit.register(_shutdown_executors)
+atexit.register(_shutdown_socks)

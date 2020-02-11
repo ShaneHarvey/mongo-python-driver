@@ -126,8 +126,9 @@ class TestMaxStaleness(unittest.TestCase):
         server = client._topology.select_server(writable_server_selector)
         last_write = server.description.last_write_date
         self.assertTrue(last_write)
+        time.sleep(1)
         client.pymongo_test.test.insert_one({})
-        time.sleep(2)
+        time.sleep(1)
         server = client._topology.select_server(writable_server_selector)
         self.assertGreater(server.description.last_write_date, last_write)
         self.assertLess(server.description.last_write_date, last_write + 10)

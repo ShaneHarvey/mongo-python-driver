@@ -129,7 +129,8 @@ class TopologyDescription(object):
 
     def reset_server(self, address):
         """A copy of this description, with one server marked Unknown."""
-        return updated_topology_description(self, ServerDescription(address))
+        unknown_sd = self._server_descriptions[address].to_unknown()
+        return updated_topology_description(self, unknown_sd)
 
     def reset(self):
         """A copy of this description, with all servers marked Unknown."""
@@ -287,6 +288,11 @@ class TopologyDescription(object):
         .. versionadded:: 3.4
         """
         return self.has_readable_server(ReadPreference.PRIMARY)
+
+    def topology_version_for(self, address):
+        if self.has_server(address):
+            return self._server_descriptions[address].topology_version
+        return None
 
 
 # If topology type is Unknown and we receive an ismaster response, what should
@@ -471,8 +477,7 @@ def _update_rs_from_primary(
                 max_election_tuple > server_description.election_tuple):
 
             # Stale primary, set to type Unknown.
-            address = server_description.address
-            sds[address] = ServerDescription(address)
+            sds[server_description.address] = server_description.to_unknown()
             return (_check_has_primary(sds),
                     replica_set_name,
                     max_set_version,
@@ -492,7 +497,7 @@ def _update_rs_from_primary(
                 and server.address != server_description.address):
 
             # Reset old primary's type to Unknown.
-            sds[server.address] = ServerDescription(server.address)
+            sds[server.address] = server.to_unknown()
 
             # There can be only one prior primary.
             break
@@ -581,3 +586,26 @@ def _check_has_primary(sds):
             return TOPOLOGY_TYPE.ReplicaSetWithPrimary
     else:
         return TOPOLOGY_TYPE.ReplicaSetNoPrimary
+
+
+def compare_topology_version(tv1, tv2):
+    """Return -1 if tv1<tv2, 0 if tv1==tv2, 1 if tv1>tv2"""
+    if tv1 is None or tv2 is None:
+        # Assume greater.
+        return -1
+    pid1 = tv1['processId']
+    pid2 = tv2['processId']
+    if pid1 == pid2:
+        counter1 = tv1['counter']
+        counter2 = tv2['counter']
+        if counter1 == counter2:
+            return 0
+        elif counter1 < counter2:
+            return -1
+        else:
+            return 1
+    elif pid1 < pid2:
+        # Use ObjectId comparison.
+        return -1
+    else:
+        return 1

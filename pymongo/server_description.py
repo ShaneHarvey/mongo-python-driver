@@ -36,14 +36,16 @@ class ServerDescription(object):
         '_max_write_batch_size', '_min_wire_version', '_max_wire_version',
         '_round_trip_time', '_me', '_is_writable', '_is_readable',
         '_ls_timeout_minutes', '_error', '_set_version', '_election_id',
-        '_cluster_time', '_last_write_date', '_last_update_time')
+        '_cluster_time', '_last_write_date', '_last_update_time',
+        '_topology_version')
 
     def __init__(
             self,
             address,
             ismaster=None,
             round_trip_time=None,
-            error=None):
+            error=None,
+            topology_version=None):
         self._address = address
         if not ismaster:
             ismaster = IsMaster({})
@@ -68,6 +70,10 @@ class ServerDescription(object):
         self._me = ismaster.me
         self._last_update_time = _time()
         self._error = error
+        if topology_version is not None:
+            self._topology_version = topology_version
+        else:
+            self._topology_version = ismaster.topology_version
 
         if ismaster.last_write_date:
             # Convert from datetime to seconds.
@@ -206,6 +212,18 @@ class ServerDescription(object):
     def retryable_reads_supported(self):
         """Checks if this server supports retryable writes."""
         return self._max_wire_version >= 6
+
+    @property
+    def streamable(self):
+        return self._topology_version is not None
+
+    @property
+    def topology_version(self):
+        return self._topology_version
+
+    def to_unknown(self):
+        return ServerDescription(
+            self.address, topology_version=self.topology_version)
 
     def __eq__(self, other):
         if isinstance(other, ServerDescription):

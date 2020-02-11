@@ -36,6 +36,7 @@ from pymongo import (MongoClient,
                      monitoring, read_preferences)
 from pymongo.errors import ConfigurationError, OperationFailure
 from pymongo.monitoring import _SENSITIVE_COMMANDS, ConnectionPoolListener
+from pymongo.network import _CancellationContext
 from pymongo.pool import PoolOptions
 from pymongo.read_concern import ReadConcern
 from pymongo.read_preferences import ReadPreference
@@ -195,7 +196,13 @@ class HeartbeatEventListener(monitoring.ServerHeartbeatListener):
 
 
 class MockSocketInfo(object):
+    def __init__(self):
+        self.cancel_context = _CancellationContext()
+
     def close(self):
+        pass
+
+    def close_socket(self, reason):
         pass
 
     def __enter__(self):

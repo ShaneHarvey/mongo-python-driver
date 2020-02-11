@@ -27,7 +27,9 @@ from pymongo.compression_support import decompress, _NO_COMPRESSION
 from pymongo.errors import (AutoReconnect,
                             NotMasterError,
                             OperationFailure,
-                            ProtocolError)
+                            ProtocolError,
+                            NetworkTimeout,
+                            _MonitorCheckCancelled)
 from pymongo.message import _UNPACK_REPLY
 from pymongo.socket_checker import _errno_from_exception
 
@@ -35,7 +37,7 @@ from pymongo.socket_checker import _errno_from_exception
 _UNPACK_HEADER = struct.Struct("<iiii").unpack
 
 
-def command(sock, dbname, spec, slave_ok, is_mongos,
+def command(sock_info, dbname, spec, slave_ok, is_mongos,
             read_preference, codec_options, session, client, check=True,
             allowable_errors=None, address=None,
             check_keys=False, listeners=None, max_bson_size=None,
@@ -133,13 +135,13 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
         start = datetime.datetime.now()
 
     try:
-        sock.sendall(msg)
+        sock_info.sock.sendall(msg)
         if use_op_msg and unacknowledged:
             # Unacknowledged, fake a successful command response.
             reply = None
             response_doc = {"ok": 1}
         else:
-            reply = receive_message(sock, request_id)
+            reply = receive_message(sock_info, request_id)
             unpacked_docs = reply.unpack_response(
                 codec_options=codec_options, user_fields=user_fields)
 
@@ -174,11 +176,11 @@ def command(sock, dbname, spec, slave_ok, is_mongos,
 
 _UNPACK_COMPRESSION_HEADER = struct.Struct("<iiB").unpack
 
-def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
+def receive_message(sock_info, request_id, max_message_size=MAX_MESSAGE_SIZE):
     """Receive a raw BSON message or raise socket.error."""
     # Ignore the response's request id.
     length, _, response_to, op_code = _UNPACK_HEADER(
-        _receive_data_on_socket(sock, 16))
+        _receive_data_on_socket(sock_info, 16))
     # No request_id for exhaust cursor "getMore".
     if request_id is not None:
         if request_id != response_to:
@@ -192,11 +194,11 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
                             "message size (%r)" % (length, max_message_size))
     if op_code == 2012:
         op_code, _, compressor_id = _UNPACK_COMPRESSION_HEADER(
-            _receive_data_on_socket(sock, 9))
+            _receive_data_on_socket(sock_info, 9))
         data = decompress(
-            _receive_data_on_socket(sock, length - 25), compressor_id)
+            _receive_data_on_socket(sock_info, length - 25), compressor_id)
     else:
-        data = _receive_data_on_socket(sock, length - 16)
+        data = _receive_data_on_socket(sock_info, length - 16)
 
     try:
         unpack_reply = _UNPACK_REPLY[op_code]
@@ -205,6 +207,154 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
                             "%r" % (op_code, _UNPACK_REPLY.keys()))
     return unpack_reply(data)
 
+# TODO: from selectors import DefaultSelector, EVENT_READ?
+# try:
+#     from selectors import DefaultSelector, EVENT_READ
+# except ImportError:
+#     class DefaultSelector(object):pass
+
+import errno
+import select
+
+_HAVE_POLL = hasattr(select, "poll")
+_SelectError = getattr(select, "error", OSError)
+
+
+def _mask(name):
+    return getattr(select, name, 0)
+
+
+_READ_MASK = (
+        _mask("POLLIN") |    # There is data to read
+        _mask("POLLPRI") |   # There is urgent data to read
+        _mask("POLLERR") |   # Error condition of some sort
+        _mask("POLLHUP") |   # Hung up
+        _mask("POLLRDHUP") | # Stream socket peer closed connection,
+                             # or shut down writing half of connection
+        _mask("POLLNVAL")    # Invalid request: descriptor not open
+)
+
+import os
+import sys
+
+if sys.platform == 'win32':
+    # TODO: windows support. Windows only supports polling on sockets. Use
+    # socketpair() on Python 3.5+ and something else on 3.4 and 2.7?
+    pass
+else:
+    class _PollableFile(object):
+        def __init__(self):
+            read_fd, write_fd = os.pipe()
+            # Disable buffering so that poll() works.
+            self.read_file = os.fdopen(read_fd, 'rb', 0)
+            self.write_file = os.fdopen(write_fd, 'wb', 0)
+
+        def fileno(self):
+            """Support polling this file for a read."""
+            return self.read_file.fileno()
+
+        def wake_reader(self):
+            self.write_file.write(b'1')
+
+        def close(self):
+            self.read_file.close()
+            self.write_file.close()
+
+
+class _ReadSelector(object):
+    def __init__(self):
+        if _HAVE_POLL:
+            self._poller = select.poll()
+        else:
+            self._poller = None
+
+    def readable(self, sock, timeout, cancel_file):
+        """Block until a timeout occurs or the socket is readable."""
+        # SSLSocket can have buffered data which won't be caught by select:
+        if hasattr(sock, 'pending') and sock.pending() > 0:
+            return
+        while True:
+            cancelled = False
+            readable = False
+            try:
+                fd = sock.fileno()
+                cancel_fd = cancel_file.fileno()
+                if self._poller:
+                    # Poll timeout is milliseconds, select timeout is seconds.
+                    if timeout:
+                        timeout *= 1000
+                    self._poller.register(cancel_fd, _READ_MASK)
+                    self._poller.register(fd, _READ_MASK)
+                    try:
+                        events = self._poller.poll(timeout)
+                    finally:
+                        self._poller.unregister(fd)
+                        self._poller.unregister(cancel_fd)
+                    for (event_fd, event) in events:
+                        if event_fd == cancel_fd:
+                            cancelled = True
+                        elif event_fd == fd:
+                            readable = True
+                else:
+                    rds, _, errs = select.select([fd, cancel_fd], [], [fd, cancel_fd], timeout)
+                    cancelled = cancel_fd in rds or cancel_fd in errs
+                    readable = fd in rds or fd in errs
+            except (RuntimeError, KeyError):
+                # RuntimeError is raised during a concurrent poll. KeyError
+                # is raised by unregister if the socket is not in the poller.
+                # These errors should not be possible since we protect the
+                # poller with a mutex.
+                raise
+            except ValueError:
+                # ValueError is raised by register/unregister/select if the
+                # socket file descriptor is negative or outside the range for
+                # select (> 1023).
+                return
+            except (_SELECT_ERROR, IOError) as exc:
+                if _errno_from_exception(exc) in (errno.EINTR, errno.EAGAIN):
+                    continue
+                return
+            except Exception:
+                # Any other exceptions should be attributed to a closed
+                # or invalid socket.
+                return
+
+            if cancelled:
+                raise _MonitorCheckCancelled('isMaster cancelled')
+
+            if readable:
+                return
+            # Otherwise we timed out
+            raise NetworkTimeout('recv timed out: %s' % (timeout,))
+
+
+class _CancellationContext(object):
+    def __init__(self):
+        self._cancelled = False
+        self._cancel_file = _PollableFile()
+
+    def close(self):
+        """Close"""
+        self._cancel_file.close()
+
+    def cancel(self):
+        """Cancel this context."""
+        if self._cancelled:
+            return
+        self._cancel_file.wake_reader()
+        self._cancelled = True
+
+    def wait_for_read(self, sock):
+        timeout = sock.gettimeout()
+        return _ReadSelector().readable(sock, timeout, self._cancel_file)
+
+
+def wait_for_read(sock_info):
+    """Block until at least one byte is read, or a timeout, or a cancel."""
+    context = sock_info.cancel_context
+    # Only Monitor connections can be cancelled.
+    if context:
+        context.wait_for_read(sock_info.sock)
 
 # memoryview was introduced in Python 2.7 but we only use it on Python 3
 # because before 2.7.4 the struct module did not support memoryview:
@@ -212,12 +362,16 @@ def receive_message(sock, request_id, max_message_size=MAX_MESSAGE_SIZE):
 # In Jython, using slice assignment on a memoryview results in a
 # NullPointerException.
 if not PY3:
-    def _receive_data_on_socket(sock, length):
+    def _recv(sock_info, length):
+        wait_for_read(sock_info)
+        return sock_info.sock.recv(length)
+
+    def _receive_data_on_socket(sock_info, length):
         buf = bytearray(length)
         i = 0
         while length:
             try:
-                chunk = sock.recv(length)
+                chunk = _recv(sock_info, length)
             except (IOError, OSError) as exc:
                 if _errno_from_exception(exc) == errno.EINTR:
                     continue
@@ -231,13 +385,17 @@ if not PY3:
 
         return bytes(buf)
 else:
-    def _receive_data_on_socket(sock, length):
+    def _recv_into(sock_info, buf):
+        wait_for_read(sock_info)
+        return sock_info.sock.recv_into(buf)
+
+    def _receive_data_on_socket(sock_info, length):
         buf = bytearray(length)
         mv = memoryview(buf)
         bytes_read = 0
         while bytes_read < length:
             try:
-                chunk_length = sock.recv_into(mv[bytes_read:])
+                chunk_length = _recv_into(sock_info, mv[bytes_read:])
             except (IOError, OSError) as exc:
                 if _errno_from_exception(exc) == errno.EINTR:
                     continue
