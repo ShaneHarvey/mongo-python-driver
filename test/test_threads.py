@@ -184,6 +184,7 @@ class TestThreads(IntegrationTest):
         okay.join()
 
     def test_client_disconnect(self):
+        # TODO: Monitor.cancel_check is racey.
         db = rs_or_single_client(serverSelectionTimeoutMS=30000).pymongo_test
         db.drop_collection("test")
         db.test.insert_many([{"x": i} for i in range(1000)])

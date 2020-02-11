@@ -1590,12 +1590,12 @@ class TestExhaustCursor(IntegrationTest):
             msg += encode({'$err': 'mock err', 'code': 0})
             return message._OpReply.unpack(msg)
 
-        saved = sock_info.receive_message
         sock_info.receive_message = receive_message
         self.assertRaises(OperationFailure, list, cursor)
-        sock_info.receive_message = saved
+        # Unpatch the instance.
+        del sock_info.receive_message
 
-        # The socket is returned the pool and it still works.
+        # The socket is returned to the pool and it still works.
         self.assertEqual(200, collection.count_documents({}))
         self.assertIn(sock_info, pool.sockets)
 

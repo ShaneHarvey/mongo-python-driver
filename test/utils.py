@@ -36,6 +36,7 @@ from pymongo import (MongoClient,
                      monitoring, read_preferences)
 from pymongo.errors import ConfigurationError, OperationFailure
 from pymongo.monitoring import _SENSITIVE_COMMANDS, ConnectionPoolListener
+from pymongo.network import _CancellationContext
 from pymongo.pool import PoolOptions
 from pymongo.read_concern import ReadConcern
 from pymongo.read_preferences import ReadPreference
@@ -160,8 +161,7 @@ class OvertCommandListener(EventListener):
             super(OvertCommandListener, self).failed(event)
 
 
-class ServerAndTopologyEventListener(monitoring.ServerListener,
-                                     monitoring.TopologyListener):
+class _ServerEventListener(object):
     """Listens to all events."""
 
     def __init__(self):
@@ -185,6 +185,16 @@ class ServerAndTopologyEventListener(monitoring.ServerListener,
         self.results = []
 
 
+class ServerEventListener(_ServerEventListener,
+                          monitoring.ServerListener):
+    """Listens to Server events."""
+
+
+class ServerAndTopologyEventListener(ServerEventListener,
+                                     monitoring.TopologyListener):
+    """Listens to Server and Topology events."""
+
+
 class HeartbeatEventListener(monitoring.ServerHeartbeatListener):
     """Listens to only server heartbeat events."""
 
@@ -200,9 +210,21 @@ class HeartbeatEventListener(monitoring.ServerHeartbeatListener):
     def failed(self, event):
         self.results.append(event)
 
+    def matching(self, matcher):
+        """Return the matching events."""
+        results = self.results[:]
+        return [event for event in results if matcher(event)]
+
 
 class MockSocketInfo(object):
+    def __init__(self):
+        self.cancel_context = _CancellationContext()
+        self.more_to_come = False
+
     def close(self):
+        pass
+
+    def close_socket(self, reason):
         pass
 
     def __enter__(self):
@@ -218,7 +240,7 @@ class MockPool(object):
         self._lock = threading.Lock()
         self.opts = PoolOptions()
 
-    def get_socket(self, all_credentials):
+    def get_socket(self, all_credentials, checkout=False):
         return MockSocketInfo()
 
     def return_socket(self, *args, **kwargs):

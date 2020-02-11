@@ -213,6 +213,10 @@ class ServerDescription(object):
         return self._max_wire_version >= 6
 
     @property
+    def streamable(self):
+        return self._topology_version is not None
+
+    @property
     def topology_version(self):
         return self._topology_version
 
@@ -235,7 +239,10 @@ class ServerDescription(object):
                     (self._election_id == other.election_id) and
                     (self._primary == other.primary) and
                     (self._ls_timeout_minutes ==
-                     other.logical_session_timeout_minutes))
+                     other.logical_session_timeout_minutes) and
+                    # TODO: Errors on the initial Monitor handshake should
+                    # be published.
+                    (self._error == other.error))
 
         return NotImplemented
 

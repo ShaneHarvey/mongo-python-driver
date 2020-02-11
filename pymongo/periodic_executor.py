@@ -153,9 +153,9 @@ def _on_executor_deleted(ref):
     _EXECUTORS.remove(ref)
 
 
-def _shutdown_executors():
+def _stop_executors():
     if _EXECUTORS is None:
-        return
+        return []
 
     # Copy the set. Stopping threads has the side effect of removing executors.
     executors = list(_EXECUTORS)
@@ -166,12 +166,26 @@ def _shutdown_executors():
         if executor:
             executor.close()
 
+    return executors
+
+
+def _join_executors(executors):
     # ...then try to join them.
     for ref in executors:
         executor = ref()
         if executor:
             executor.join(1)
-
     executor = None
 
-atexit.register(_shutdown_executors)
+
+def _shutdown_executors():
+    if _EXECUTORS is None:
+        return
+
+    # Copy the set. Stopping threads has the side effect of removing executors.
+    executors = _stop_executors()
+
+    # ...then try to join them.
+    _join_executors(executors)
+
+# atexit.register(_shutdown_executors)

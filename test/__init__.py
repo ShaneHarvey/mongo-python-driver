@@ -229,6 +229,8 @@ class ClientContext(object):
             self.connection_attempts.append(
                 'failed to connect client %r: %s' % (client, exc))
             return None
+        finally:
+            client.close()
 
     def _init_client(self):
         self.client = self._connect(host, port)
@@ -605,6 +607,14 @@ class ClientContext(object):
         point."""
         return self._require(lambda: self.supports_failCommand_fail_point,
                              "failCommand fail point must be supported",
+                             func=func)
+
+    def require_failCommand_appName(self, func):
+        """Run a test only if the server supports the failCommand appName."""
+        # SERVER-47195
+        return self._require(lambda: (self.test_commands_enabled and
+                                      self.version >= (4, 4, -1)),
+                             "failCommand appName must be supported",
                              func=func)
 
     def require_ssl(self, func):
