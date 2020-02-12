@@ -51,7 +51,7 @@ MECHANISMS = frozenset(
     ['GSSAPI',
      'MONGODB-CR',
      'MONGODB-X509',
-     'MONGODB-IAM',
+     'MONGODB-AWS',
      'PLAIN',
      'SCRAM-SHA-1',
      'SCRAM-SHA-256',
@@ -103,7 +103,7 @@ GSSAPIProperties = namedtuple('GSSAPIProperties',
 
 MongoDBIAMProperties = namedtuple('MongoDBIAMProperties',
                                   ['aws_session_token'])
-"""Mechanism properties for MONGODB-IAM authentication."""
+"""Mechanism properties for MONGODB-AWS authentication."""
 
 
 def _build_credentials_tuple(mech, source, user, passwd, extra, database):
@@ -134,14 +134,14 @@ def _build_credentials_tuple(mech, source, user, passwd, extra, database):
                 "$external or None for MONGODB-X509")
         # Source is always $external, user can be None.
         return MongoCredential(mech, '$external', user, None, None, None)
-    elif mech == 'MONGODB-IAM':
+    elif mech == 'MONGODB-AWS':
         if user is None and passwd is None:
             raise ConfigurationError(
-                "username without a password is not supported by MONGODB-IAM")
+                "username without a password is not supported by MONGODB-AWS")
         if source is not None and source != '$external':
             raise ConfigurationError(
                 "authentication source must be "
-                "$external or None for MONGODB-IAM")
+                "$external or None for MONGODB-AWS")
 
         properties = extra.get('authmechanismproperties', {})
         aws_session_token = properties.get('AWS_SESSION_TOKEN')
@@ -539,7 +539,7 @@ _AWS_EC2_PATH = '/latest/meta-data/iam/security-credentials/'
 
 
 def _aws_temp_credentials():
-    """Construct temporary MONGODB-IAM credentials.
+    """Construct temporary MONGODB-AWS credentials.
     """
     # If the environment variable
     # AWS_CONTAINER_CREDENTIALS_RELATIVE_URI is set then drivers MUST
@@ -553,7 +553,7 @@ def _aws_temp_credentials():
             res_json = res.json()
         except (ValueError, requests.exceptions.RequestException):
             raise OperationFailure(
-                'temporary MONGODB-IAM credentials could not be obtained')
+                'temporary MONGODB-AWS credentials could not be obtained')
     else:
         # If the environment variable AWS_CONTAINER_CREDENTIALS_RELATIVE_URI is
         # not set drivers MUST assume we are on an EC2 instance and use the
@@ -579,7 +579,7 @@ def _aws_temp_credentials():
             res_json = res.json()
         except (ValueError, requests.exceptions.RequestException):
             raise OperationFailure(
-                'temporary MONGODB-IAM credentials could not be obtained')
+                'temporary MONGODB-AWS credentials could not be obtained')
 
     try:
         temp_user = res_json['AccessKeyId']
@@ -589,10 +589,10 @@ def _aws_temp_credentials():
         # If temporary credentials cannot be obtained then drivers MUST
         # fail authentication and raise an error.
         raise OperationFailure(
-            'temporary MONGODB-IAM credentials could not be obtained')
+            'temporary MONGODB-AWS credentials could not be obtained')
 
     return MongoCredential(
-        'MONGODB-IAM', '$external', temp_user, temp_password,
+        'MONGODB-AWS', '$external', temp_user, temp_password,
         MongoDBIAMProperties(aws_session_token=token), None)
 
 
@@ -647,13 +647,13 @@ def _aws_auth_header(credentials, server_nonce, sts_host):
     return final
 
 
-def _authenticate_iam(credentials, sock_info):
-    """Authenticate using MONGODB-IAM.
+def _authenticate_aws(credentials, sock_info):
+    """Authenticate using MONGODB-AWS.
     """
     if sock_info.max_wire_version < 9:
         # TODO: Add the actual server version to the error message.
         raise ConfigurationError(
-            "MONGODB-IAM authentication requires MongoDB version 4.4 or later")
+            "MONGODB-AWS authentication requires MongoDB version 4.4 or later")
 
     # If a username and password are not provided, drivers MUST query
     # a link-local AWS address for temporary credentials.
@@ -664,7 +664,7 @@ def _authenticate_iam(credentials, sock_info):
     client_nonce = os.urandom(32)
     payload = {'r': Binary(client_nonce), 'p': 110}
     client_first = SON([('saslStart', 1),
-                        ('mechanism', 'MONGODB-IAM'),
+                        ('mechanism', 'MONGODB-AWS'),
                         ('payload', Binary(bson.encode(payload)))])
     server_first = sock_info.command('$external', client_first)
 
@@ -684,7 +684,7 @@ def _authenticate_iam(credentials, sock_info):
                          ('payload', Binary(bson.encode(payload)))])
     res = sock_info.command('$external', client_second)
     if not res['done']:
-        raise OperationFailure('MONGODB-IAM conversation failed to complete.')
+        raise OperationFailure('MONGODB-AWS conversation failed to complete.')
 
 
 def _authenticate_mongo_cr(credentials, sock_info):
@@ -729,7 +729,7 @@ _AUTH_MAP = {
     'GSSAPI': _authenticate_gssapi,
     'MONGODB-CR': _authenticate_mongo_cr,
     'MONGODB-X509': _authenticate_x509,
-    'MONGODB-IAM': _authenticate_iam,
+    'MONGODB-AWS': _authenticate_aws,
     'PLAIN': _authenticate_plain,
     'SCRAM-SHA-1': functools.partial(
         _authenticate_scram, mechanism='SCRAM-SHA-1'),
