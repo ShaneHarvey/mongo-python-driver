@@ -111,12 +111,13 @@ class Monitor(MonitorBase):
         self._server_description = server_description
         self._pool = pool
         self._settings = topology_settings
-        self._avg_round_trip_time = MovingAverage()
         self._listeners = self._settings._pool_options.event_listeners
         pub = self._listeners is not None
         self._publish = pub and self._listeners.enabled_for_server_heartbeat
         self._rtt_executor = None
         self.current_sock = None
+        self._avg_round_trip_time = RttMonitor(
+            topology, topology_settings, self)
 
     def interrupt_check(self):
         """Interrupt a concurrent isMaster check by closing the socket.
@@ -129,8 +130,13 @@ class Monitor(MonitorBase):
             sock.cancel_context.cancel()
             # sock.close_socket(None)
 
+    def _start_rtt_monitor(self):
+        """Start an RttMonitor that periodically runs ping."""
+        self._avg_round_trip_time.open()
+
     def close(self):
         super(Monitor, self).close()
+        self._avg_round_trip_time.close()
         self.interrupt_check()
 
         # Increment the pool_id and maybe close the socket. If the executor
@@ -144,6 +150,7 @@ class Monitor(MonitorBase):
             while (not self._executor._stopped and
                    self._server_description.is_server_type_known and
                    self._server_description.topology_version):
+                self._start_rtt_monitor()
                 self._server_description = self._check_with_retry(long_poll=True)
                 self._topology.on_change(self._server_description)
         except _MonitorCheckCancelled:
@@ -297,3 +304,67 @@ class SrvMonitor(MonitorBase):
             self._executor.update_interval(
                 max(ttl, common.MIN_SRV_RESCAN_INTERVAL))
             return seedlist
+
+
+class RttMonitor(MonitorBase):
+    def __init__(self, topology, topology_settings, monitor):
+        """Maintain round trip times for a server.
+
+        The Topology is weakly referenced.
+        """
+        super(RttMonitor, self).__init__(
+            topology,
+            "pymongo_server_rtt_thread",
+            topology_settings.heartbeat_frequency,
+            common.MIN_HEARTBEAT_INTERVAL)
+
+        # We weakly reference the monitor and it strongly references us.
+        self._monitor = weakref.proxy(monitor)
+        self._avg_round_trip_time = MovingAverage()
+
+    def add_sample(self, sample):
+        """Add a RTT sample."""
+        self._avg_round_trip_time.add_sample(sample)
+
+    def get(self):
+        """Get the calculated average, or None if no samples yet."""
+        return self._avg_round_trip_time.get()
+
+    def reset(self):
+        """Reset the average RTT."""
+        # TODO: Call this method when a server is reset from an app error.
+        return self._avg_round_trip_time.reset()
+
+    def _run(self):
+        try:
+            # NOTE: Only run when when using the streaming heartbeat protocol.
+            # TODO: skip check if the server is unknown.
+            # TODO: shutdown if the server is downgraded.
+            rtt = self._ping()
+            self.add_sample(rtt)
+        except ReferenceError:
+            # Topology was garbage-collected.
+            self.close()
+        except Exception as error:
+            # TODO: handle errors with _MongoClientErrorHandler
+            pass
+
+    def _ping(self):
+        """Run a "ping" command.
+
+        Returns the RTT of the ping.
+        """
+        with self._monitor._pool.get_socket({}) as sock_info:
+            start = _time()
+            self._ping_with_socket(sock_info)
+            return _time() - start
+
+    def _ping_with_socket(self, sock_info):
+        """Return (IsMaster, round_trip_time).
+
+        Can raise ConnectionFailure or OperationFailure.
+        """
+        # TODO: ping?
+        return sock_info.ismaster(self._monitor._pool.opts.metadata,
+                                  None,  # TODO: $clusterTime?
+                                  None, None),
