@@ -30,7 +30,7 @@ from pymongo.errors import (AutoReconnect,
                             ProtocolError,
                             NetworkTimeout,
                             _MonitorCheckCancelled)
-from pymongo.message import _UNPACK_REPLY
+from pymongo.message import _UNPACK_REPLY, _OpMsg
 from pymongo.socket_checker import _errno_from_exception
 
 
@@ -47,7 +47,8 @@ def command(sock_info, dbname, spec, slave_ok, is_mongos,
             compression_ctx=None,
             use_op_msg=False,
             unacknowledged=False,
-            user_fields=None):
+            user_fields=None,
+            exhaust_allowed=False):
     """Execute a command over the socket, or raise socket.error.
 
     :Parameters:
@@ -110,7 +111,8 @@ def command(sock_info, dbname, spec, slave_ok, is_mongos,
         check_keys = False
 
     if use_op_msg:
-        flags = 2 if unacknowledged else 0
+        flags = _OpMsg.MORE_TO_COME if unacknowledged else 0
+        flags |= _OpMsg.EXHAUST_ALLOWED if exhaust_allowed else 0
         request_id, msg, size, max_doc_size = message._op_msg(
             flags, spec, dbname, read_preference, slave_ok, check_keys,
             codec_options, ctx=compression_ctx)
@@ -142,6 +144,7 @@ def command(sock_info, dbname, spec, slave_ok, is_mongos,
             response_doc = {"ok": 1}
         else:
             reply = receive_message(sock_info, request_id)
+            sock_info.more_to_come = reply.more_to_come
             unpacked_docs = reply.unpack_response(
                 codec_options=codec_options, user_fields=user_fields)
 

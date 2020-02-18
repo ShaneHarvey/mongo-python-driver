@@ -118,6 +118,7 @@ class Monitor(MonitorBase):
         self.current_sock = None
         self._avg_round_trip_time = RttMonitor(
             topology, topology_settings, self)
+        self.heartbeater = None
 
     def interrupt_check(self):
         """Interrupt a concurrent isMaster check by closing the socket.
@@ -217,43 +218,45 @@ class Monitor(MonitorBase):
         address = self._server_description.address
         if self._publish:
             self._listeners.publish_server_heartbeat_started(address)
-        with self._pool.get_socket({}) as sock_info:
-            self.current_sock = sock_info
-            response, round_trip_time = self._check_with_socket(
-                sock_info, long_poll)
-            if not long_poll:
-                self._avg_round_trip_time.add_sample(round_trip_time)
-            sd = ServerDescription(
-                address=address,
-                ismaster=response,
-                round_trip_time=self._avg_round_trip_time.get())
-            if self._publish:
-                self._listeners.publish_server_heartbeat_succeeded(
-                    address, round_trip_time, response)
 
-            return sd
+        if self.heartbeater and self.heartbeater.done:
+            self._pool.return_socket(self.heartbeater.sock_info)
+            self.heartbeater = None
 
-    def _check_with_socket(self, sock_info, long_poll):
+        if not self.heartbeater:
+            with self._pool.get_socket({}, checkout=True) as sock_info:
+                self.current_sock = sock_info
+                self.heartbeater = Heartbeater(
+                    sock_info, self._server_description.topology_version,
+                    self._settings)
+
+        response, round_trip_time = self._check_with_socket(self.heartbeater)
+        if not response.awaitable:
+            self._avg_round_trip_time.add_sample(round_trip_time)
+        sd = ServerDescription(
+            address=address,
+            ismaster=response,
+            round_trip_time=self._avg_round_trip_time.get())
+        if self._publish:
+            self._listeners.publish_server_heartbeat_succeeded(
+                address, round_trip_time, response)
+
+        return sd
+
+    def _check_with_socket(self, heartbeater):
         """Return (IsMaster, round_trip_time).
 
         Can raise ConnectionFailure or OperationFailure.
         """
-        if long_poll:
-            topology_version = self._server_description.topology_version
-        else:
-            topology_version = None
         start = _time()
         try:
-            return (sock_info.ismaster(self._pool.opts.metadata,
-                                       self._topology.max_cluster_time(),
-                                       topology_version,
-                                       self._settings.heartbeat_frequency),
-                    _time() - start)
+            response = heartbeater.check(self._topology.max_cluster_time())
         except OperationFailure as exc:
             # Update max cluster time even when isMaster fails.
             self._topology.receive_cluster_time(
                 exc.details.get('$clusterTime'))
             raise
+        return response, _time() - start
 
 
 class SrvMonitor(MonitorBase):
@@ -364,7 +367,50 @@ class RttMonitor(MonitorBase):
 
         Can raise ConnectionFailure or OperationFailure.
         """
-        # TODO: ping?
-        return sock_info.ismaster(self._monitor._pool.opts.metadata,
-                                  None,  # TODO: $clusterTime?
-                                  None, None),
+        # TODO: Use ping instead of isMaster
+        # TODO: $clusterTime?
+        return sock_info.ismaster()
+
+
+class Heartbeater(object):
+    START = 1
+    STREAM = 2
+    DONE = 3
+
+    def __init__(self, sock_info, topology_version, topology_settings):
+        self.sock_info = sock_info
+        self.state = None
+        self.topology_version = topology_version
+        self._settings = topology_settings
+        self._gen = None
+
+    def check(self, cluster_time):
+        """Run the next heartbeat check and return the response."""
+        if self.state == self.DONE:
+            assert False, 'invalid state DONE'
+
+        # Run the next heartbeat
+        try:
+            response = None
+            if self._gen:
+                try:
+                    response = next(self._gen)
+                except StopIteration:
+                    self._gen = None
+            if response is None:
+                self._gen = self.sock_info.multi_ismaster(
+                    cluster_time,
+                    self.topology_version,
+                    self._settings.heartbeat_frequency)
+                response = next(self._gen)
+        except:
+            self.state = self.DONE
+            raise
+
+        self.topology_version = response.topology_version
+        return response
+
+    @property
+    def done(self):
+        """Are we done?"""
+        return self.state == self.DONE
