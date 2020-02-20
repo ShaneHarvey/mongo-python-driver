@@ -155,6 +155,9 @@ class Monitor(MonitorBase):
                 self._server_description = self._check_with_retry(long_poll=True)
                 self._topology.on_change(self._server_description)
         except _MonitorCheckCancelled:
+            # TODO: streaming bug: after _MonitorCheckCancelled we MUST run
+            # a regular non-awaitable isMaster.
+            self._pool.reset()
             pass
         except ReferenceError:
             # Topology was garbage-collected.
