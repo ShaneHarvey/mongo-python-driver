@@ -422,24 +422,24 @@ class Topology(object):
             if server:
                 server.pool.reset()
 
-    def reset_server(self, address, error):
+    def reset_server(self, address, err_ctx):
         """Clear our pool for a server and mark it Unknown.
 
         Do *not* request an immediate check.
         """
         with self._lock:
-            self._reset_server(address, reset_pool=True, error=error)
+            self._reset_server(address, reset_pool=True, err_ctx=err_ctx)
 
-    def reset_server_and_request_check(self, address, error):
+    def reset_server_and_request_check(self, address, err_ctx):
         """Clear our pool for a server, mark it Unknown, and check it soon."""
         with self._lock:
-            self._reset_server(address, reset_pool=True, error=error)
+            self._reset_server(address, reset_pool=True, err_ctx=err_ctx)
             self._request_check(address)
 
-    def mark_server_unknown_and_request_check(self, address, error):
+    def mark_server_unknown_and_request_check(self, address, err_ctx):
         """Mark a server Unknown, and check it soon."""
         with self._lock:
-            self._reset_server(address, reset_pool=False, error=error)
+            self._reset_server(address, reset_pool=False, err_ctx=err_ctx)
             self._request_check(address)
 
     def update_pool(self):
@@ -552,12 +552,16 @@ class Topology(object):
         for server in itervalues(self._servers):
             server.open()
 
-    def _reset_server(self, address, reset_pool, error):
+    def _reset_server(self, address, reset_pool, err_ctx):
         """Mark a server Unknown and optionally reset it's pool.
 
         Hold the lock when calling this. Does *not* request an immediate check.
         """
         server = self._servers.get(address)
+        # This is an outdated error from a previous pool version.
+        if err_ctx and err_ctx.sock_pool_id != server._pool.pool_id:
+            return
+        error = err_ctx.error if err_ctx else None
 
         def get_tv(error):
             if error and hasattr(error, 'details'):
@@ -729,3 +733,11 @@ class Topology(object):
             else:
                 return ','.join(str(server.error) for server in servers
                                 if server.error)
+
+
+class _ErrorContext(object):
+    """An error with context for SDAM error handling."""
+    def __init__(self, error, max_wire_version, sock_pool_id):
+        self.error = error
+        self.max_wire_version = max_wire_version
+        self.sock_pool_id = sock_pool_id

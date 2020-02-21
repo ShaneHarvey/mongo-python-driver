@@ -68,7 +68,8 @@ from pymongo.read_preferences import ReadPreference
 from pymongo.server_selectors import (writable_preferred_server_selector,
                                       writable_server_selector)
 from pymongo.server_type import SERVER_TYPE
-from pymongo.topology import Topology
+from pymongo.topology import (Topology,
+                              _ErrorContext)
 from pymongo.topology_description import TOPOLOGY_TYPE
 from pymongo.settings import TopologySettings
 from pymongo.uri_parser import (_handle_option_deprecations,
@@ -1499,9 +1500,9 @@ class MongoClient(common.BaseObject):
         with self._tmp_session(session) as s:
             return self._retry_with_session(retryable, func, s, None)
 
-    def _reset_server_and_request_check(self, address, error):
+    def _reset_server_and_request_check(self, address, err_ctx):
         """Clear our pool for a server, mark it Unknown, and check it soon."""
-        self._topology.reset_server_and_request_check(address, error)
+        self._topology.reset_server_and_request_check(address, err_ctx)
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -2167,18 +2168,20 @@ class MongoClient(common.BaseObject):
 
 class _MongoClientErrorHandler(object):
     """Error handler for MongoClient."""
-    __slots__ = ('_client', '_server_address', '_session', '_max_wire_version')
+    __slots__ = ('_client', '_server_address', '_session',
+                 '_max_wire_version', '_sock_pool_id')
 
     def __init__(self, client, server_address, session):
         self._client = client
         self._server_address = server_address
         self._session = session
         self._max_wire_version = common.MIN_WIRE_VERSION
+        self._sock_pool_id = 0
 
     def contribute_socket(self, sock_info):
         """Provide socket information to the error handler."""
-        # Currently, we only extract the max_wire_version information.
         self._max_wire_version = sock_info.max_wire_version
+        self._sock_pool_id = sock_info.pool_id
 
     def __enter__(self):
         return self
@@ -2191,6 +2194,9 @@ class _MongoClientErrorHandler(object):
             if self._session and exc_val.has_error_label(
                     "TransientTransactionError"):
                 self._session._unpin_mongos()
+
+        err_ctx = _ErrorContext(
+            exc_val, self._max_wire_version, self._sock_pool_id)
 
         if issubclass(exc_type, NetworkTimeout):
             # The socket has been closed. Don't reset the server.
@@ -2213,14 +2219,14 @@ class _MongoClientErrorHandler(object):
             if is_shutting_down or (self._max_wire_version <= 7):
                 # Clear the pool, mark server Unknown and request check.
                 self._client._reset_server_and_request_check(
-                    self._server_address, exc_val)
+                    self._server_address, err_ctx)
             else:
                 self._client._topology.mark_server_unknown_and_request_check(
-                    self._server_address, exc_val)
+                    self._server_address, err_ctx)
         elif issubclass(exc_type, ConnectionFailure):
             # "Client MUST replace the server's description with type Unknown
             # ... MUST NOT request an immediate check of the server."
-            self._client._topology.reset_server(self._server_address, exc_val)
+            self._client._topology.reset_server(self._server_address, err_ctx)
             if self._session:
                 self._session._server_session.mark_dirty()
         elif issubclass(exc_type, OperationFailure):
@@ -2228,4 +2234,4 @@ class _MongoClientErrorHandler(object):
             # shutting down.
             if exc_val.code in helpers._RETRYABLE_ERROR_CODES:
                 self._client._topology.reset_server(
-                    self._server_address, exc_val)
+                    self._server_address, err_ctx)
