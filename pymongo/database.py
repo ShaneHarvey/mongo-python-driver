@@ -403,9 +403,9 @@ class Database(common.BaseObject):
            Removed deprecated argument: options
         """
         with self.__client._tmp_session(session) as s:
-            if name in self.list_collection_names(
-                    filter={"name": name}, session=s):
-                raise CollectionInvalid("collection %s already exists" % name)
+            # if name in self.list_collection_names(
+            #         filter={"name": name}, session=s):
+            #     raise CollectionInvalid("collection %s already exists" % name)
 
             return Collection(self, name, True, codec_options,
                               read_preference, write_concern,

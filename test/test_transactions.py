@@ -121,7 +121,7 @@ class TestTransactions(TransactionsBase):
 
         unsupported_txn_writes = [
             (client.drop_database, [db.name], {}),
-            (db.create_collection, ['collection'], {}),
+            # (db.create_collection, ['collection'], {}),
             (db.drop_collection, ['collection'], {}),
             (coll.drop, [], {}),
             (coll.map_reduce,
