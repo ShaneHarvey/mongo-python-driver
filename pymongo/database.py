@@ -403,13 +403,24 @@ class Database(common.BaseObject):
            Removed deprecated argument: options
         """
         with self.__client._tmp_session(session) as s:
-            if name in self.list_collection_names(
-                    filter={"name": name}, session=s):
-                raise CollectionInvalid("collection %s already exists" % name)
-
-            return Collection(self, name, True, codec_options,
-                              read_preference, write_concern,
-                              read_concern, session=s, **kwargs)
+            try:
+                return Collection(self, name, True, codec_options,
+                                  read_preference, write_concern,
+                                  read_concern, session=s, **kwargs)
+            except OperationFailure as exc:
+                # When the create command fails because the collection already
+                # exists we need to raise CollectionInvalid for backwards
+                # compatibility.
+                # MongoDB 2.6 does not return an error code:
+                # {'ok': 0, 'errmsg': 'collection already exists'}
+                # MongoDB 3.0+ returns error code 48 (NamespaceExists).
+                if (exc.code == 48 or
+                        exc.code is None and
+                        exc.details.get('errmsg') ==
+                        'collection already exists'):
+                    raise CollectionInvalid(
+                        'collection %s already exists' % name)
+                raise
 
     def _apply_incoming_manipulators(self, son, collection):
         """Apply incoming manipulators to `son`."""
