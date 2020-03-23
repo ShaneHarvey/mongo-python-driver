@@ -154,8 +154,7 @@ class OvertCommandListener(EventListener):
             super(OvertCommandListener, self).failed(event)
 
 
-class ServerAndTopologyEventListener(monitoring.ServerListener,
-                                     monitoring.TopologyListener):
+class _ServerEventListener(object):
     """Listens to all events."""
 
     def __init__(self):
@@ -177,6 +176,16 @@ class ServerAndTopologyEventListener(monitoring.ServerListener,
 
     def reset(self):
         self.results = []
+
+
+class ServerEventListener(_ServerEventListener,
+                          monitoring.ServerListener):
+    """Listens to Server events."""
+
+
+class ServerAndTopologyEventListener(ServerEventListener,
+                                     monitoring.TopologyListener):
+    """Listens to Server and Topology events."""
 
 
 class HeartbeatEventListener(monitoring.ServerHeartbeatListener):
