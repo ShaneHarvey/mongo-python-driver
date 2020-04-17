@@ -44,7 +44,8 @@ from test import (client_context,
                   client_knobs,
                   IntegrationTest,
                   unittest)
-from test.utils import (camel_to_snake,
+from test.utils import (assertion_context,
+                        camel_to_snake,
                         camel_to_snake_args,
                         camel_to_upper_camel,
                         CompareType,
@@ -524,6 +525,8 @@ class SpecRunner(IntegrationTest):
         if (client_options.get('retryWrites') is True and
                 client_context.storage_engine == 'mmapv1'):
             self.skipTest("MMAPv1 does not support retryWrites=True")
+        if not client_options.get('appname', client_options.get('appName')):
+            client_options['appName'] = self.id()[-128:]
         use_multi_mongos = test['useMultipleMongoses']
         if client_context.is_mongos and use_multi_mongos:
             client = rs_client(client_context.mongos_seeds(),
@@ -609,9 +612,20 @@ class SpecRunner(IntegrationTest):
                 read_concern=ReadConcern('local'))
             actual_data = list(outcome_coll.find(sort=[('_id', 1)]))
 
+            class AddListenerInfo(object):
+                def __str__(self):
+                    if not listener:
+                        return ''
+                    parts = []
+                    for event in listener.ordered_events:
+                        parts.append('Event: ' + repr(event))
+                    return '\n'.join(parts)
+
             # The expected data needs to be the left hand side here otherwise
             # CompareType(Binary) doesn't work.
-            self.assertEqual(wrap_types(expected_c['data']), actual_data)
+            with assertion_context(AddListenerInfo()):
+                self.assertEqual(wrap_types(expected_c['data']), actual_data)
+
 
 def expect_any_error(op):
     if isinstance(op, dict):

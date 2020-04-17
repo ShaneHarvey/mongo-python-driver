@@ -107,15 +107,19 @@ class EventListener(monitoring.CommandListener):
 
     def __init__(self):
         self.results = defaultdict(list)
+        self.ordered_events = []
 
     def started(self, event):
         self.results['started'].append(event)
+        self.ordered_events.append(event)
 
     def succeeded(self, event):
         self.results['succeeded'].append(event)
+        self.ordered_events.append(event)
 
     def failed(self, event):
         self.results['failed'].append(event)
+        self.ordered_events.append(event)
 
     def started_command_names(self):
         """Return list of command names started."""
@@ -124,6 +128,7 @@ class EventListener(monitoring.CommandListener):
     def reset(self):
         """Reset the state of this listener."""
         self.results.clear()
+        self.ordered_events = []
 
 
 class WhiteListEventListener(EventListener):
