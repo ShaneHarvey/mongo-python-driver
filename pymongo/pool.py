@@ -535,6 +535,7 @@ class SocketInfo(object):
             cmd['topologyVersion'] = topology_version
             cmd['maxAwaitTimeMS'] = int(heartbeat_frequency*1000)
             awaitable = True
+            self.sock.settimeout(self.opts.connect_timeout+heartbeat_frequency)
 
         if self.max_wire_version >= 6 and cluster_time is not None:
             cmd['$clusterTime'] = cluster_time

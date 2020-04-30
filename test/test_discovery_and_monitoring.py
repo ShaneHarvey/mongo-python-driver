@@ -21,7 +21,8 @@ import threading
 sys.path[0:0] = [""]
 
 from bson import json_util, Timestamp
-from pymongo import common
+from pymongo import (common,
+                     monitoring)
 from pymongo.errors import (AutoReconnect,
                             ConfigurationError,
                             NetworkTimeout,
@@ -37,11 +38,14 @@ from pymongo.settings import TopologySettings
 from pymongo.uri_parser import parse_uri
 from test import unittest, IntegrationTest
 from test.utils import (assertion_context,
+                        client_context,
                         Barrier,
                         get_pool,
                         server_name_to_type,
                         rs_or_single_client,
+                        TestCreator,
                         wait_until)
+from test.utils_spec_runner import SpecRunner
 
 
 # Location of JSON test specifications.
@@ -304,6 +308,75 @@ class TestIgnoreStaleErrors(IntegrationTest):
 
         # Server should be selectable.
         client.admin.command('ping')
+
+
+class TestSpec(SpecRunner):
+    # Location of JSON test specifications.
+    TEST_PATH = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        'discovery_and_monitoring_spec')
+
+    def _event_count(self, event):
+        # Only support CMAP events for now.
+        self.assertTrue(event.startswith('Pool') or event.startswith('Conn'))
+        event_type = getattr(monitoring, event)
+        return self.pool_listener.event_count(event_type)
+
+    def assert_event_count(self, event, count):
+        """Run the assertEventCount test operation.
+
+        Assert the given event was published exactly `count` times.
+        """
+        self.assertEqual(self._event_count(event), count)
+
+    def wait_for_event(self, event, count):
+        """Run the waitForEvent test operation.
+
+        Wait for a number of events to be published, or fail.
+        """
+        wait_until(lambda: self._event_count(event) >= count,
+                   'find %s %s event(s)' % (count, event))
+
+    def configure_fail_point(self, fail_point):
+        """Run the configureFailPoint test operation.
+        """
+        self.set_fail_point(fail_point)
+        self.addCleanup(self.set_fail_point, {
+            'configureFailPoint': fail_point['configureFailPoint'],
+            'mode': 'off'})
+
+    def run_admin_command(self, command):
+        """Run the runAdminCommand test operation.
+        """
+        self.client.admin.command(command)
+
+    def record_primary(self):
+        """Run the recordPrimary test operation.
+        """
+        self._previous_primary = self.scenario_client.primary
+
+    def wait_for_primary_change(self, timeout_ms):
+        """Run the waitForPrimaryChange test operation.
+        """
+        def primary_changed():
+            primary = self.scenario_client.primary
+            if primary is None:
+                return False
+            return primary != self._previous_primary
+        timeout = timeout_ms/1000.0
+        wait_until(primary_changed, 'change primary', timeout=timeout)
+
+
+def create_spec_test(scenario_def, test, name):
+    @client_context.require_test_commands
+    def run_scenario(self):
+        self.run_scenario(scenario_def, test)
+
+    return run_scenario
+
+
+test_creator = TestCreator(create_spec_test, TestSpec, TestSpec.TEST_PATH)
+test_creator.create_tests()
 
 
 if __name__ == "__main__":

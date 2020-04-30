@@ -48,6 +48,7 @@ from test.utils import (camel_to_snake,
                         camel_to_snake_args,
                         camel_to_upper_camel,
                         CompareType,
+                        CMAPListener,
                         OvertCommandListener,
                         rs_client, parse_read_preference)
 
@@ -72,6 +73,7 @@ class SpecRunner(IntegrationTest):
     def setUp(self):
         super(SpecRunner, self).setUp()
         self.listener = None
+        self.pool_listener = None
         self.maxDiff = None
 
     def _set_fail_point(self, client, command_args):
@@ -519,6 +521,7 @@ class SpecRunner(IntegrationTest):
     def run_scenario(self, scenario_def, test):
         self.maybe_skip_scenario(test)
         listener = OvertCommandListener()
+        pool_listener = CMAPListener()
         # Create a new client, to avoid interference from pooled sessions.
         client_options = self.parse_client_options(test['clientOptions'])
         # MMAPv1 does not support retryable writes.
@@ -527,11 +530,15 @@ class SpecRunner(IntegrationTest):
             self.skipTest("MMAPv1 does not support retryWrites=True")
         use_multi_mongos = test['useMultipleMongoses']
         if client_context.is_mongos and use_multi_mongos:
-            client = rs_client(client_context.mongos_seeds(),
-                               event_listeners=[listener], **client_options)
+            client = rs_client(
+                client_context.mongos_seeds(),
+                event_listeners=[listener, pool_listener], **client_options)
         else:
-            client = rs_client(event_listeners=[listener], **client_options)
+            client = rs_client(
+                event_listeners=[listener, pool_listener], **client_options)
+        self.scenario_client = client
         self.listener = listener
+        self.pool_listener = pool_listener
         # Close the client explicitly to avoid having too many threads open.
         self.addCleanup(client.close)
 
@@ -613,6 +620,7 @@ class SpecRunner(IntegrationTest):
             # The expected data needs to be the left hand side here otherwise
             # CompareType(Binary) doesn't work.
             self.assertEqual(wrap_types(expected_c['data']), actual_data)
+
 
 def expect_any_error(op):
     if isinstance(op, dict):
