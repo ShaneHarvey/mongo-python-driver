@@ -146,14 +146,23 @@ class Monitor(MonitorBase):
 
     def _run(self):
         try:
-            self._server_description = self._check_with_retry(long_poll=False)
-            self._topology.on_change(self._server_description)
-            while (not self._executor._stopped and
-                   self._server_description.is_server_type_known and
-                   self._server_description.topology_version):
-                self._start_rtt_monitor()
-                self._server_description = self._check_with_retry(long_poll=True)
+            for _ in range(2):
+                prev_sd = self._server_description
+                self._server_description = self._check_with_retry()
                 self._topology.on_change(self._server_description)
+                while (not self._executor._stopped and
+                       self._server_description.is_server_type_known and
+                       self._server_description.topology_version):
+                    self._start_rtt_monitor()
+                    prev_sd = self._server_description
+                    self._server_description = self._check_with_retry()
+                    self._topology.on_change(self._server_description)
+                if self._executor._stopped:
+                    return
+                if self._server_description.error and prev_sd.is_server_type_known:
+                    # Immediate check on error.
+                    continue
+                break
         except _MonitorCheckCancelled:
             # TODO: streaming bug: after _MonitorCheckCancelled we MUST run
             # a regular non-awaitable isMaster.
@@ -163,7 +172,7 @@ class Monitor(MonitorBase):
             # Topology was garbage-collected.
             self.close()
 
-    def _check_with_retry(self, long_poll):
+    def _check_with_retry(self):
         """Call ismaster once or twice. Reset server's pool on error.
 
         Returns a ServerDescription.
@@ -172,13 +181,9 @@ class Monitor(MonitorBase):
         # server's pool. If a server was once connected, change its type
         # to Unknown only after retrying once.
         address = self._server_description.address
-        retry = True
-        if self._server_description.server_type == SERVER_TYPE.Unknown:
-            retry = False
-
         start = _time()
         try:
-            return self._check_once(long_poll)
+            return self._check_once()
         except (ReferenceError, _MonitorCheckCancelled):
             raise
         except Exception as error:
@@ -187,31 +192,11 @@ class Monitor(MonitorBase):
                 self._listeners.publish_server_heartbeat_failed(
                     address, error_time, error)
             self._topology.reset_pool(address)
-            # TODO: is it correct to include both error and topology_version?
-            # For command errors I think not.
-            # For connection errors, maybe? Consider case study.
-            default = ServerDescription(address, error=error)
-            if not retry:
-                self._avg_round_trip_time.reset()
-                # Server type defaults to Unknown.
-                return default
+            self._avg_round_trip_time.reset()
+            # Server type defaults to Unknown.
+            return ServerDescription(address, error=error)
 
-            # Try a second and final time. If it fails return original error.
-            # Always send metadata: this is a new connection.
-            start = _time()
-            try:
-                return self._check_once(long_poll=False)
-            except (ReferenceError, _MonitorCheckCancelled):
-                raise
-            except Exception as error:
-                error_time = _time() - start
-                if self._publish:
-                    self._listeners.publish_server_heartbeat_failed(
-                        address, error_time, error)
-                self._avg_round_trip_time.reset()
-                return default
-
-    def _check_once(self, long_poll):
+    def _check_once(self):
         """A single attempt to call ismaster.
 
         Returns a ServerDescription, or raises an exception.
