@@ -178,3 +178,6 @@ class IsMaster(object):
     @property
     def awaitable(self):
         return self._awaitable
+
+    def __repr__(self):
+        return '<IsMaster awaitable: %s, doc: %s>' % (self._awaitable, self._doc)
