@@ -50,6 +50,7 @@ from test.utils import (camel_to_snake,
                         single_client,
                         TestCreator,
                         wait_until)
+from test.utils_spec_runner import SpecRunnerThread
 
 
 OBJECT_TYPES = {
@@ -70,40 +71,6 @@ OBJECT_TYPES = {
 }
 
 
-class CMAPThread(threading.Thread):
-    def __init__(self, name):
-        super(CMAPThread, self).__init__()
-        self.name = name
-        self.exc = None
-        self.setDaemon(True)
-        self.cond = threading.Condition()
-        self.ops = []
-        self.stopped = False
-
-    def schedule(self, work):
-        self.ops.append(work)
-        with self.cond:
-            self.cond.notify()
-
-    def stop(self):
-        self.stopped = True
-        with self.cond:
-            self.cond.notify()
-
-    def run(self):
-        while not self.stopped or self.ops:
-            if not self. ops:
-                with self.cond:
-                    self.cond.wait(10)
-            if self.ops:
-                try:
-                    work = self.ops.pop(0)
-                    work()
-                except Exception as exc:
-                    self.exc = exc
-                    self.stop()
-
-
 class TestCMAP(IntegrationTest):
     # Location of JSON test specifications.
     TEST_PATH = os.path.join(
@@ -114,7 +81,7 @@ class TestCMAP(IntegrationTest):
     def start(self, op):
         """Run the 'start' thread operation."""
         target = op['target']
-        thread = CMAPThread(target)
+        thread = SpecRunnerThread(target)
         thread.start()
         self.targets[target] = thread
 

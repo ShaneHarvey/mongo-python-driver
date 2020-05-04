@@ -1,32 +1,63 @@
 {
   "runOn": [
     {
-      "minServerVersion": "4.4",
-      "topology": [
-        "replicaset"
-      ]
+      "minServerVersion": "4.4"
     }
   ],
   "database_name": "sdam-tests",
-  "collection_name": "test-replSetStepDown",
-  "data": [
-    {
-      "_id": 1
-    },
-    {
-      "_id": 2
-    }
-  ],
+  "collection_name": "isMaster-moreToComeTest",
+  "data": [],
   "tests": [
     {
-      "description": "Rediscover quickly after replSetStepDown",
+      "description": "Monitor handles moreToCome",
       "clientOptions": {
-        "appName": "replSetStepDownTest",
-        "heartbeatFrequencyMS": 60000,
-        "serverSelectionTimeoutMS": 5000,
-        "w": "majority"
+        "heartbeatFrequencyMS": 500,
+        "appName": "moreToComeTest"
       },
       "operations": [
+        {
+          "name": "insertMany",
+          "object": "collection",
+          "arguments": {
+            "documents": [
+              {
+                "_id": 1
+              },
+              {
+                "_id": 2
+              }
+            ]
+          }
+        },
+        {
+          "name": "configureFailPoint",
+          "object": "testRunner",
+          "arguments": {
+            "failPoint": {
+              "configureFailPoint": "doNotSetMoreToCome",
+              "mode": {
+                "times": 100
+              }
+            }
+          }
+        },
+        {
+          "name": "wait",
+          "object": "testRunner",
+          "arguments": {
+            "ms": 2000
+          }
+        },
+        {
+          "name": "configureFailPoint",
+          "object": "testRunner",
+          "arguments": {
+            "failPoint": {
+              "configureFailPoint": "doNotSetMoreToCome",
+              "mode": "off"
+            }
+          }
+        },
         {
           "name": "insertMany",
           "object": "collection",
@@ -40,63 +71,19 @@
               }
             ]
           }
-        },
-        {
-          "name": "recordPrimary",
-          "object": "testRunner"
-        },
-        {
-          "name": "runAdminCommand",
-          "object": "testRunner",
-          "command_name": "replSetStepDown",
-          "arguments": {
-            "command": {
-              "replSetStepDown": 20,
-              "force": false
-            }
-          }
-        },
-        {
-          "name": "waitForPrimaryChange",
-          "object": "testRunner",
-          "arguments": {
-            "timeoutMS": 15000
-          }
-        },
-        {
-          "name": "insertMany",
-          "object": "collection",
-          "arguments": {
-            "documents": [
-              {
-                "_id": 5
-              },
-              {
-                "_id": 6
-              }
-            ]
-          }
-        },
-        {
-          "name": "assertEventCount",
-          "object": "testRunner",
-          "arguments": {
-            "event": "PoolClearedEvent",
-            "count": 0
-          }
         }
       ],
       "expectations": [
         {
           "command_started_event": {
             "command": {
-              "insert": "test-replSetStepDown",
+              "insert": "isMaster-moreToComeTest",
               "documents": [
                 {
-                  "_id": 3
+                  "_id": 1
                 },
                 {
-                  "_id": 4
+                  "_id": 2
                 }
               ]
             },
@@ -107,13 +94,13 @@
         {
           "command_started_event": {
             "command": {
-              "insert": "test-replSetStepDown",
+              "insert": "isMaster-moreToComeTest",
               "documents": [
                 {
-                  "_id": 5
+                  "_id": 3
                 },
                 {
-                  "_id": 6
+                  "_id": 4
                 }
               ]
             },
@@ -136,12 +123,6 @@
             },
             {
               "_id": 4
-            },
-            {
-              "_id": 5
-            },
-            {
-              "_id": 6
             }
           ]
         }

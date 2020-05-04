@@ -17,6 +17,7 @@
 import os
 import sys
 import threading
+import time
 
 sys.path[0:0] = [""]
 
@@ -45,7 +46,7 @@ from test.utils import (assertion_context,
                         rs_or_single_client,
                         TestCreator,
                         wait_until)
-from test.utils_spec_runner import SpecRunner
+from test.utils_spec_runner import SpecRunner, SpecRunnerThread
 
 
 # Location of JSON test specifications.
@@ -365,6 +366,31 @@ class TestSpec(SpecRunner):
             return primary != self._previous_primary
         timeout = timeout_ms/1000.0
         wait_until(primary_changed, 'change primary', timeout=timeout)
+
+    def wait(self, ms):
+        """Run the "wait" test operation.
+        """
+        time.sleep(ms/1000.0)
+
+    def start_thread(self, name):
+        """Run the 'startThread' thread operation."""
+        thread = SpecRunnerThread(name)
+        thread.start()
+        self.targets[name] = thread
+
+    def run_on_thread(self, sessions, collection, name, operation):
+        """Run the 'runOnThread' operation."""
+        thread = self.targets[name]
+        thread.schedule(lambda: self._run_op(
+            sessions, collection, operation, False))
+
+    def wait_for_thread(self, name):
+        """Run the 'waitForThread' operation."""
+        thread = self.targets[name]
+        thread.stop()
+        thread.join()
+        if thread.exc:
+            raise thread.exc
 
 
 def create_spec_test(scenario_def, test, name):

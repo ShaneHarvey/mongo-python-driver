@@ -15,7 +15,7 @@
 """Utilities for testing driver specs."""
 
 import copy
-import sys
+import threading
 
 
 from bson import decode, encode
@@ -50,7 +50,44 @@ from test.utils import (camel_to_snake,
                         CompareType,
                         CMAPListener,
                         OvertCommandListener,
-                        rs_client, parse_read_preference)
+                        parse_read_preference,
+                        rs_client,
+                        ServerAndTopologyEventListener,
+                        HeartbeatEventListener)
+
+
+class SpecRunnerThread(threading.Thread):
+    def __init__(self, name):
+        super(SpecRunnerThread, self).__init__()
+        self.name = name
+        self.exc = None
+        self.setDaemon(True)
+        self.cond = threading.Condition()
+        self.ops = []
+        self.stopped = False
+
+    def schedule(self, work):
+        self.ops.append(work)
+        with self.cond:
+            self.cond.notify()
+
+    def stop(self):
+        self.stopped = True
+        with self.cond:
+            self.cond.notify()
+
+    def run(self):
+        while not self.stopped or self.ops:
+            if not self. ops:
+                with self.cond:
+                    self.cond.wait(10)
+            if self.ops:
+                try:
+                    work = self.ops.pop(0)
+                    work()
+                except Exception as exc:
+                    self.exc = exc
+                    self.stop()
 
 
 class SpecRunner(IntegrationTest):
@@ -72,6 +109,7 @@ class SpecRunner(IntegrationTest):
 
     def setUp(self):
         super(SpecRunner, self).setUp()
+        self.targets = {}
         self.listener = None
         self.pool_listener = None
         self.maxDiff = None
@@ -346,6 +384,10 @@ class SpecRunner(IntegrationTest):
             else:
                 arguments[c2s] = arguments.pop(arg_name)
 
+        if name == 'run_on_thread':
+            args = {'sessions': sessions, 'collection': collection}
+            args.update(arguments)
+            arguments = args
         result = cmd(**dict(arguments))
 
         if name == "aggregate":
@@ -370,45 +412,48 @@ class SpecRunner(IntegrationTest):
         """Allow encryption spec to override expected error classes."""
         return (PyMongoError,)
 
+    def _run_op(self, sessions, collection, op, in_with_transaction):
+        expected_result = op.get('result')
+        if expect_error(op):
+            with self.assertRaises(self.allowable_errors(op),
+                                   msg=op['name']) as context:
+                self.run_operation(sessions, collection, op.copy())
+
+            if expect_error_message(expected_result):
+                if isinstance(context.exception, BulkWriteError):
+                    errmsg = str(context.exception.details).lower()
+                else:
+                    errmsg = str(context.exception).lower()
+                self.assertIn(expected_result['errorContains'].lower(),
+                              errmsg)
+            if expect_error_code(expected_result):
+                self.assertEqual(expected_result['errorCodeName'],
+                                 context.exception.details.get('codeName'))
+            if expect_error_labels_contain(expected_result):
+                self.assertErrorLabelsContain(
+                    context.exception,
+                    expected_result['errorLabelsContain'])
+            if expect_error_labels_omit(expected_result):
+                self.assertErrorLabelsOmit(
+                    context.exception,
+                    expected_result['errorLabelsOmit'])
+
+            # Reraise the exception if we're in the with_transaction
+            # callback.
+            if in_with_transaction:
+                raise context.exception
+        else:
+            result = self.run_operation(sessions, collection, op.copy())
+            if 'result' in op:
+                if op['name'] == 'runCommand':
+                    self.check_command_result(expected_result, result)
+                else:
+                    self.check_result(expected_result, result)
+
     def run_operations(self, sessions, collection, ops,
                        in_with_transaction=False):
         for op in ops:
-            expected_result = op.get('result')
-            if expect_error(op):
-                with self.assertRaises(self.allowable_errors(op),
-                                       msg=op['name']) as context:
-                    self.run_operation(sessions, collection, op.copy())
-
-                if expect_error_message(expected_result):
-                    if isinstance(context.exception, BulkWriteError):
-                        errmsg = str(context.exception.details).lower()
-                    else:
-                        errmsg = str(context.exception).lower()
-                    self.assertIn(expected_result['errorContains'].lower(),
-                                  errmsg)
-                if expect_error_code(expected_result):
-                    self.assertEqual(expected_result['errorCodeName'],
-                                     context.exception.details.get('codeName'))
-                if expect_error_labels_contain(expected_result):
-                    self.assertErrorLabelsContain(
-                        context.exception,
-                        expected_result['errorLabelsContain'])
-                if expect_error_labels_omit(expected_result):
-                    self.assertErrorLabelsOmit(
-                        context.exception,
-                        expected_result['errorLabelsOmit'])
-
-                # Reraise the exception if we're in the with_transaction
-                # callback.
-                if in_with_transaction:
-                    raise context.exception
-            else:
-                result = self.run_operation(sessions, collection, op.copy())
-                if 'result' in op:
-                    if op['name'] == 'runCommand':
-                        self.check_command_result(expected_result, result)
-                    else:
-                        self.check_result(expected_result, result)
+            self._run_op(sessions, collection, op, in_with_transaction)
 
     # TODO: factor with test_command_monitoring.py
     def check_events(self, test, listener, session_ids):
