@@ -15,8 +15,11 @@
 """Test the database module."""
 
 import sys
+import time
 
 sys.path[0:0] = [""]
+
+from pymongo import monitoring
 
 from test import (client_context,
                   IntegrationTest,
@@ -70,6 +73,53 @@ class TestStreamingProtocol(IntegrationTest):
             # Topology events are published asynchronously
             wait_until(marked_unknown, 'mark node unknown')
             wait_until(rediscovered, 'rediscover node')
+
+        # Server should be selectable.
+        client.admin.command('ping')
+
+    @client_context.require_failCommand_appName
+    def test_streaming_rtt(self):
+        listener = ServerEventListener()
+        hb_listener = HeartbeatEventListener()
+        client = rs_or_single_client(
+            event_listeners=[listener, hb_listener], heartbeatFrequencyMS=500,
+            appName='streamingRttTest')
+        self.addCleanup(client.close)
+        # Force a connection.
+        client.admin.command('ping')
+        address = client.address
+
+        # Sleep long enough for multiple heartbeats to succeed.
+        time.sleep(2)
+
+        def changed_event(event):
+            return (event.server_address == address and
+                    isinstance(event, monitoring.ServerDescriptionChangedEvent))
+
+        events = listener.matching(changed_event)
+        for event in events:
+            self.assertTrue(event.new_description.round_trip_time)
+
+        delay_ismaster = {
+            'configureFailPoint': 'failCommand',
+            'mode': {'times': 1000},
+            'data': {
+                'failCommands': ['isMaster'],
+                'blockConnection': True,
+                'blockTimeMS': 500,
+                'appName': 'streamingRttTest',
+            },
+        }
+        with self.fail_point(delay_ismaster):
+            def rtt_exceeds_250_ms():
+                topology = client._topology
+                sd = topology.description.server_descriptions()[address]
+                return sd.round_trip_time > 0.250
+                # TODO: Foiled by SD equality yet again... update prose test.
+                # event = listener.matching(changed_event)[-1]
+                # return event.new_description.round_trip_time > 0.250
+
+            wait_until(rtt_exceeds_250_ms, 'exceed 250ms RTT')
 
         # Server should be selectable.
         client.admin.command('ping')
