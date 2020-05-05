@@ -318,6 +318,11 @@ class TestSpec(SpecRunner):
         'discovery_and_monitoring_spec')
 
     def _event_count(self, event):
+        if event == 'ServerMarkedUnknownEvent':
+            def marked_unknown(e):
+                return (isinstance(e, monitoring.ServerDescriptionChangedEvent)
+                        and not e.new_description.is_server_type_known)
+            return len(self.server_listener.matching(marked_unknown))
         # Only support CMAP events for now.
         self.assertTrue(event.startswith('Pool') or event.startswith('Conn'))
         event_type = getattr(monitoring, event)

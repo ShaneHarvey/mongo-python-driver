@@ -34,6 +34,14 @@
           "name": "waitForEvent",
           "object": "testRunner",
           "arguments": {
+            "event": "ServerMarkedUnknownEvent",
+            "count": 1
+          }
+        },
+        {
+          "name": "waitForEvent",
+          "object": "testRunner",
+          "arguments": {
             "event": "PoolClearedEvent",
             "count": 1
           }
@@ -50,6 +58,14 @@
                 "_id": 2
               }
             ]
+          }
+        },
+        {
+          "name": "assertEventCount",
+          "object": "testRunner",
+          "arguments": {
+            "event": "ServerMarkedUnknownEvent",
+            "count": 1
           }
         },
         {
@@ -139,6 +155,14 @@
           "name": "waitForEvent",
           "object": "testRunner",
           "arguments": {
+            "event": "ServerMarkedUnknownEvent",
+            "count": 1
+          }
+        },
+        {
+          "name": "waitForEvent",
+          "object": "testRunner",
+          "arguments": {
             "event": "PoolClearedEvent",
             "count": 1
           }
@@ -155,6 +179,14 @@
                 "_id": 4
               }
             ]
+          }
+        },
+        {
+          "name": "assertEventCount",
+          "object": "testRunner",
+          "arguments": {
+            "event": "ServerMarkedUnknownEvent",
+            "count": 1
           }
         },
         {

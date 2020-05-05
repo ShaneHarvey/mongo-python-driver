@@ -5,7 +5,7 @@
     }
   ],
   "database_name": "sdam-tests",
-  "collection_name": "error-handling",
+  "collection_name": "find-network-error",
   "data": [
     {
       "_id": 1
@@ -16,7 +16,7 @@
   ],
   "tests": [
     {
-      "description": "Reset server and pool after network error",
+      "description": "Reset server and pool after network error on find",
       "failPoint": {
         "configureFailPoint": "failCommand",
         "mode": {
@@ -24,31 +24,35 @@
         },
         "data": {
           "failCommands": [
-            "insert"
+            "find"
           ],
           "closeConnection": true,
-          "appName": "clearPoolTest"
+          "appName": "findNetworkErrorTest"
         }
       },
       "clientOptions": {
         "retryWrites": false,
-        "appName": "clearPoolTest"
+        "retryReads": false,
+        "appName": "findNetworkErrorTest"
       },
       "operations": [
         {
-          "name": "insertMany",
+          "name": "find",
           "object": "collection",
           "arguments": {
-            "documents": [
-              {
-                "_id": 3
-              },
-              {
-                "_id": 4
-              }
-            ]
+            "filter": {
+              "_id": 1
+            }
           },
           "error": true
+        },
+        {
+          "name": "waitForEvent",
+          "object": "testRunner",
+          "arguments": {
+            "event": "ServerMarkedUnknownEvent",
+            "count": 1
+          }
         },
         {
           "name": "waitForEvent",
@@ -76,6 +80,14 @@
           "name": "assertEventCount",
           "object": "testRunner",
           "arguments": {
+            "event": "ServerMarkedUnknownEvent",
+            "count": 1
+          }
+        },
+        {
+          "name": "assertEventCount",
+          "object": "testRunner",
+          "arguments": {
             "event": "PoolClearedEvent",
             "count": 1
           }
@@ -85,24 +97,16 @@
         {
           "command_started_event": {
             "command": {
-              "insert": "error-handling",
-              "documents": [
-                {
-                  "_id": 3
-                },
-                {
-                  "_id": 4
-                }
-              ]
+              "find": "find-network-error"
             },
-            "command_name": "insert",
+            "command_name": "find",
             "database_name": "sdam-tests"
           }
         },
         {
           "command_started_event": {
             "command": {
-              "insert": "error-handling",
+              "insert": "find-network-error",
               "documents": [
                 {
                   "_id": 5

@@ -5,15 +5,16 @@
     }
   ],
   "database_name": "sdam-tests",
-  "collection_name": "insert-shutdown-error",
+  "collection_name": "find-shutdown-error",
   "data": [],
   "tests": [
     {
-      "description": "Concurrent shutdown error on insert",
+      "description": "Concurrent shutdown error on find",
       "clientOptions": {
         "retryWrites": false,
+        "retryReads": false,
         "heartbeatFrequencyMS": 500,
-        "appName": "shutdownErrorInsertTest"
+        "appName": "shutdownErrorFindTest"
       },
       "operations": [
         {
@@ -36,9 +37,9 @@
               },
               "data": {
                 "failCommands": [
-                  "insert"
+                  "find"
                 ],
-                "appName": "shutdownErrorInsertTest",
+                "appName": "shutdownErrorFindTest",
                 "errorCode": 91,
                 "blockConnection": true,
                 "blockTimeMS": 500
@@ -66,11 +67,11 @@
           "arguments": {
             "name": "thread1",
             "operation": {
-              "name": "insertOne",
+              "name": "find",
               "object": "collection",
               "arguments": {
-                "document": {
-                  "_id": 2
+                "filter": {
+                  "_id": 1
                 }
               },
               "error": true
@@ -83,11 +84,11 @@
           "arguments": {
             "name": "thread2",
             "operation": {
-              "name": "insertOne",
+              "name": "find",
               "object": "collection",
               "arguments": {
-                "document": {
-                  "_id": 3
+                "filter": {
+                  "_id": 1
                 }
               },
               "error": true

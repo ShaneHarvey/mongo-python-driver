@@ -112,6 +112,7 @@ class SpecRunner(IntegrationTest):
         self.targets = {}
         self.listener = None
         self.pool_listener = None
+        self.server_listener = None
         self.maxDiff = None
 
     def _set_fail_point(self, client, command_args):
@@ -567,6 +568,7 @@ class SpecRunner(IntegrationTest):
         self.maybe_skip_scenario(test)
         listener = OvertCommandListener()
         pool_listener = CMAPListener()
+        server_listener = ServerAndTopologyEventListener()
         # Create a new client, to avoid interference from pooled sessions.
         client_options = self.parse_client_options(test['clientOptions'])
         # MMAPv1 does not support retryable writes.
@@ -577,13 +579,16 @@ class SpecRunner(IntegrationTest):
         if client_context.is_mongos and use_multi_mongos:
             client = rs_client(
                 client_context.mongos_seeds(),
-                event_listeners=[listener, pool_listener], **client_options)
+                event_listeners=[listener, pool_listener, server_listener],
+                **client_options)
         else:
             client = rs_client(
-                event_listeners=[listener, pool_listener], **client_options)
+                event_listeners=[listener, pool_listener, server_listener],
+                **client_options)
         self.scenario_client = client
         self.listener = listener
         self.pool_listener = pool_listener
+        self.server_listener = server_listener
         # Close the client explicitly to avoid having too many threads open.
         self.addCleanup(client.close)
 
