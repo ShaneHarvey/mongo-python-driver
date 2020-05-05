@@ -357,7 +357,8 @@ class SpecRunner(IntegrationTest):
                 arguments["requests"] = requests
             elif arg_name == "session":
                 arguments['session'] = sessions[arguments['session']]
-            elif name == 'command' and arg_name == 'command':
+            elif (name in ('command', 'run_admin_command') and
+                  arg_name == 'command'):
                 # Ensure the first key is the command name.
                 ordered_command = SON([(operation['command_name'], 1)])
                 ordered_command.update(arguments['command'])

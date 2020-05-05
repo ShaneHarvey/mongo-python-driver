@@ -129,6 +129,15 @@ class Monitor(MonitorBase):
         sock = self.current_sock
         if sock:
             sock.cancel_context.cancel()
+            # TODO: This causes sendall to fail with EBADF:
+            # Traceback (most recent call last):
+            #   File "/Users/shane/git/mongo-python-driver/pymongo/pool.py",
+            #   line 658, in command
+            #     return command(self, dbname, spec, slave_ok,
+            #   File "/Users/shane/git/mongo-python-driver/pymongo/network
+            #   .py", line 141, in command
+            #     sock_info.sock.sendall(msg)
+            # OSError: [Errno 9] Bad file descriptor
             # sock.close_socket(None)
 
     def _start_rtt_monitor(self):
