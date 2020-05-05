@@ -114,7 +114,7 @@
       "description": "Command error on Monitor check",
       "clientOptions": {
         "retryWrites": false,
-        "connectTimeoutMS": 250,
+        "connectTimeoutMS": 1000,
         "heartbeatFrequencyMS": 500,
         "appName": "commandErrorCheckTest"
       },
@@ -140,7 +140,7 @@
             "failPoint": {
               "configureFailPoint": "failCommand",
               "mode": {
-                "times": 1
+                "times": 2
               },
               "data": {
                 "failCommands": [
@@ -148,6 +148,8 @@
                 ],
                 "appName": "commandErrorCheckTest",
                 "closeConnection": false,
+                "blockConnection": true,
+                "blockTimeMS": 750,
                 "errorCode": 91
               }
             }

@@ -114,7 +114,7 @@
       "description": "Network timeout on Monitor check",
       "clientOptions": {
         "retryWrites": false,
-        "connectTimeoutMS": 250,
+        "connectTimeoutMS": 750,
         "heartbeatFrequencyMS": 500,
         "appName": "timeoutMonitorCheckTest"
       },
@@ -140,7 +140,7 @@
             "failPoint": {
               "configureFailPoint": "failCommand",
               "mode": {
-                "times": 1
+                "times": 2
               },
               "data": {
                 "failCommands": [
