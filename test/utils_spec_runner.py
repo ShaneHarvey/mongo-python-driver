@@ -566,6 +566,26 @@ class SpecRunner(IntegrationTest):
 
     def run_scenario(self, scenario_def, test):
         self.maybe_skip_scenario(test)
+
+        # Kill all sessions before and after each test to prevent an open
+        # transaction (from a test failure) from blocking collection/database
+        # operations during test set up and tear down.
+        self.kill_all_sessions()
+        self.addCleanup(self.kill_all_sessions)
+        self.setup_scenario(scenario_def)
+        database_name = self.get_scenario_db_name(scenario_def)
+        collection_name = self.get_scenario_coll_name(scenario_def)
+        # SPEC-1245 workaround StaleDbVersion on distinct
+        for c in self.mongos_clients:
+            c[database_name][collection_name].distinct("x")
+
+        # Configure the fail point before creating the client.
+        if 'failPoint' in test:
+            fp = test['failPoint']
+            self.set_fail_point(fp)
+            self.addCleanup(self.set_fail_point, {
+                'configureFailPoint': fp['configureFailPoint'], 'mode': 'off'})
+
         listener = OvertCommandListener()
         pool_listener = CMAPListener()
         server_listener = ServerAndTopologyEventListener()
@@ -592,20 +612,6 @@ class SpecRunner(IntegrationTest):
         # Close the client explicitly to avoid having too many threads open.
         self.addCleanup(client.close)
 
-        # Kill all sessions before and after each test to prevent an open
-        # transaction (from a test failure) from blocking collection/database
-        # operations during test set up and tear down.
-        self.kill_all_sessions()
-        self.addCleanup(self.kill_all_sessions)
-
-        database_name = self.get_scenario_db_name(scenario_def)
-        collection_name = self.get_scenario_coll_name(scenario_def)
-        self.setup_scenario(scenario_def)
-
-        # SPEC-1245 workaround StaleDbVersion on distinct
-        for c in self.mongos_clients:
-            c[database_name][collection_name].distinct("x")
-
         # Create session0 and session1.
         sessions = {}
         session_ids = {}
@@ -629,14 +635,6 @@ class SpecRunner(IntegrationTest):
             session_ids[session_name] = s.session_id
 
         self.addCleanup(end_sessions, sessions)
-
-        if 'failPoint' in test:
-            fp = test['failPoint']
-            self.set_fail_point(fp)
-            self.addCleanup(self.set_fail_point, {
-                'configureFailPoint': fp['configureFailPoint'], 'mode': 'off'})
-
-        listener.results.clear()
 
         collection = client[database_name][collection_name]
         self.run_test_ops(sessions, collection, test)
