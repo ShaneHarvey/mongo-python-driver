@@ -13,7 +13,7 @@
       "clientOptions": {
         "retryWrites": false,
         "heartbeatFrequencyMS": 500,
-        "appName": "shutdownErrorInsertTest"
+        "appname": "shutdownErrorInsertTest"
       },
       "operations": [
         {

@@ -32,7 +32,7 @@
       },
       "clientOptions": {
         "retryWrites": false,
-        "appName": "insertNetworkErrorTest"
+        "appname": "insertNetworkErrorTest"
       },
       "operations": [
         {

@@ -13,7 +13,7 @@
       "failPoint": {
         "configureFailPoint": "failCommand",
         "mode": {
-          "times": 1
+          "times": 2
         },
         "data": {
           "failCommands": [
@@ -27,7 +27,7 @@
         "retryWrites": false,
         "connectTimeoutMS": 250,
         "heartbeatFrequencyMS": 500,
-        "appName": "networkErrorHandshakeTest"
+        "appname": "networkErrorHandshakeTest"
       },
       "operations": [
         {
@@ -58,22 +58,6 @@
                 "_id": 2
               }
             ]
-          }
-        },
-        {
-          "name": "assertEventCount",
-          "object": "testRunner",
-          "arguments": {
-            "event": "ServerMarkedUnknownEvent",
-            "count": 1
-          }
-        },
-        {
-          "name": "assertEventCount",
-          "object": "testRunner",
-          "arguments": {
-            "event": "PoolClearedEvent",
-            "count": 1
           }
         }
       ],
@@ -115,7 +99,7 @@
         "retryWrites": false,
         "connectTimeoutMS": 250,
         "heartbeatFrequencyMS": 500,
-        "appName": "networkErrorCheckTest"
+        "appname": "networkErrorCheckTest"
       },
       "operations": [
         {

@@ -33,7 +33,7 @@
       "clientOptions": {
         "retryWrites": false,
         "retryReads": false,
-        "appName": "findNetworkErrorTest"
+        "appname": "findNetworkErrorTest"
       },
       "operations": [
         {

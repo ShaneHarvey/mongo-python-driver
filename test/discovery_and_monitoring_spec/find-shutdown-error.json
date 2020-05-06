@@ -14,7 +14,7 @@
         "retryWrites": false,
         "retryReads": false,
         "heartbeatFrequencyMS": 500,
-        "appName": "shutdownErrorFindTest"
+        "appname": "shutdownErrorFindTest"
       },
       "operations": [
         {

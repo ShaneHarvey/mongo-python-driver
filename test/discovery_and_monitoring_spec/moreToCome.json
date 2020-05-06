@@ -12,7 +12,7 @@
       "description": "Monitor handles moreToCome",
       "clientOptions": {
         "heartbeatFrequencyMS": 500,
-        "appName": "moreToComeTest"
+        "appname": "moreToComeTest"
       },
       "operations": [
         {

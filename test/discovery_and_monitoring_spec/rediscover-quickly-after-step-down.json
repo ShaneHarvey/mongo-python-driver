@@ -21,7 +21,7 @@
     {
       "description": "Rediscover quickly after replSetStepDown",
       "clientOptions": {
-        "appName": "replSetStepDownTest",
+        "appname": "replSetStepDownTest",
         "heartbeatFrequencyMS": 60000,
         "serverSelectionTimeoutMS": 5000,
         "w": "majority"
