@@ -44,8 +44,6 @@ class MockPool(Pool):
         client = self.client
         host_and_port = '%s:%s' % (self.mock_host, self.mock_port)
         if host_and_port in client.mock_down_hosts:
-            print('Mock Pool.get_socket error: %s, generation: %s' % (
-                host_and_port, self.generation))
             raise AutoReconnect('mock error')
 
         assert host_and_port in (
@@ -159,7 +157,6 @@ class MockClient(MongoClient):
 
         # host is like 'a:1'.
         if host in self.mock_down_hosts:
-            print('mock_is_master error', host)
             raise NetworkTimeout('mock timeout')
 
         elif host in self.mock_standalones:

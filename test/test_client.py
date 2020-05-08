@@ -1835,43 +1835,25 @@ class TestMongoClientFailover(MockClientTest):
             self.assertEqual(7, sd_b.max_wire_version)
 
     def test_network_error_on_query(self):
-        """
-        ATTEMPT 42
-        ('mock_is_master error', 'a:1')
-         Mock Pool.get_socket error: a:1, generation: 0
-        ('mock_is_master error', 'a:1'Ignoring stale error ('a', 1): AutoReconnect('mock error',) (error generation outdated: 0, current: 1)
-        )
-        FAIL
-        """
         callback = lambda client: client.db.collection.find_one()
-        for i in range(50):
-            print('ATTEMPT %s' % i)
-            self._test_network_error(callback)
+        self._test_network_error(callback)
 
     def test_network_error_on_insert(self):
         callback = lambda client: client.db.collection.insert_one({})
-        for i in range(50):
-            print('ATTEMPT %s' % i)
-            self._test_network_error(callback)
+        self._test_network_error(callback)
 
     def test_network_error_on_update(self):
         callback = lambda client: client.db.collection.update_one(
             {}, {'$unset': 'x'})
-        for i in range(50):
-            print('ATTEMPT %s' % i)
-            self._test_network_error(callback)
+        self._test_network_error(callback)
 
     def test_network_error_on_replace(self):
         callback = lambda client: client.db.collection.replace_one({}, {})
-        for i in range(50):
-            print('ATTEMPT %s' % i)
-            self._test_network_error(callback)
+        self._test_network_error(callback)
 
     def test_network_error_on_delete(self):
         callback = lambda client: client.db.collection.delete_many({})
-        for i in range(50):
-            print('ATTEMPT %s' % i)
-            self._test_network_error(callback)
+        self._test_network_error(callback)
 
     def test_gevent_task(self):
         if not gevent_monkey_patched():
