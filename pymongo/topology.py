@@ -543,10 +543,12 @@ class Topology(object):
         server = self._servers.get(address)
         if server is None:
             # Another thread removed this server from the topology.
+            print('Ignoring stale error %s: %r (Another thread removed this server from the topology)' % (address, err_ctx.error))
             return True
 
         if err_ctx.sock_generation != server._pool.generation:
             # This is an outdated error from a previous pool version.
+            print('Ignoring stale error %s: %r (error generation outdated: %s, current: %s)' % (address, err_ctx.error, err_ctx.sock_generation, server._pool.generation))
             return True
 
         # topologyVersion check, ignore error when cur_tv >= error_tv:
@@ -557,7 +559,10 @@ class Topology(object):
             if isinstance(error.details, dict):
                 error_tv = error.details.get('topologyVersion')
 
-        return _is_stale_error_topology_version(cur_tv, error_tv)
+        stale = _is_stale_error_topology_version(cur_tv, error_tv)
+        if stale:
+            print('Ignoring stale error %s: %r (topologyVersion outdated: %s, current: %s)' % (address, err_ctx.error, error_tv, cur_tv))
+        return stale
 
     def _handle_error(self, address, err_ctx):
         if self._is_stale_error(address, err_ctx):
