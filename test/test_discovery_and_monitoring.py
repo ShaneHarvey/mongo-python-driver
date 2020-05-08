@@ -311,11 +311,11 @@ class TestIgnoreStaleErrors(IntegrationTest):
         client.admin.command('ping')
 
 
-class TestSpec(SpecRunner):
+class TestIntegration(SpecRunner):
     # Location of JSON test specifications.
     TEST_PATH = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
-        'discovery_and_monitoring_spec')
+        'discovery_and_monitoring_integration')
 
     def _event_count(self, event):
         if event == 'ServerMarkedUnknownEvent':
@@ -406,7 +406,7 @@ def create_spec_test(scenario_def, test, name):
     return run_scenario
 
 
-test_creator = TestCreator(create_spec_test, TestSpec, TestSpec.TEST_PATH)
+test_creator = TestCreator(create_spec_test, TestIntegration, TestIntegration.TEST_PATH)
 test_creator.create_tests()
 
 
