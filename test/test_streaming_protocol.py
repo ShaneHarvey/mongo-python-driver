@@ -124,6 +124,52 @@ class TestStreamingProtocol(IntegrationTest):
         # Server should be selectable.
         client.admin.command('ping')
 
+    @client_context.require_failCommand_appName
+    def test_monitor_waits_after_server_check_error(self):
+        hb_listener = HeartbeatEventListener()
+        client = rs_or_single_client(
+            event_listeners=[hb_listener], heartbeatFrequencyMS=500,
+            appName='waitAfterErrorTest')
+        self.addCleanup(client.close)
+        # Force a connection.
+        client.admin.command('ping')
+        address = client.address
+
+        fail_ismaster = {
+            'mode': {'times': 50},
+            'data': {
+                'failCommands': ['isMaster'],
+                'closeConnection': False,
+                'errorCode': 91,
+                'appName': 'waitAfterErrorTest',
+            },
+        }
+        with self.fail_point(fail_ismaster):
+            time.sleep(2)
+
+        # Server should be selectable.
+        client.admin.command('ping')
+
+        def hb_started(event):
+            return (isinstance(event, monitoring.ServerHeartbeatStartedEvent)
+                    and event.connection_id == address)
+
+        hb_started_events = hb_listener.matching(hb_started)
+        # Time: event
+        # 0ms: create MongoClient
+        # 1ms: run monitor handshake, 1
+        # 2ms: run awaitable isMaster, 2
+        # 3ms: run configureFailPoint
+        # 502ms: isMaster fails for the first time with command error
+        # 1002ms: run monitor handshake, 3
+        # 1502ms: run monitor handshake, 4
+        # 2002ms: run monitor handshake, 5
+        # 2003ms: disable configureFailPoint
+        # 2004ms: isMaster succeeds, 6
+        # 2004ms: awaitable isMaster, 7
+        self.assertGreater(len(hb_started_events), 10)
+        self.assertLess(len(hb_started_events), 15)
+
 
 if __name__ == "__main__":
     unittest.main()

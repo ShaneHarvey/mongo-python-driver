@@ -210,6 +210,11 @@ class HeartbeatEventListener(monitoring.ServerHeartbeatListener):
     def failed(self, event):
         self.results.append(event)
 
+    def matching(self, matcher):
+        """Return the matching events."""
+        results = self.results[:]
+        return [event for event in results if matcher(event)]
+
 
 class MockSocketInfo(object):
     def __init__(self):
