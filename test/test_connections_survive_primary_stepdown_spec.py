@@ -28,7 +28,7 @@ from test import (client_context,
                   IntegrationTest)
 from test.utils import (CMAPListener,
                         ensure_all_connected,
-                        rs_or_single_client)
+                        rs_or_single_client,single_client)
 
 
 class TestConnectionsSurvivePrimaryStepDown(IntegrationTest):
@@ -38,7 +38,8 @@ class TestConnectionsSurvivePrimaryStepDown(IntegrationTest):
         super(TestConnectionsSurvivePrimaryStepDown, cls).setUpClass()
         cls.listener = CMAPListener()
         cls.client = rs_or_single_client(event_listeners=[cls.listener],
-                                         retryWrites=False)
+                                         retryWrites=False,
+                                         appName='SurvivePrimaryStepDown')
 
         # Ensure connections to all servers in replica set. This is to test
         # that the is_writable flag is properly updated for sockets that
@@ -55,7 +56,18 @@ class TestConnectionsSurvivePrimaryStepDown(IntegrationTest):
         # Note that all ops use same write-concern as self.db (majority).
         self.db.drop_collection("step-down")
         self.db.create_collection("step-down")
+        self._orig_client = single_client('%s:%s' % self.client.primary, appName='pymongoPinned')
+        self.addCleanup(self._orig_client.close)
+        self._orig_client.admin.command('isMaster')
+        import time
+        time.sleep(3)
+        self.initial_connections = self.server_connections()
         self.listener.reset()
+
+    def server_connections(self):
+        print(self._orig_client.admin.command('isMaster')['me'])
+        return self._orig_client.admin.command(
+            'serverStatus')['connections']['totalCreated']
 
     def set_fail_point(self, command_args):
         cmd = SON([("configureFailPoint", "failCommand")])
@@ -65,10 +77,12 @@ class TestConnectionsSurvivePrimaryStepDown(IntegrationTest):
     def verify_pool_cleared(self):
         self.assertEqual(
             self.listener.event_count(monitoring.PoolClearedEvent), 1)
+        self.assertGreaterEqual(self.server_connections(), self.initial_connections)
 
     def verify_pool_not_cleared(self):
         self.assertEqual(
             self.listener.event_count(monitoring.PoolClearedEvent), 0)
+        self.assertEqual(self.server_connections(), self.initial_connections)
 
     @client_context.require_version_min(4, 2, -1)
     def test_get_more_iteration(self):
@@ -81,7 +95,7 @@ class TestConnectionsSurvivePrimaryStepDown(IntegrationTest):
             cursor.next()
         # Force step-down the primary.
         res = self.client.admin.command(
-            SON([("replSetStepDown", 5), ("force", True)]))
+            "replSetStepDown", 1, secondaryCatchUpPeriodSecs=1, force=False)
         self.assertEqual(res["ok"], 1.0)
         # Get next batch of results.
         for _ in range(batch_size):

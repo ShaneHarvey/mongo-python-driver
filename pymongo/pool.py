@@ -1143,6 +1143,7 @@ class Pool:
             self.next_connection_id += 1
 
         listeners = self.opts.event_listeners
+        print('publish_connection_created: %s, %s' % (self.address, 'for APP' if self.handshake else 'for SDAM'))
         if self.enabled_for_cmap:
             listeners.publish_connection_created(self.address, conn_id)
 
