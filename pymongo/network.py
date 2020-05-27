@@ -310,17 +310,26 @@ class _ReadSelector(object):
 
 class _CancellationContext(object):
     def __init__(self):
+        self._closed = False
         self._cancelled = False
         self._read_file, self._write_file = socketpair()
+        # Configure a 1-second socket timeout to ensure sendall does not
+        # block forever.
+        self._write_file.settimeout(1)
         self._selector = _ReadSelector()
 
     def close(self):
-        self._read_file.close()
-        self._write_file.close()
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            self._write_file.close()
+        finally:
+            self._read_file.close()
 
     def cancel(self):
         """Cancel this context."""
-        if self._cancelled:
+        if self._cancelled or self._closed:
             return
         self._write_file.sendall(b'1')
         self._cancelled = True

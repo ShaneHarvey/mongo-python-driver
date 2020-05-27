@@ -825,12 +825,8 @@ class SocketInfo(object):
         if self.closed:
             return
         self.closed = True
-        # Avoid exceptions on interpreter shutdown.
-        try:
-            self.sock.close()
-        except Exception:
-            pass
-        # Avoid exceptions on interpreter shutdown.
+        # Note: We catch exceptions to avoid spurious errors on interpreter
+        # shutdown.
         if self.cancel_context:
             try:
                 self.cancel_context.cancel()
@@ -840,6 +836,10 @@ class SocketInfo(object):
                 self.cancel_context.close()
             except Exception:
                 pass
+        try:
+            self.sock.close()
+        except Exception:
+            pass
 
     def socket_closed(self):
         """Return True if we know socket has been closed, False otherwise."""
@@ -1357,7 +1357,7 @@ import weakref
 import atexit
 _SOCKS = set()
 
-
+# TODO: remove socket tracking. Replace with Monitor tracking.
 def _register_sock(sock):
     ref = weakref.ref(sock, _on_sock_deleted)
     _SOCKS.add(ref)

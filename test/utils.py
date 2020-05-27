@@ -221,11 +221,8 @@ class MockSocketInfo(object):
         self.cancel_context = _CancellationContext()
         self.more_to_come = False
 
-    def close(self):
-        pass
-
     def close_socket(self, reason):
-        pass
+        self.cancel_context.close()
 
     def __enter__(self):
         return self
