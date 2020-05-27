@@ -149,26 +149,23 @@ class Monitor(MonitorBase):
 
     def _run(self):
         try:
-            for _ in range(2):
-                prev_sd = self._server_description
+            prev_sd = self._server_description
+            try:
                 self._server_description = self._check_server()
-                self._topology.on_change(self._server_description)
-                while (not self._executor._stopped and
-                       self._server_description.is_server_type_known and
-                       self._server_description.topology_version):
-                    self._start_rtt_monitor()
-                    prev_sd = self._server_description
-                    self._server_description = self._check_server()
-                    self._topology.on_change(self._server_description)
-                if self._executor._stopped:
-                    return
-                if self._server_description.error and prev_sd.is_server_type_known:
-                    # Immediate check on error.
-                    continue
-                break
-        except _MonitorCheckCancelled:
-            # Already closed the connection, wait for the next check.
-            pass
+            except _MonitorCheckCancelled:
+                # Already closed the connection, wait for the next check.
+                return
+            self._topology.on_change(self._server_description)
+
+            if (self._server_description.is_server_type_known and
+                     self._server_description.topology_version):
+                self._start_rtt_monitor()
+                # Immediately check for the next streaming response.
+                self._executor.skip_sleep()
+
+            if self._server_description.error and prev_sd.is_server_type_known:
+                # Immediately retry on network errors.
+                self._executor.skip_sleep()
         except ReferenceError:
             # Topology was garbage-collected.
             self.close()

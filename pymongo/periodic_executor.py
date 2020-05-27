@@ -46,6 +46,7 @@ class PeriodicExecutor(object):
         self._stopped = False
         self._thread = None
         self._name = name
+        self._skip_sleep = False
 
         self._thread_will_exit = False
         self._lock = threading.Lock()
@@ -105,6 +106,9 @@ class PeriodicExecutor(object):
     def update_interval(self, new_interval):
         self._interval = new_interval
 
+    def skip_sleep(self):
+        self._skip_sleep = True
+
     def __should_stop(self):
         with self._lock:
             if self._stopped:
@@ -125,13 +129,14 @@ class PeriodicExecutor(object):
 
                 raise
 
-            deadline = _time() + self._interval
+            if not self._skip_sleep:
+                deadline = _time() + self._interval
+                while not self._stopped and _time() < deadline:
+                    time.sleep(self._min_interval)
+                    if self._event:
+                        break  # Early wake.
 
-            while not self._stopped and _time() < deadline:
-                time.sleep(self._min_interval)
-                if self._event:
-                    break  # Early wake.
-
+            self._skip_sleep = False
             self._event = False
 
 
