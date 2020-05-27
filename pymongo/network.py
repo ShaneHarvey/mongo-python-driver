@@ -237,45 +237,8 @@ _READ_MASK = (
         _mask("POLLNVAL")    # Invalid request: descriptor not open
 )
 
-import os
-import sys
 
-if sys.platform == 'win32':
-    # Windows support. Windows only supports polling on sockets.
-    from pymongo._socketpair import socketpair
-
-    class _PollableFile(object):
-        def __init__(self):
-            self.read_file, self.write_file = socketpair()
-
-        def fileno(self):
-            """Support polling this file for a read."""
-            return self.read_file.fileno()
-
-        def wake_reader(self):
-            self.write_file.sendall(b'1')
-
-        def close(self):
-            self.read_file.close()
-            self.write_file.close()
-else:
-    class _PollableFile(object):
-        def __init__(self):
-            read_fd, write_fd = os.pipe()
-            # Disable buffering so that poll() works.
-            self.read_file = os.fdopen(read_fd, 'rb', 0)
-            self.write_file = os.fdopen(write_fd, 'wb', 0)
-
-        def fileno(self):
-            """Support polling this file for a read."""
-            return self.read_file.fileno()
-
-        def wake_reader(self):
-            self.write_file.write(b'1')
-
-        def close(self):
-            self.read_file.close()
-            self.write_file.close()
+from pymongo._socketpair import socketpair
 
 
 class _ReadSelector(object):
@@ -348,18 +311,18 @@ class _ReadSelector(object):
 class _CancellationContext(object):
     def __init__(self):
         self._cancelled = False
-        self._cancel_file = _PollableFile()
+        self._read_file, self._write_file = socketpair()
         self._selector = _ReadSelector()
 
     def close(self):
-        """Close"""
-        self._cancel_file.close()
+        self._read_file.close()
+        self._write_file.close()
 
     def cancel(self):
         """Cancel this context."""
         if self._cancelled:
             return
-        self._cancel_file.wake_reader()
+        self._write_file.sendall(b'1')
         self._cancelled = True
 
     def cancelled(self):
@@ -368,7 +331,7 @@ class _CancellationContext(object):
 
     def wait_for_read(self, sock):
         timeout = sock.gettimeout()
-        return self._selector.readable(sock, timeout, self._cancel_file)
+        return self._selector.readable(sock, timeout, self._read_file)
 
 
 def wait_for_read(sock_info):
