@@ -82,6 +82,12 @@ def any_server_selector(selection):
     return selection
 
 
+def not_standalone_selector(selection):
+    return selection.with_server_descriptions(
+        [s for s in selection.server_descriptions
+         if s.server_type != SERVER_TYPE.Standalone])
+
+
 def readable_server_selector(selection):
     return selection.with_server_descriptions(
         [s for s in selection.server_descriptions if s.is_readable])

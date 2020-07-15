@@ -42,7 +42,13 @@
         ]
       ],
       "outcome": {
-        "servers": {},
+        "servers": {
+          "a:27017": {
+            "type": "Standalone",
+            "minWireVersion": 0,
+            "maxWireVersion": 6
+          }
+        },
         "topologyType": "ReplicaSetNoPrimary",
         "logicalSessionTimeoutMinutes": null,
         "setName": "rs"

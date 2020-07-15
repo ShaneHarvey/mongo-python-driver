@@ -1,5 +1,5 @@
 {
-  "description": "Standalone removed from multi-server topology",
+  "description": "Standalone not removed from multi-server topology",
   "uri": "mongodb://a,b",
   "phases": [
     {
@@ -16,6 +16,12 @@
       ],
       "outcome": {
         "servers": {
+          "a:27017": {
+            "type": "Standalone",
+            "setName": null,
+            "minWireVersion": 0,
+            "maxWireVersion": 6
+          },
           "b:27017": {
             "type": "Unknown",
             "setName": null
