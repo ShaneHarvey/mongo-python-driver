@@ -15,7 +15,11 @@
         ]
       ],
       "outcome": {
-        "servers": {},
+        "servers": {
+          "a:27017": {
+            "type": "Unknown"
+          }
+        },
         "topologyType": "ReplicaSetNoPrimary",
         "logicalSessionTimeoutMinutes": null,
         "setName": "rs"

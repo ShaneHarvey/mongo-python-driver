@@ -254,6 +254,7 @@ class TopologyDescription(object):
             # Ignore read preference.
             selection = Selection.from_topology_description(self)
         else:
+            # ReplicaSetNoPrimary, ReplicaSetWithPrimary, or Unknown.
             selection = selector(Selection.from_topology_description(self))
 
         # Apply custom selector followed by localThresholdMS.
@@ -359,8 +360,8 @@ def updated_topology_description(topology_description, server_description):
             if len(topology_description._topology_settings.seeds) == 1:
                 topology_type = TOPOLOGY_TYPE.Single
             else:
-                # Remove standalone from Topology when given multiple seeds.
-                sds.pop(address)
+                # Mark the standalone node Unknown.
+                sds[address] = ServerDescription(address)
         elif server_type not in (SERVER_TYPE.Unknown, SERVER_TYPE.RSGhost):
             topology_type = _SERVER_TYPE_TO_TOPOLOGY_TYPE[server_type]
 
@@ -369,7 +370,11 @@ def updated_topology_description(topology_description, server_description):
             sds.pop(address)
 
     elif topology_type == TOPOLOGY_TYPE.ReplicaSetNoPrimary:
-        if server_type in (SERVER_TYPE.Standalone, SERVER_TYPE.Mongos):
+        if server_type == SERVER_TYPE.Standalone:
+            # Mark the standalone node Unknown.
+            sds[address] = ServerDescription(address)
+
+        elif server_type == SERVER_TYPE.Mongos:
             sds.pop(address)
 
         elif server_type == SERVER_TYPE.RSPrimary:
@@ -390,7 +395,12 @@ def updated_topology_description(topology_description, server_description):
                 sds, set_name, server_description)
 
     elif topology_type == TOPOLOGY_TYPE.ReplicaSetWithPrimary:
-        if server_type in (SERVER_TYPE.Standalone, SERVER_TYPE.Mongos):
+        if server_type == SERVER_TYPE.Standalone:
+            # Mark the standalone node Unknown.
+            sds[address] = ServerDescription(address)
+            topology_type = _check_has_primary(sds)
+
+        elif server_type == SERVER_TYPE.Mongos:
             sds.pop(address)
             topology_type = _check_has_primary(sds)
 

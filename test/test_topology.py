@@ -823,22 +823,43 @@ class TestServerSelectionErrors(TopologyTest):
             'No replica set members available for replica set name "rs"', t)
 
     def test_multiple_standalones(self):
-        # Standalones are removed from a topology with multiple seeds.
+        # Standalones are not removed from a topology with multiple seeds.
         t = create_mock_topology(seeds=['a', 'b'])
-        got_ismaster(t, ('a', 27017), {'ok': 1})
-        got_ismaster(t, ('b', 27017), {'ok': 1})
-        self.assertMessage('No servers available', t)
+        got_ismaster(t, ('a', 27017), {'ok': 1, 'maxWireVersion': 6})
+        got_ismaster(t, ('b', 27017), {'ok': 1, 'maxWireVersion': 6})
+        self.assertMessage('No servers found yet', t)
+        # Restart as secondary
+        got_ismaster(t, ('a', 27017), {
+            'ok': 1,
+            'ismaster': False,
+            'secondary': True,
+            'setName': 'rs',
+            'hosts': ['a']})
+        self.assertEqual(
+            t._description.topology_type_name, 'ReplicaSetNoPrimary')
+        self.assertEqual(len(t._description.server_descriptions()), 2)
+        # Secondary becomes primary
+        got_ismaster(t, ('a', 27017), {
+            'ok': 1,
+            'ismaster': True,
+            'secondary': False,
+            'setName': 'rs',
+            'hosts': ['a']})
+        self.assertEqual(
+            t._description.topology_type_name, 'ReplicaSetWithPrimary')
+        self.assertEqual(len(t._description.server_descriptions()), 1)
 
     def test_no_mongoses(self):
         # Standalones are removed from a topology with multiple seeds.
         t = create_mock_topology(seeds=['a', 'b'])
 
         # Discover a mongos and change topology type to Sharded.
-        got_ismaster(t, ('a', 27017), {'ok': 1, 'msg': 'isdbgrid'})
+        got_ismaster(t, ('a', 27017), {'ok': 1, 'msg': 'isdbgrid',
+                                       'maxWireVersion': 6})
 
         # Oops, both servers are standalone now. Remove them.
-        got_ismaster(t, ('a', 27017), {'ok': 1})
-        got_ismaster(t, ('b', 27017), {'ok': 1})
+        got_ismaster(t, ('a', 27017), {'ok': 1, 'maxWireVersion': 6})
+        got_ismaster(t, ('b', 27017), {'ok': 1, 'maxWireVersion': 6})
         self.assertMessage('No mongoses available', t)
 
 
