@@ -21,10 +21,8 @@
             "setName": null
           },
           "b:27017": {
-            "type": "Standalone",
-            "setName": null,
-            "minWireVersion": 0,
-            "maxWireVersion": 6
+            "type": "Unknown",
+            "setName": null
           }
         },
         "topologyType": "Unknown",

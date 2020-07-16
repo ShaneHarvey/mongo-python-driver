@@ -17,9 +17,7 @@
       "outcome": {
         "servers": {
           "a:27017": {
-            "type": "Standalone",
-            "minWireVersion": 0,
-            "maxWireVersion": 6
+            "type": "Unknown"
           }
         },
         "topologyType": "ReplicaSetNoPrimary",

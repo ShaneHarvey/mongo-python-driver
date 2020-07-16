@@ -46,7 +46,6 @@ from pymongo.server import Server
 from pymongo.server_description import ServerDescription
 from pymongo.server_selectors import (any_server_selector,
                                       arbiter_server_selector,
-                                      not_standalone_selector,
                                       secondary_server_selector,
                                       readable_server_selector,
                                       writable_server_selector,
@@ -517,8 +516,7 @@ class Topology(object):
 
         Hold the lock when calling this.
         """
-        return not_standalone_selector(
-            Selection.from_topology_description(self._description))
+        return Selection.from_topology_description(self._description)
 
     def _ensure_opened(self):
         """Start monitors, or restart after a fork.

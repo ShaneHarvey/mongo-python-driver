@@ -827,7 +827,7 @@ class TestServerSelectionErrors(TopologyTest):
         t = create_mock_topology(seeds=['a', 'b'])
         got_ismaster(t, ('a', 27017), {'ok': 1, 'maxWireVersion': 6})
         got_ismaster(t, ('b', 27017), {'ok': 1, 'maxWireVersion': 6})
-        self.assertMessage('No servers match selector', t)
+        self.assertMessage('No servers found yet', t)
         # Restart as secondary
         got_ismaster(t, ('a', 27017), {
             'ok': 1,
