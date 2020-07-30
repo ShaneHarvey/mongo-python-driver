@@ -400,9 +400,10 @@ class TestIntegration(SpecRunner):
         """Run the 'waitForThread' operation."""
         thread = self.targets[name]
         thread.stop()
-        thread.join()
+        thread.join(15)
         if thread.exc:
             raise thread.exc
+        self.assertFalse(thread.is_alive(), 'Thread %s is stuck' % (name,))
 
 
 def create_spec_test(scenario_def, test, name):
