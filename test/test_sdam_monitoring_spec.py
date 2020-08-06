@@ -25,7 +25,8 @@ from bson.json_util import object_hook
 from pymongo import monitoring
 from pymongo.common import clean_node
 from pymongo.errors import (ConnectionFailure,
-                            NotMasterError)
+                            NotMasterError,
+                            WriteConcernError)
 from pymongo.ismaster import IsMaster
 from pymongo.monitor import Monitor
 from pymongo.server_description import ServerDescription
@@ -339,6 +340,17 @@ class TestSdamMonitoring(IntegrationTest):
         self._test_app_error({'errorCode': 91, 'closeConnection': False,
                               'errorLabels': ['RetryableWriteError']},
                              NotMasterError)
+
+    def test_write_concern_error_publishes_events(self):
+        wce = {
+            "code": 91,
+            "errmsg": "Replication is being shut down",
+            "errorLabels": ["RetryableWriteError"],
+        }
+        self._test_app_error({'writeConcernError': wce,
+                              'closeConnection': False,
+                              'errorLabels': ['RetryableWriteError']},
+                             WriteConcernError)
 
 
 if __name__ == "__main__":
