@@ -27,12 +27,12 @@ class TypeRegistry(object):
             type_codecs: Optional[Iterable[Codec]] = ...,
             fallback_encoder: Optional[Fallback]=...): ...
 
-_options_base = NamedTuple('_options_base', [
+_options_base = NamedTuple('CodecOptions', [
     ('document_class', type),
     ('tz_aware', bool),
     ('uuid_representation', int),
     ('unicode_decode_error_handler', str),
-    ('tzinfo', datetime.tzinfo),
+    ('tzinfo', Optional[datetime.tzinfo]),
     ('type_registry', TypeRegistry)
 ])
 
@@ -41,7 +41,7 @@ class CodecOptions(_options_base):
         cls,
         document_class: type = ...,
         tz_aware: bool = ...,
-        uuid_representation: int = ...,
+        uuid_representation: Optional[int] = ...,
         unicode_decode_error_handler: str = ...,
         tzinfo: Optional[datetime.tzinfo] = ...,
         type_registry: Optional[TypeRegistry] = ...) -> CodecOptions: ...
