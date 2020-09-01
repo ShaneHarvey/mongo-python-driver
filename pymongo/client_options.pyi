@@ -5,7 +5,6 @@ from pymongo.auth import MongoCredential
 from pymongo.pool import PoolOptions
 from pymongo.read_concern import ReadConcern
 from pymongo.read_preferences import _ServerMode
-from pymongo.ssl_support import SSLContext
 from pymongo.write_concern import WriteConcern
 
 

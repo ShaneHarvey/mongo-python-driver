@@ -2,10 +2,6 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from pymongo.collation import Collation
 from pymongo.collection import Collection
-from pymongo.errors import (BulkWriteError as BulkWriteError,
-                            ConfigurationError as ConfigurationError,
-                            InvalidOperation as InvalidOperation,
-                            OperationFailure as OperationFailure)
 from pymongo.pool import SocketInfo
 from pymongo.write_concern import WriteConcern
 

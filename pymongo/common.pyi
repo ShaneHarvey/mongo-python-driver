@@ -2,7 +2,7 @@ import collections
 import datetime
 from typing import Any, Callable, Dict, FrozenSet, List, Mapping, MutableMapping, Optional, Tuple, Type, TypeVar, Union
 
-from bson import CodecOptions
+from bson.codec_options import CodecOptions
 from bson.raw_bson import RawBSONDocument
 from pymongo.read_concern import ReadConcern
 from pymongo.read_preferences import _ServerMode

@@ -2,7 +2,7 @@ import datetime
 from typing import Any, Dict, Optional, Set, Tuple
 
 from pymongo.ismaster import IsMaster
-from pymongo.server_type import SERVER_TYPE as SERVER_TYPE
+from pymongo.server_type import SERVER_TYPE
 
 
 class ServerDescription(object):

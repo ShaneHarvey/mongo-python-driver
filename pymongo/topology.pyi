@@ -10,7 +10,7 @@ from pymongo.server import Server
 from pymongo.server_description import ServerDescription
 from pymongo.server_selectors import Selection
 from pymongo.settings import TopologySettings
-from pymongo.topology_description import TopologyDescription, TOPOLOGY_TYPE as TOPOLOGY_TYPE
+from pymongo.topology_description import TopologyDescription, TOPOLOGY_TYPE
 
 
 def process_events_queue(queue_ref: Queue[Tuple[Callable[..., Any], Sequence[Any]]]) -> bool: ...

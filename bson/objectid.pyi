@@ -5,8 +5,6 @@
 import datetime
 from typing import Any, Optional, Union
 
-from bson.errors import InvalidId as InvalidId
-
 class ObjectId:
     def __init__(self, oid: Optional[Union[str, ObjectId, bytes]] = ...) -> None: ...
     @classmethod

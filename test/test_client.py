@@ -60,8 +60,8 @@ from pymongo.read_preferences import ReadPreference
 from pymongo.server_selectors import (any_server_selector,
                                       writable_server_selector)
 from pymongo.server_type import SERVER_TYPE
-from pymongo.settings import TOPOLOGY_TYPE
 from pymongo.srv_resolver import _HAVE_DNSPYTHON
+from pymongo.topology_description import TOPOLOGY_TYPE
 from pymongo.write_concern import WriteConcern
 from test import (client_context,
                   client_knobs,

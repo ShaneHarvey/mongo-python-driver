@@ -1,5 +1,5 @@
 from typing import Any, Optional, Union
-from pymongo.ssl_context import SSLContext as SSLContext
+from pymongo.ssl_context import SSLContext
 
 HAVE_SSL: bool = ...
 
