@@ -38,6 +38,13 @@ else:
         return text
 
 
+def _resolve(qname, rdtype, timeout):
+    # In dnspython 2.0, resolve() was added and query() was deprecated.
+    if hasattr(resolver, 'resolve'):
+        return resolver.resolve(qname, rdtype, lifetime=timeout, search=True)
+    return resolver.query(qname, rdtype, lifetime=timeout)
+
+
 class _SrvResolver(object):
     def __init__(self, fqdn, connect_timeout=None):
         self.__fqdn = fqdn
@@ -54,8 +61,7 @@ class _SrvResolver(object):
 
     def get_options(self):
         try:
-            results = resolver.query(self.__fqdn, 'TXT',
-                                     lifetime=self.__connect_timeout)
+            results = _resolve(self.__fqdn, 'TXT', self.__connect_timeout)
         except (resolver.NoAnswer, resolver.NXDOMAIN):
             # No TXT records
             return None
@@ -67,10 +73,10 @@ class _SrvResolver(object):
             b'&'.join([b''.join(res.strings) for res in results])).decode(
             'utf-8')
 
-    def _resolve_uri(self, encapsulate_errors):
+    def _resolve_srv(self, encapsulate_errors):
         try:
-            results = resolver.query('_mongodb._tcp.' + self.__fqdn, 'SRV',
-                                     lifetime=self.__connect_timeout)
+            results = _resolve('_mongodb._tcp.' + self.__fqdn, 'SRV',
+                               self.__connect_timeout)
         except Exception as exc:
             if not encapsulate_errors:
                 # Raise the original error.
@@ -80,7 +86,7 @@ class _SrvResolver(object):
         return results
 
     def _get_srv_response_and_hosts(self, encapsulate_errors):
-        results = self._resolve_uri(encapsulate_errors)
+        results = self._resolve_srv(encapsulate_errors)
 
         # Construct address tuples
         nodes = [

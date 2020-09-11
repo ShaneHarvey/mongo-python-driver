@@ -391,11 +391,11 @@ class ClientUnitTest(unittest.TestCase):
         _HAVE_DNSPYTHON, "DNS-related tests need dnspython to be installed")
     def test_connection_timeout_ms_propagates_to_DNS_resolver(self):
         # Patch the resolver.
-        from pymongo.srv_resolver import resolver
-        patched_resolver = FunctionCallRecorder(resolver.query)
-        pymongo.srv_resolver.resolver.query = patched_resolver
+        from pymongo.srv_resolver import _resolve as original_resolve
+        patched_resolver = FunctionCallRecorder(original_resolve)
+        pymongo.srv_resolver._resolve = patched_resolver
         def reset_resolver():
-            pymongo.srv_resolver.resolver.query = resolver.query
+            pymongo.srv_resolver._resolve = original_resolve
         self.addCleanup(reset_resolver)
 
         # Setup.
@@ -405,11 +405,11 @@ class ClientUnitTest(unittest.TestCase):
         uri_with_timeout = base_uri + "/?connectTimeoutMS=6000"
         expected_uri_value = 6.0
 
-        def test_scenario(args, kwargs, expected_value):
+        def test_scenario(args, kwargs, expected_timeout):
             patched_resolver.reset()
             MongoClient(*args, **kwargs)
-            for _, kw in patched_resolver.call_list():
-                self.assertAlmostEqual(kw['lifetime'], expected_value)
+            for args, kw in patched_resolver.call_list():
+                self.assertAlmostEqual(args[2], expected_timeout)
 
         # No timeout specified.
         test_scenario((base_uri,), {}, CONNECT_TIMEOUT)
