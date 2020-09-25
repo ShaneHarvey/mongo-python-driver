@@ -1,0 +1,451 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) MongoDB, Inc. 2008-present. MongoDB, Mongo, and the leaf
+# logo are registered trademarks of MongoDB, Inc
+# This file is distributed under the same license as the PyMongo package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2020.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PyMongo 3.11.1.dev1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-09-24 18:14-0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.8.0\n"
+
+#: ../../migrate-to-pymongo3.rst:2
+msgid "PyMongo 3 Migration Guide"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:4
+msgid "Contents"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:12
+msgid ""
+"PyMongo 3 is a partial rewrite bringing a large number of improvements. "
+"It also brings a number of backward breaking changes. This guide provides"
+" a roadmap for migrating an existing application from PyMongo 2.x to 3.x "
+"or writing libraries that will work with both PyMongo 2.x and 3.x."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:18
+msgid "PyMongo 2.9"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:20
+msgid ""
+"The first step in any successful migration involves upgrading to, or "
+"requiring, at least PyMongo 2.9. If your project has a requirements.txt "
+"file, add the line \"pymongo >= 2.9, < 3.0\" until you have completely "
+"migrated to PyMongo 3. Most of the key new methods and options from "
+"PyMongo 3.0 are backported in PyMongo 2.9 making migration much easier."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:28
+msgid "Enable Deprecation Warnings"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:30
+msgid ""
+"Starting with PyMongo 2.9, :exc:`DeprecationWarning` is raised by most "
+"methods removed in PyMongo 3.0. Make sure you enable runtime warnings to "
+"see where deprecated functions and methods are being used in your "
+"application::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:36
+msgid "Warnings can also be changed to errors::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:40
+msgid ""
+"Not all deprecated features raise :exc:`DeprecationWarning` when used. "
+"For example, the :meth:`~pymongo.collection.Collection.find` options "
+"renamed in PyMongo 3.0 do not raise :exc:`DeprecationWarning` when used "
+"in PyMongo 2.x. See also `Removed features with no migration path`_."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:46
+msgid "CRUD API"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:49
+msgid "Changes to find() and find_one()"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:52
+msgid "\"spec\" renamed \"filter\""
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:54
+msgid "The `spec` option has been renamed to `filter`. Code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:58 ../../migrate-to-pymongo3.rst:77
+#: ../../migrate-to-pymongo3.rst:97 ../../migrate-to-pymongo3.rst:110
+#: ../../migrate-to-pymongo3.rst:127 ../../migrate-to-pymongo3.rst:156
+#: ../../migrate-to-pymongo3.rst:211 ../../migrate-to-pymongo3.rst:223
+#: ../../migrate-to-pymongo3.rst:242 ../../migrate-to-pymongo3.rst:255
+#: ../../migrate-to-pymongo3.rst:269 ../../migrate-to-pymongo3.rst:294
+#: ../../migrate-to-pymongo3.rst:330 ../../migrate-to-pymongo3.rst:343
+#: ../../migrate-to-pymongo3.rst:429
+msgid "can be changed to this with PyMongo 2.9 or later:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:64 ../../migrate-to-pymongo3.rst:83
+msgid "or this with any version of PyMongo:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:71
+msgid "\"fields\" renamed \"projection\""
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:73
+msgid "The `fields` option has been renamed to `projection`. Code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:90
+msgid "\"partial\" renamed \"allow_partial_results\""
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:92
+msgid ""
+"The `partial` option has been renamed to `allow_partial_results`. Code "
+"like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:104
+msgid "\"timeout\" replaced by \"no_cursor_timeout\""
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:106
+msgid ""
+"The `timeout` option has been replaced by `no_cursor_timeout`. Code like "
+"this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:117
+msgid "\"network_timeout\" is removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:119
+msgid ""
+"The `network_timeout` option has been removed. This option was always the"
+" wrong solution for timing out long running queries and should never be "
+"used in production. Starting with **MongoDB 2.6** you can use the "
+"$maxTimeMS query modifier. Code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:134
+msgid "or with PyMongo 3.5 or later:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:138
+msgid "or with any version of PyMongo:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:144
+msgid ""
+"`$maxTimeMS "
+"<http://docs.mongodb.org/manual/reference/operator/meta/maxTimeMS/>`_"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:148
+msgid "Tailable cursors"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:150
+msgid ""
+"The `tailable` and `await_data` options have been replaced by "
+"`cursor_type`. Code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:165
+msgid "Other removed options"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:167
+msgid ""
+"The `slave_okay`, `read_preference`, `tag_sets`, and "
+"`secondary_acceptable_latency_ms` options have been removed. See the "
+"`Read Preferences`_ section for solutions."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:172
+msgid "The aggregate method always returns a cursor"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:174
+msgid ""
+"PyMongo 2.6 added an option to return an iterable cursor from "
+":meth:`~pymongo.collection.Collection.aggregate`. In PyMongo 3 "
+":meth:`~pymongo.collection.Collection.aggregate` always returns a cursor."
+" Use the `cursor` option for consistent behavior with PyMongo 2.9 and "
+"later:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:185
+msgid "Read Preferences"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:188
+msgid "The \"slave_okay\" option is removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:190
+msgid ""
+"The `slave_okay` option is removed from PyMongo's API. The "
+"secondaryPreferred read preference provides the same behavior. Code like "
+"this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:196
+msgid "can be changed to this with PyMongo 2.9 or newer:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:203
+msgid "The \"read_preference\" attribute is immutable"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:205 ../../migrate-to-pymongo3.rst:218
+#: ../../migrate-to-pymongo3.rst:262 ../../migrate-to-pymongo3.rst:325
+#: ../../migrate-to-pymongo3.rst:360 ../../migrate-to-pymongo3.rst:388
+#: ../../migrate-to-pymongo3.rst:463 ../../migrate-to-pymongo3.rst:476
+msgid "Code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:230 ../../migrate-to-pymongo3.rst:278
+#: ../../migrate-to-pymongo3.rst:352
+msgid ":meth:`~pymongo.database.Database.get_collection`"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:233
+msgid "The \"tag_sets\" option and attribute are removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:235
+msgid ""
+"The `tag_sets` MongoClient option is removed. The `read_preference` "
+"option can be used instead. Code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:249
+msgid "To change the tags sets for a Database or Collection, code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:281
+msgid "The \"secondary_acceptable_latency_ms\" option and attribute are removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:283
+msgid ""
+"PyMongo 2.x supports `secondary_acceptable_latency_ms` as an option to "
+"methods throughout the driver, but mongos only supports a global latency "
+"option. PyMongo 3.x has changed to match the behavior of mongos, allowing"
+" migration from a single server, to a replica set, to a sharded cluster "
+"without a surprising change in server selection behavior. A new option, "
+"`localThresholdMS`, is available through MongoClient and should be used "
+"in place of `secondaryAcceptableLatencyMS`. Code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:302
+msgid "Write Concern"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:305
+msgid "The \"safe\" option is removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:307
+msgid ""
+"In PyMongo 3 the `safe` option is removed from the entire API. "
+":class:`~pymongo.mongo_client.MongoClient` has always defaulted to "
+"acknowledged write operations and continues to do so in PyMongo 3."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:312
+msgid "The \"write_concern\" attribute is immutable"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:314
+msgid "The `write_concern` attribute is immutable in PyMongo 3. Code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:319
+msgid "can be changed to this with any version of PyMongo:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:338
+msgid ""
+"The new CRUD API write methods do not accept write concern options. Code "
+"like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:355
+msgid "Codec Options"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:358
+msgid "The \"document_class\" attribute is removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:366
+msgid "can be replaced by this in any version of PyMongo:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:373
+msgid ""
+"or to change the `document_class` for a "
+":class:`~pymongo.database.Database` with PyMongo 2.9 or later:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:382 ../../migrate-to-pymongo3.rst:403
+msgid ""
+":meth:`~pymongo.database.Database.get_collection` and "
+":meth:`~pymongo.collection.Collection.with_options`"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:386
+msgid "The \"uuid_subtype\" option and attribute are removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:394 ../../migrate-to-pymongo3.rst:453
+#: ../../migrate-to-pymongo3.rst:467 ../../migrate-to-pymongo3.rst:481
+msgid "can be replaced by this with PyMongo 2.9 or later:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:407
+msgid "MongoClient"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:410
+msgid "MongoClient connects asynchronously"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:412
+msgid ""
+"In PyMongo 3, the :class:`~pymongo.mongo_client.MongoClient` constructor "
+"no longer blocks while connecting to the server or servers, and it no "
+"longer raises :exc:`~pymongo.errors.ConnectionFailure` if they are "
+"unavailable, nor :exc:`~pymongo.errors.ConfigurationError` if the user’s "
+"credentials are wrong. Instead, the constructor returns immediately and "
+"launches the connection process on background threads. The `connect` "
+"option is added to control whether these threads are started immediately,"
+" or when the client is first used."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:420
+msgid "For consistent behavior in PyMongo 2.x and PyMongo 3.x, code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:441
+msgid ""
+"Any operation can be used to determine if the server is available. We "
+"choose the \"ismaster\" command here because it is cheap and does not "
+"require auth, so it is a simple way to check whether the server is "
+"available."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:446
+msgid "The max_pool_size parameter is removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:448
+msgid ""
+"PyMongo 3 replaced the max_pool_size parameter with support for the "
+"MongoDB URI `maxPoolSize` option. Code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:461
+msgid "The \"disconnect\" method is removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:474
+msgid "The host and port attributes are removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:489
+msgid "BSON"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:492
+msgid "\"as_class\", \"tz_aware\", and \"uuid_subtype\" are removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:494
+msgid ""
+"The `as_class`, `tz_aware`, and `uuid_subtype` parameters have been "
+"removed from the functions provided in :mod:`bson`. Furthermore, the "
+":func:`~bson.encode` and :func:`~bson.decode` functions have been added "
+"as more performant alternatives to the :meth:`bson.BSON.encode` and "
+":meth:`bson.BSON.decode` methods. Code like this::"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:504
+msgid "can be replaced by this in PyMongo 2.9 or later:"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:514
+msgid "Removed features with no migration path"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:517
+msgid "MasterSlaveConnection is removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:519
+msgid ""
+"Master slave deployments are deprecated in MongoDB. Starting with MongoDB"
+" 3.0 a replica set can have up to 50 members and that limit is likely to "
+"be removed in later releases. We recommend migrating to replica sets "
+"instead."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:524
+msgid "Requests are removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:526
+msgid ""
+"The client methods `start_request`, `in_request`, and `end_request` are "
+"removed. Requests were designed to make read-your-writes consistency more"
+" likely with the w=0 write concern. Additionally, a thread in a request "
+"used the same member for all secondary reads in a replica set. To ensure "
+"read-your-writes consistency in PyMongo 3.0, do not override the default "
+"write concern with w=0, and do not override the default read preference "
+"of PRIMARY."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:534
+msgid "The \"compile_re\" option is removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:536
+msgid ""
+"In PyMongo 3 regular expressions are never compiled to Python match "
+"objects."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:539
+msgid "The \"use_greenlets\" option is removed"
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:541
+msgid ""
+"The `use_greenlets` option was meant to allow use of PyMongo with Gevent "
+"without the use of gevent.monkey.patch_threads(). This option caused a "
+"lot of confusion and made it difficult to support alternative asyncio "
+"libraries like Eventlet. Users of Gevent should use "
+"gevent.monkey.patch_all() instead."
+msgstr ""
+
+#: ../../migrate-to-pymongo3.rst:546
+msgid ":doc:`examples/gevent`"
+msgstr ""
+

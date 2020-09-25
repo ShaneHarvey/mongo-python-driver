@@ -1,0 +1,371 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) MongoDB, Inc. 2008-present. MongoDB, Mongo, and the leaf
+# logo are registered trademarks of MongoDB, Inc
+# This file is distributed under the same license as the PyMongo package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2020.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PyMongo 3.11.1.dev1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-09-24 18:14-0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.8.0\n"
+
+#: ../../contributors.rst:2
+msgid "Contributors"
+msgstr ""
+
+#: ../../contributors.rst:3
+msgid ""
+"The following is a list of people who have contributed to **PyMongo**. If"
+" you belong here and are missing please let us know (or send a pull "
+"request after adding yourself to the list):"
+msgstr ""
+
+#: ../../contributors.rst:7
+msgid "Mike Dirolf (mdirolf)"
+msgstr ""
+
+#: ../../contributors.rst:8
+msgid "Jeff Jenkins (jeffjenkins)"
+msgstr ""
+
+#: ../../contributors.rst:9
+msgid "Jim Jones"
+msgstr ""
+
+#: ../../contributors.rst:10
+msgid "Eliot Horowitz (erh)"
+msgstr ""
+
+#: ../../contributors.rst:11
+msgid "Michael Stephens (mikejs)"
+msgstr ""
+
+#: ../../contributors.rst:12
+msgid "Joakim Sernbrant (serbaut)"
+msgstr ""
+
+#: ../../contributors.rst:13
+msgid "Alexander Artemenko (svetlyak40wt)"
+msgstr ""
+
+#: ../../contributors.rst:14
+msgid "Mathias Stearn (RedBeard0531)"
+msgstr ""
+
+#: ../../contributors.rst:15
+msgid "Fajran Iman Rusadi (fajran)"
+msgstr ""
+
+#: ../../contributors.rst:16
+msgid "Brad Clements (bkc)"
+msgstr ""
+
+#: ../../contributors.rst:17
+msgid "Andrey Fedorov (andreyf)"
+msgstr ""
+
+#: ../../contributors.rst:18
+msgid "Joshua Roesslein (joshthecoder)"
+msgstr ""
+
+#: ../../contributors.rst:19
+msgid "Gregg Lind (gregglind)"
+msgstr ""
+
+#: ../../contributors.rst:20
+msgid "Michael Schurter (schmichael)"
+msgstr ""
+
+#: ../../contributors.rst:21
+msgid "Daniel Lundin"
+msgstr ""
+
+#: ../../contributors.rst:22
+msgid "Michael Richardson (mtrichardson)"
+msgstr ""
+
+#: ../../contributors.rst:23
+msgid "Dan McKinley (mcfunley)"
+msgstr ""
+
+#: ../../contributors.rst:24
+msgid "David Wolever (wolever)"
+msgstr ""
+
+#: ../../contributors.rst:25
+msgid "Carlos Valiente (carletes)"
+msgstr ""
+
+#: ../../contributors.rst:26
+msgid "Jehiah Czebotar (jehiah)"
+msgstr ""
+
+#: ../../contributors.rst:27
+msgid "Drew Perttula (drewp)"
+msgstr ""
+
+#: ../../contributors.rst:28
+msgid "Carl Baatz (c-w-b)"
+msgstr ""
+
+#: ../../contributors.rst:29
+msgid "Johan Bergstrom (jbergstroem)"
+msgstr ""
+
+#: ../../contributors.rst:30
+msgid "Jonas Haag (jonashaag)"
+msgstr ""
+
+#: ../../contributors.rst:31
+msgid "Kristina Chodorow (kchodorow)"
+msgstr ""
+
+#: ../../contributors.rst:32
+msgid "Andrew Sibley (sibsibsib)"
+msgstr ""
+
+#: ../../contributors.rst:33
+msgid "Flavio Percoco Premoli (FlaPer87)"
+msgstr ""
+
+#: ../../contributors.rst:34
+msgid "Ken Kurzweil (kurzweil)"
+msgstr ""
+
+#: ../../contributors.rst:35
+msgid "Christian Wyglendowski (dowski)"
+msgstr ""
+
+#: ../../contributors.rst:36
+msgid "James Murty (jmurty)"
+msgstr ""
+
+#: ../../contributors.rst:37
+msgid "Brendan W. McAdams (bwmcadams)"
+msgstr ""
+
+#: ../../contributors.rst:38
+msgid "Bernie Hackett (behackett)"
+msgstr ""
+
+#: ../../contributors.rst:39
+msgid "Reed O'Brien (reedobrien)"
+msgstr ""
+
+#: ../../contributors.rst:40
+msgid "Francisco Souza (fsouza)"
+msgstr ""
+
+#: ../../contributors.rst:41
+msgid "Alexey I. Froloff (raorn)"
+msgstr ""
+
+#: ../../contributors.rst:42
+msgid "Steve Lacy (slacy)"
+msgstr ""
+
+#: ../../contributors.rst:43
+msgid "Richard Shea (shearic)"
+msgstr ""
+
+#: ../../contributors.rst:44
+msgid "Vladimir Sidorenko (gearheart)"
+msgstr ""
+
+#: ../../contributors.rst:45
+msgid "Aaron Westendorf (awestendorf)"
+msgstr ""
+
+#: ../../contributors.rst:46
+msgid "Dan Crosta (dcrosta)"
+msgstr ""
+
+#: ../../contributors.rst:47
+msgid "Ryan Smith-Roberts (rmsr)"
+msgstr ""
+
+#: ../../contributors.rst:48
+msgid "David Pisoni (gefilte)"
+msgstr ""
+
+#: ../../contributors.rst:49
+msgid "Abhay Vardhan (abhayv)"
+msgstr ""
+
+#: ../../contributors.rst:50
+msgid "Alexey Borzenkov (snaury)"
+msgstr ""
+
+#: ../../contributors.rst:51
+msgid "Kostya Rybnikov (k-bx)"
+msgstr ""
+
+#: ../../contributors.rst:52
+msgid "A Jesse Jiryu Davis (ajdavis)"
+msgstr ""
+
+#: ../../contributors.rst:53
+msgid "Samuel Clay (samuelclay)"
+msgstr ""
+
+#: ../../contributors.rst:54
+msgid "Ross Lawley (rozza)"
+msgstr ""
+
+#: ../../contributors.rst:55
+msgid "Wouter Bolsterlee (wbolster)"
+msgstr ""
+
+#: ../../contributors.rst:56
+msgid "Alex Grönholm (agronholm)"
+msgstr ""
+
+#: ../../contributors.rst:57
+msgid "Christoph Simon (kalanzun)"
+msgstr ""
+
+#: ../../contributors.rst:58
+msgid "Chris Tompkinson (tompko)"
+msgstr ""
+
+#: ../../contributors.rst:59
+msgid "Mike O'Brien (mpobrien)"
+msgstr ""
+
+#: ../../contributors.rst:60
+msgid "T Dampier (dampier)"
+msgstr ""
+
+#: ../../contributors.rst:61
+msgid "Michael Henson (hensom)"
+msgstr ""
+
+#: ../../contributors.rst:62
+msgid "Craig Hobbs (craigahobbs)"
+msgstr ""
+
+#: ../../contributors.rst:63
+msgid "Emily Stolfo (estolfo)"
+msgstr ""
+
+#: ../../contributors.rst:64
+msgid "Sam Helman (shelman)"
+msgstr ""
+
+#: ../../contributors.rst:65
+msgid "Justin Patrin (reversefold)"
+msgstr ""
+
+#: ../../contributors.rst:66
+msgid "Xiuming Chen (cxmcc)"
+msgstr ""
+
+#: ../../contributors.rst:67
+msgid "Tyler Jones (thomascirca)"
+msgstr ""
+
+#: ../../contributors.rst:68
+msgid "Amalia Hawkins (hawka)"
+msgstr ""
+
+#: ../../contributors.rst:69
+msgid "Yuchen Ying (yegle)"
+msgstr ""
+
+#: ../../contributors.rst:70
+msgid "Kyle Erf (3rf)"
+msgstr ""
+
+#: ../../contributors.rst:71
+msgid "Luke Lovett (lovett89)"
+msgstr ""
+
+#: ../../contributors.rst:72
+msgid "Jaroslav Semančík (girogiro)"
+msgstr ""
+
+#: ../../contributors.rst:73
+msgid "Don Mitchell (dmitchell)"
+msgstr ""
+
+#: ../../contributors.rst:74
+msgid "Ximing (armnotstrong)"
+msgstr ""
+
+#: ../../contributors.rst:75
+msgid "Can Zhang (cannium)"
+msgstr ""
+
+#: ../../contributors.rst:76
+msgid "Sergey Azovskov (last-g)"
+msgstr ""
+
+#: ../../contributors.rst:77
+msgid "Heewa Barfchin (heewa)"
+msgstr ""
+
+#: ../../contributors.rst:78
+msgid "Anna Herlihy (aherlihy)"
+msgstr ""
+
+#: ../../contributors.rst:79
+msgid "Len Buckens (buckensl)"
+msgstr ""
+
+#: ../../contributors.rst:80
+msgid "ultrabug"
+msgstr ""
+
+#: ../../contributors.rst:81
+msgid "Shane Harvey (ShaneHarvey)"
+msgstr ""
+
+#: ../../contributors.rst:82
+msgid "Cao Siyang (caosiyang)"
+msgstr ""
+
+#: ../../contributors.rst:83
+msgid "Zhecong Kwok (gzcf)"
+msgstr ""
+
+#: ../../contributors.rst:84
+msgid "TaoBeier(tao12345666333)"
+msgstr ""
+
+#: ../../contributors.rst:85
+msgid "Jagrut Trivedi(Jagrut)"
+msgstr ""
+
+#: ../../contributors.rst:86
+msgid "Shrey Batra(shreybatra)"
+msgstr ""
+
+#: ../../contributors.rst:87
+msgid "Felipe Rodrigues(fbidu)"
+msgstr ""
+
+#: ../../contributors.rst:88
+msgid "Terence Honles (terencehonles)"
+msgstr ""
+
+#: ../../contributors.rst:89
+msgid "Paul Fisher (thetorpedodog)"
+msgstr ""
+
+#: ../../contributors.rst:90
+msgid "Julius Park (juliusgeo)"
+msgstr ""
+
+#: ../../contributors.rst:91
+msgid "Ishmum Jawad Khan (ishmum123)"
+msgstr ""
+

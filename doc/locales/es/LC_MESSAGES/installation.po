@@ -1,0 +1,373 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) MongoDB, Inc. 2008-present. MongoDB, Mongo, and the leaf
+# logo are registered trademarks of MongoDB, Inc
+# This file is distributed under the same license as the PyMongo package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2020.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PyMongo 3.11.1.dev1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-09-24 18:14-0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.8.0\n"
+
+#: ../../installation.rst:2
+msgid "Installing / Upgrading"
+msgstr ""
+
+#: ../../installation.rst:5
+msgid ""
+"**PyMongo** is in the `Python Package Index "
+"<http://pypi.python.org/pypi/pymongo/>`_."
+msgstr ""
+
+#: ../../installation.rst:8
+msgid ""
+"**Do not install the \"bson\" package from pypi.** PyMongo comes with its"
+" own bson package; doing \"pip install bson\" or \"easy_install bson\" "
+"installs a third-party package that is incompatible with PyMongo."
+msgstr ""
+
+#: ../../installation.rst:13
+msgid "Installing with pip"
+msgstr ""
+
+#: ../../installation.rst:15
+msgid ""
+"We recommend using `pip <http://pypi.python.org/pypi/pip>`_ to install "
+"pymongo on all platforms::"
+msgstr ""
+
+#: ../../installation.rst:20
+msgid "To get a specific version of pymongo::"
+msgstr ""
+
+#: ../../installation.rst:24
+msgid "To upgrade using pip::"
+msgstr ""
+
+#: ../../installation.rst:29
+msgid ""
+"pip does not support installing python packages in .egg format. If you "
+"would like to install PyMongo from a .egg provided on pypi use "
+"easy_install instead."
+msgstr ""
+
+#: ../../installation.rst:34
+msgid "Installing with easy_install"
+msgstr ""
+
+#: ../../installation.rst:36
+msgid ""
+"To use ``easy_install`` from `setuptools "
+"<http://pypi.python.org/pypi/setuptools>`_ do::"
+msgstr ""
+
+#: ../../installation.rst:41
+msgid "To upgrade do::"
+msgstr ""
+
+#: ../../installation.rst:46
+msgid "Dependencies"
+msgstr ""
+
+#: ../../installation.rst:48
+msgid "PyMongo supports CPython 2.7, 3.4+, PyPy, and PyPy3.5+."
+msgstr ""
+
+#: ../../installation.rst:50
+msgid "Optional dependencies:"
+msgstr ""
+
+#: ../../installation.rst:52
+msgid ""
+"GSSAPI authentication requires `pykerberos "
+"<https://pypi.python.org/pypi/pykerberos>`_ on Unix or `WinKerberos "
+"<https://pypi.python.org/pypi/winkerberos>`_ on Windows. The correct "
+"dependency can be installed automatically along with PyMongo::"
+msgstr ""
+
+#: ../../installation.rst:59
+msgid ""
+":ref:`MONGODB-AWS` authentication requires `pymongo-auth-aws "
+"<https://pypi.org/project/pymongo-auth-aws/>`_::"
+msgstr ""
+
+#: ../../installation.rst:64
+msgid ""
+"Support for mongodb+srv:// URIs requires `dnspython "
+"<https://pypi.python.org/pypi/dnspython>`_::"
+msgstr ""
+
+#: ../../installation.rst:69
+msgid ""
+"TLS / SSL support may require `ipaddress "
+"<https://pypi.python.org/pypi/ipaddress>`_ and `certifi "
+"<https://pypi.python.org/pypi/certifi>`_ or `wincertstore "
+"<https://pypi.python.org/pypi/wincertstore>`_ depending on the Python "
+"version in use. The necessary dependencies can be installed along with "
+"PyMongo::"
+msgstr ""
+
+#: ../../installation.rst:78
+msgid ""
+"Users of Python versions older than 2.7.9 will also receive the "
+"dependencies for OCSP when using the tls extra."
+msgstr ""
+
+#: ../../installation.rst:81
+msgid ""
+":ref:`OCSP` requires `PyOpenSSL <https://pypi.org/project/pyOpenSSL/>`_, "
+"`requests <https://pypi.org/project/requests/>`_ and `service_identity "
+"<https://pypi.org/project/service_identity/>`_::"
+msgstr ""
+
+#: ../../installation.rst:88
+msgid ""
+"Wire protocol compression with snappy requires `python-snappy "
+"<https://pypi.org/project/python-snappy>`_::"
+msgstr ""
+
+#: ../../installation.rst:93
+msgid ""
+"Wire protocol compression with zstandard requires `zstandard "
+"<https://pypi.org/project/zstandard>`_::"
+msgstr ""
+
+#: ../../installation.rst:98
+msgid ""
+":ref:`Client-Side Field Level Encryption` requires `pymongocrypt "
+"<https://pypi.org/project/pymongocrypt/>`_::"
+msgstr ""
+
+#: ../../installation.rst:103
+msgid ""
+"You can install all dependencies automatically with the following "
+"command::"
+msgstr ""
+
+#: ../../installation.rst:108
+msgid "Other optional packages:"
+msgstr ""
+
+#: ../../installation.rst:110
+msgid ""
+"`backports.pbkdf2 <https://pypi.python.org/pypi/backports.pbkdf2/>`_, "
+"improves authentication performance with SCRAM-SHA-1 and SCRAM-SHA-256. "
+"It especially improves performance on Python versions older than 2.7.8."
+msgstr ""
+
+#: ../../installation.rst:113
+msgid ""
+"`monotonic <https://pypi.python.org/pypi/monotonic>`_ adds support for a "
+"monotonic clock, which improves reliability in environments where clock "
+"adjustments are frequent. Not needed in Python 3."
+msgstr ""
+
+#: ../../installation.rst:119
+msgid "Installing from source"
+msgstr ""
+
+#: ../../installation.rst:121
+msgid ""
+"If you'd rather install directly from the source (i.e. to stay on the "
+"bleeding edge), install the C extension dependencies then check out the "
+"latest source from GitHub and install the driver from the resulting "
+"tree::"
+msgstr ""
+
+#: ../../installation.rst:130
+msgid "Installing from source on Unix"
+msgstr ""
+
+#: ../../installation.rst:132
+msgid ""
+"To build the optional C extensions on Linux or another non-macOS Unix you"
+" must have the GNU C compiler (gcc) installed. Depending on your flavor "
+"of Unix (or Linux distribution) you may also need a python development "
+"package that provides the necessary header files for your version of "
+"Python. The package name may vary from distro to distro."
+msgstr ""
+
+#: ../../installation.rst:138
+msgid "Debian and Ubuntu users should issue the following command::"
+msgstr ""
+
+#: ../../installation.rst:142
+msgid ""
+"Users of Red Hat based distributions (RHEL, CentOS, Amazon Linux, Oracle "
+"Linux, Fedora, etc.) should issue the following command::"
+msgstr ""
+
+#: ../../installation.rst:148
+msgid "Installing from source on macOS / OSX"
+msgstr ""
+
+#: ../../installation.rst:150
+msgid ""
+"If you want to install PyMongo with C extensions from source you will "
+"need the command line developer tools. On modern versions of macOS they "
+"can be installed by running the following in Terminal (found in "
+"/Applications/Utilities/)::"
+msgstr ""
+
+#: ../../installation.rst:157
+msgid ""
+"For older versions of OSX you may need Xcode. See the notes below for "
+"various OSX and Xcode versions."
+msgstr ""
+
+#: ../../installation.rst:160
+msgid "**Snow Leopard (10.6)** - Xcode 3 with 'UNIX Development Support'."
+msgstr ""
+
+#: ../../installation.rst:162
+msgid ""
+"**Snow Leopard Xcode 4**: The Python versions shipped with OSX 10.6.x are"
+" universal binaries. They support i386, PPC, and x86_64. Xcode 4 removed "
+"support for PPC, causing the distutils version shipped with Apple's "
+"builds of Python to fail to build the C extensions if you have Xcode 4 "
+"installed. There is a workaround::"
+msgstr ""
+
+#: ../../installation.rst:171
+msgid ""
+"See `http://bugs.python.org/issue11623 "
+"<http://bugs.python.org/issue11623>`_ for a more detailed explanation."
+msgstr ""
+
+#: ../../installation.rst:174
+msgid ""
+"**Lion (10.7) and newer** - PyMongo's C extensions can be built against "
+"versions of Python 2.7 >= 2.7.4 or Python 3.4+ downloaded from "
+"python.org. In all cases Xcode must be installed with 'UNIX Development "
+"Support'."
+msgstr ""
+
+#: ../../installation.rst:179
+msgid ""
+"**Xcode 5.1**: Starting with version 5.1 the version of clang that ships "
+"with Xcode throws an error when it encounters compiler flags it doesn't "
+"recognize. This may cause C extension builds to fail with an error "
+"similar to::"
+msgstr ""
+
+#: ../../installation.rst:185
+msgid "There are workarounds::"
+msgstr ""
+
+#: ../../installation.rst:201
+msgid "Installing from source on Windows"
+msgstr ""
+
+#: ../../installation.rst:203
+msgid ""
+"If you want to install PyMongo with C extensions from source the "
+"following requirements apply to both CPython and ActiveState's "
+"ActivePython:"
+msgstr ""
+
+#: ../../installation.rst:207
+msgid "64-bit Windows"
+msgstr ""
+
+#: ../../installation.rst:209
+msgid ""
+"For Python 3.5 and newer install Visual Studio 2015. For Python 3.4 "
+"install Visual Studio 2010. You must use the full version of Visual "
+"Studio 2010 as Visual C++ Express does not provide 64-bit compilers. Make"
+" sure that you check the \"x64 Compilers and Tools\" option under Visual "
+"C++. For Python 2.7 install the `Microsoft Visual C++ Compiler for Python"
+" 2.7`_."
+msgstr ""
+
+#: ../../installation.rst:216
+msgid "32-bit Windows"
+msgstr ""
+
+#: ../../installation.rst:218
+msgid "For Python 3.5 and newer install Visual Studio 2015."
+msgstr ""
+
+#: ../../installation.rst:220
+msgid "For Python 3.4 install Visual C++ 2010 Express."
+msgstr ""
+
+#: ../../installation.rst:222
+msgid "For Python 2.7 install the `Microsoft Visual C++ Compiler for Python 2.7`_"
+msgstr ""
+
+#: ../../installation.rst:229
+msgid "Installing Without C Extensions"
+msgstr ""
+
+#: ../../installation.rst:231
+msgid ""
+"By default, the driver attempts to build and install optional C "
+"extensions (used for increasing performance) when it is installed. If any"
+" extension fails to build the driver will be installed anyway but a "
+"warning will be printed."
+msgstr ""
+
+#: ../../installation.rst:236
+msgid ""
+"If you wish to install PyMongo without the C extensions, even if the "
+"extensions build properly, it can be done using a command line option to "
+"*setup.py*::"
+msgstr ""
+
+#: ../../installation.rst:243
+msgid "Building PyMongo egg Packages"
+msgstr ""
+
+#: ../../installation.rst:245
+msgid ""
+"Some organizations do not allow compilers and other build tools on "
+"production systems. To install PyMongo on these systems with C extensions"
+" you may need to build custom egg packages. Make sure that you have "
+"installed the dependencies listed above for your operating system then "
+"run the following command in the PyMongo source directory::"
+msgstr ""
+
+#: ../../installation.rst:253
+msgid ""
+"The egg package can be found in the dist/ subdirectory. The file name "
+"will resemble “pymongo-3.6-py2.7-linux-x86_64.egg” but may have a "
+"different name depending on your platform and the version of python you "
+"use to compile."
+msgstr ""
+
+#: ../../installation.rst:259
+msgid ""
+"These “binary distributions,” will only work on systems that resemble the"
+" environment on which you built the package. In other words, ensure that "
+"operating systems and versions of Python and architecture (i.e. “32” or "
+"“64” bit) match."
+msgstr ""
+
+#: ../../installation.rst:264
+msgid ""
+"Copy this file to the target system and issue the following command to "
+"install the package::"
+msgstr ""
+
+#: ../../installation.rst:270
+msgid "Installing a beta or release candidate"
+msgstr ""
+
+#: ../../installation.rst:272
+msgid ""
+"MongoDB, Inc. may occasionally tag a beta or release candidate for "
+"testing by the community before final release. These releases will not be"
+" uploaded to pypi but can be found on the `GitHub tags page "
+"<https://github.com/mongodb/mongo-python-driver/tags>`_. They can be "
+"installed by passing the full URL for the tag to pip::"
+msgstr ""
+

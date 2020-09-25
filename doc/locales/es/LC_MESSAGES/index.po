@@ -1,0 +1,243 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) MongoDB, Inc. 2008-present. MongoDB, Mongo, and the leaf
+# logo are registered trademarks of MongoDB, Inc
+# This file is distributed under the same license as the PyMongo package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2020.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PyMongo 3.11.1.dev1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-09-24 18:14-0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.8.0\n"
+
+#: ../../index.rst:2
+msgid "PyMongo |release| Documentation"
+msgstr ""
+
+#: ../../index.rst:5
+msgid "Overview"
+msgstr ""
+
+#: ../../index.rst:6
+msgid ""
+"**PyMongo** is a Python distribution containing tools for working with "
+"`MongoDB <http://www.mongodb.org>`_, and is the recommended way to work "
+"with MongoDB from Python. This documentation attempts to explain "
+"everything you need to know to use **PyMongo**."
+msgstr ""
+
+#: ../../index.rst:11
+msgid "Todo"
+msgstr ""
+
+#: ../../index.rst:11
+msgid "a list of PyMongo's features"
+msgstr ""
+
+#: ../../index.rst:14
+msgid ":doc:`installation`"
+msgstr ""
+
+#: ../../index.rst:14
+msgid "Instructions on how to get the distribution."
+msgstr ""
+
+#: ../../index.rst:17
+msgid ":doc:`tutorial`"
+msgstr ""
+
+#: ../../index.rst:17
+msgid "Start here for a quick overview."
+msgstr ""
+
+#: ../../index.rst:20
+msgid ":doc:`examples/index`"
+msgstr ""
+
+#: ../../index.rst:20
+msgid "Examples of how to perform specific tasks."
+msgstr ""
+
+#: ../../index.rst:23
+msgid ":doc:`atlas`"
+msgstr ""
+
+#: ../../index.rst:23
+msgid "Using PyMongo with MongoDB Atlas."
+msgstr ""
+
+#: ../../index.rst:26
+msgid ":doc:`examples/tls`"
+msgstr ""
+
+#: ../../index.rst:26
+msgid "Using PyMongo with TLS / SSL."
+msgstr ""
+
+#: ../../index.rst:29
+msgid ":doc:`examples/encryption`"
+msgstr ""
+
+#: ../../index.rst:29
+msgid "Using PyMongo with client side encryption."
+msgstr ""
+
+#: ../../index.rst:32
+msgid ":doc:`faq`"
+msgstr ""
+
+#: ../../index.rst:32
+msgid "Some questions that come up often."
+msgstr ""
+
+#: ../../index.rst:35
+msgid ":doc:`migrate-to-pymongo3`"
+msgstr ""
+
+#: ../../index.rst:35
+msgid "A PyMongo 2.x to 3.x migration guide."
+msgstr ""
+
+#: ../../index.rst:38
+msgid ":doc:`python3`"
+msgstr ""
+
+#: ../../index.rst:38
+msgid "Frequently asked questions about python 3 support."
+msgstr ""
+
+#: ../../index.rst:42
+msgid ":doc:`compatibility-policy`"
+msgstr ""
+
+#: ../../index.rst:41
+msgid ""
+"Explanation of deprecations, and how to keep pace with changes in "
+"PyMongo's API."
+msgstr ""
+
+#: ../../index.rst:45
+msgid ":doc:`api/index`"
+msgstr ""
+
+#: ../../index.rst:45
+msgid "The complete API documentation, organized by module."
+msgstr ""
+
+#: ../../index.rst:49
+msgid ":doc:`tools`"
+msgstr ""
+
+#: ../../index.rst:48
+msgid ""
+"A listing of Python tools and libraries that have been written for "
+"MongoDB."
+msgstr ""
+
+#: ../../index.rst:52
+msgid ":doc:`developer/index`"
+msgstr ""
+
+#: ../../index.rst:52
+msgid "Developer guide for contributors to PyMongo."
+msgstr ""
+
+#: ../../index.rst:55
+msgid "Getting Help"
+msgstr ""
+
+#: ../../index.rst:56
+msgid ""
+"If you're having trouble or have questions about PyMongo, ask your "
+"question on our `MongoDB Community Forum "
+"<https://developer.mongodb.com/community/forums/tags/c/drivers-odms-"
+"connectors/7/python-driver>`_. You may also want to consider a "
+"`commercial support subscription <https://support.mongodb.com/welcome>`_."
+" Once you get an answer, it'd be great if you could work it back into "
+"this documentation and contribute!"
+msgstr ""
+
+#: ../../index.rst:64
+msgid "Issues"
+msgstr ""
+
+#: ../../index.rst:65
+msgid ""
+"All issues should be reported (and can be tracked / voted for / commented"
+" on) at the main `MongoDB JIRA bug tracker "
+"<http://jira.mongodb.org/browse/PYTHON>`_, in the \"Python Driver\" "
+"project."
+msgstr ""
+
+#: ../../index.rst:71
+msgid "Feature Requests / Feedback"
+msgstr ""
+
+#: ../../index.rst:72
+msgid ""
+"Use our `feedback engine "
+"<https://feedback.mongodb.com/forums/924286-drivers>`_ to send us feature"
+" requests and general feedback about PyMongo."
+msgstr ""
+
+#: ../../index.rst:76
+msgid "Contributing"
+msgstr ""
+
+#: ../../index.rst:77
+msgid ""
+"**PyMongo** has a large :doc:`community <contributors>` and contributions"
+" are always encouraged. Contributions can be as simple as minor tweaks to"
+" this documentation. To contribute, fork the project on `GitHub "
+"<http://github.com/mongodb/mongo-python-driver/>`_ and send a pull "
+"request."
+msgstr ""
+
+#: ../../index.rst:84
+msgid "Changes"
+msgstr ""
+
+#: ../../index.rst:85
+msgid ""
+"See the :doc:`changelog` for a full list of changes to PyMongo. For older"
+" versions of the documentation please see the `archive list "
+"<http://api.mongodb.org/python/>`_."
+msgstr ""
+
+#: ../../index.rst:90
+msgid "About This Documentation"
+msgstr ""
+
+#: ../../index.rst:91
+msgid ""
+"This documentation is generated using the `Sphinx "
+"<http://sphinx.pocoo.org/>`_ documentation generator. The source files "
+"for the documentation are located in the *doc/* directory of the "
+"**PyMongo** distribution. To generate the docs locally run the following "
+"command from the root directory of the **PyMongo** source:"
+msgstr ""
+
+#: ../../index.rst:102
+msgid "Indices and tables"
+msgstr ""
+
+#: ../../index.rst:104
+msgid ":ref:`genindex`"
+msgstr ""
+
+#: ../../index.rst:105
+msgid ":ref:`modindex`"
+msgstr ""
+
+#: ../../index.rst:106
+msgid ":ref:`search`"
+msgstr ""
+

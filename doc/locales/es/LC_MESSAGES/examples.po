@@ -1,0 +1,3112 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) MongoDB, Inc. 2008-present. MongoDB, Mongo, and the leaf
+# logo are registered trademarks of MongoDB, Inc
+# This file is distributed under the same license as the PyMongo package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2020.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PyMongo 3.11.1.dev1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-09-24 18:14-0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.8.0\n"
+
+#: ../../examples/aggregation.rst:2
+msgid "Aggregation Examples"
+msgstr ""
+
+#: ../../examples/aggregation.rst:4
+msgid ""
+"There are several methods of performing aggregations in MongoDB.  These "
+"examples cover the new aggregation framework, using map reduce and using "
+"the group method."
+msgstr ""
+
+#: ../../examples/aggregation.rst:15 ../../examples/gridfs.rst:20
+msgid "Setup"
+msgstr ""
+
+#: ../../examples/aggregation.rst:16
+msgid ""
+"To start, we'll insert some example data which we can perform "
+"aggregations on:"
+msgstr ""
+
+#: ../../examples/aggregation.rst:33
+msgid "Aggregation Framework"
+msgstr ""
+
+#: ../../examples/aggregation.rst:35
+msgid ""
+"This example shows how to use the "
+":meth:`~pymongo.collection.Collection.aggregate` method to use the "
+"aggregation framework.  We'll perform a simple aggregation to count the "
+"number of occurrences for each tag in the ``tags`` array, across the "
+"entire collection. To achieve this we need to pass in three operations to"
+" the pipeline. First, we need to unwind the ``tags`` array, then group by"
+" the tags and sum them up, finally we sort by count."
+msgstr ""
+
+#: ../../examples/aggregation.rst:43
+msgid ""
+"As python dictionaries don't maintain order you should use "
+":class:`~bson.son.SON` or :class:`collections.OrderedDict` where explicit"
+" ordering is required eg \"$sort\":"
+msgstr ""
+
+#: ../../examples/aggregation.rst:49
+msgid "aggregate requires server version **>= 2.1.0**."
+msgstr ""
+
+#: ../../examples/aggregation.rst:65
+msgid ""
+"To run an explain plan for this aggregation use the "
+":meth:`~pymongo.database.Database.command` method::"
+msgstr ""
+
+#: ../../examples/aggregation.rst:71
+msgid ""
+"As well as simple aggregations the aggregation framework provides "
+"projection capabilities to reshape the returned data. Using projections "
+"and aggregation, you can add computed fields, create new virtual sub-"
+"objects, and extract sub-fields into the top-level of results."
+msgstr ""
+
+#: ../../examples/aggregation.rst:76
+msgid ""
+"The full documentation for MongoDB's `aggregation framework "
+"<http://docs.mongodb.org/manual/applications/aggregation>`_"
+msgstr ""
+
+#: ../../examples/aggregation.rst:80
+msgid "Map/Reduce"
+msgstr ""
+
+#: ../../examples/aggregation.rst:82
+msgid ""
+"Another option for aggregation is to use the map reduce framework.  Here "
+"we will define **map** and **reduce** functions to also count the number "
+"of occurrences for each tag in the ``tags`` array, across the entire "
+"collection."
+msgstr ""
+
+#: ../../examples/aggregation.rst:86
+msgid ""
+"Our **map** function just emits a single `(key, 1)` pair for each tag in "
+"the array:"
+msgstr ""
+
+#: ../../examples/aggregation.rst:100
+msgid ""
+"The **reduce** function sums over all of the emitted values for a given "
+"key:"
+msgstr ""
+
+#: ../../examples/aggregation.rst:114
+msgid ""
+"We can't just return ``values.length`` as the **reduce** function might "
+"be called iteratively on the results of other reduce steps."
+msgstr ""
+
+#: ../../examples/aggregation.rst:117
+msgid ""
+"Finally, we call :meth:`~pymongo.collection.Collection.map_reduce` and "
+"iterate over the result collection:"
+msgstr ""
+
+#: ../../examples/aggregation.rst:131
+msgid "Advanced Map/Reduce"
+msgstr ""
+
+#: ../../examples/aggregation.rst:133
+msgid ""
+"PyMongo's API supports all of the features of MongoDB's map/reduce "
+"engine. One interesting feature is the ability to get more detailed "
+"results when desired, by passing `full_response=True` to "
+":meth:`~pymongo.collection.Collection.map_reduce`. This returns the full "
+"response to the map/reduce command, rather than just the result "
+"collection:"
+msgstr ""
+
+#: ../../examples/aggregation.rst:145
+msgid ""
+"All of the optional map/reduce parameters are also supported, simply pass"
+" them as keyword arguments. In this example we use the `query` parameter "
+"to limit the documents that will be mapped over:"
+msgstr ""
+
+#: ../../examples/aggregation.rst:159
+msgid ""
+"You can use :class:`~bson.son.SON` or :class:`collections.OrderedDict` to"
+" specify a different database to store the result collection:"
+msgstr ""
+
+#: ../../examples/aggregation.rst:173
+msgid ""
+"The full list of options for MongoDB's `map reduce engine "
+"<http://www.mongodb.org/display/DOCS/MapReduce>`_"
+msgstr ""
+
+#: ../../examples/authentication.rst:2
+msgid "Authentication Examples"
+msgstr ""
+
+#: ../../examples/authentication.rst:4
+msgid ""
+"MongoDB supports several different authentication mechanisms. These "
+"examples cover all authentication methods currently supported by PyMongo,"
+" documenting Python module and MongoDB version dependencies."
+msgstr ""
+
+#: ../../examples/authentication.rst:11
+msgid "Percent-Escaping Username and Password"
+msgstr ""
+
+#: ../../examples/authentication.rst:13
+msgid ""
+"Username and password must be percent-escaped with "
+":meth:`urllib.parse.quote_plus` in Python 3, or :meth:`urllib.quote_plus`"
+" in Python 2, to be used in a MongoDB URI. For example, in Python 3::"
+msgstr ""
+
+#: ../../examples/authentication.rst:31
+msgid "SCRAM-SHA-256 (RFC 7677)"
+msgstr ""
+
+#: ../../examples/authentication.rst:34
+msgid ""
+"SCRAM-SHA-256 is the default authentication mechanism supported by a "
+"cluster configured for authentication with MongoDB 4.0 or later. "
+"Authentication requires a username, a password, and a database name. The "
+"default database name is \"admin\", this can be overridden with the "
+"``authSource`` option. Credentials can be specified as arguments to "
+":class:`~pymongo.mongo_client.MongoClient`::"
+msgstr ""
+
+#: ../../examples/authentication.rst:48 ../../examples/authentication.rst:71
+msgid "Or through the MongoDB URI::"
+msgstr ""
+
+#: ../../examples/authentication.rst:54
+msgid "SCRAM-SHA-1 (RFC 5802)"
+msgstr ""
+
+#: ../../examples/authentication.rst:57
+msgid ""
+"SCRAM-SHA-1 is the default authentication mechanism supported by a "
+"cluster configured for authentication with MongoDB 3.0 or later. "
+"Authentication requires a username, a password, and a database name. The "
+"default database name is \"admin\", this can be overridden with the "
+"``authSource`` option. Credentials can be specified as arguments to "
+":class:`~pymongo.mongo_client.MongoClient`::"
+msgstr ""
+
+#: ../../examples/authentication.rst:76
+msgid ""
+"For best performance on Python versions older than 2.7.8 install "
+"`backports.pbkdf2`_."
+msgstr ""
+
+#: ../../examples/authentication.rst:81
+msgid "MONGODB-CR"
+msgstr ""
+
+#: ../../examples/authentication.rst:83
+msgid ""
+"MONGODB-CR was deprecated with the release of MongoDB 3.6 and is no "
+"longer supported by MongoDB 4.0."
+msgstr ""
+
+#: ../../examples/authentication.rst:86
+msgid ""
+"Before MongoDB 3.0 the default authentication mechanism was MONGODB-CR, "
+"the \"MongoDB Challenge-Response\" protocol::"
+msgstr ""
+
+#: ../../examples/authentication.rst:99
+msgid "Default Authentication Mechanism"
+msgstr ""
+
+#: ../../examples/authentication.rst:101
+msgid ""
+"If no mechanism is specified, PyMongo automatically uses MONGODB-CR when "
+"connected to a pre-3.0 version of MongoDB, SCRAM-SHA-1 when connected to "
+"MongoDB 3.0 through 3.6, and negotiates the mechanism to use (SCRAM-SHA-1"
+" or SCRAM-SHA-256) when connected to MongoDB 4.0+."
+msgstr ""
+
+#: ../../examples/authentication.rst:107
+msgid "Default Database and \"authSource\""
+msgstr ""
+
+#: ../../examples/authentication.rst:109
+msgid ""
+"You can specify both a default database and the authentication database "
+"in the URI::"
+msgstr ""
+
+#: ../../examples/authentication.rst:115
+msgid ""
+"PyMongo will authenticate on the \"admin\" database, but the default "
+"database will be \"default_db\"::"
+msgstr ""
+
+#: ../../examples/authentication.rst:126
+msgid "MONGODB-X509"
+msgstr ""
+
+#: ../../examples/authentication.rst:129
+msgid ""
+"The MONGODB-X509 mechanism authenticates a username derived from the "
+"distinguished subject name of the X.509 certificate presented by the "
+"driver during SSL negotiation. This authentication method requires the "
+"use of SSL connections with certificate validation and is available in "
+"MongoDB 2.6 and newer::"
+msgstr ""
+
+#: ../../examples/authentication.rst:145
+msgid ""
+"MONGODB-X509 authenticates against the $external virtual database, so you"
+" do not have to specify a database in the URI::"
+msgstr ""
+
+#: ../../examples/authentication.rst:156
+msgid "When connected to MongoDB >= 3.4 the username is no longer required."
+msgstr ""
+
+#: ../../examples/authentication.rst:162
+msgid "GSSAPI (Kerberos)"
+msgstr ""
+
+#: ../../examples/authentication.rst:165
+msgid ""
+"GSSAPI (Kerberos) authentication is available in the Enterprise Edition "
+"of MongoDB."
+msgstr ""
+
+#: ../../examples/authentication.rst:169
+msgid "Unix"
+msgstr ""
+
+#: ../../examples/authentication.rst:171
+msgid ""
+"To authenticate using GSSAPI you must first install the python "
+"`kerberos`_ or `pykerberos`_ module using easy_install or pip. Make sure "
+"you run kinit before using the following authentication methods::"
+msgstr ""
+
+#: ../../examples/authentication.rst:184
+msgid ""
+"Now authenticate using the MongoDB URI. GSSAPI authenticates against the "
+"$external virtual database so you do not have to specify a database in "
+"the URI::"
+msgstr ""
+
+#: ../../examples/authentication.rst:194
+msgid ""
+"The default service name used by MongoDB and PyMongo is `mongodb`. You "
+"can specify a custom service name with the ``authMechanismProperties`` "
+"option::"
+msgstr ""
+
+#: ../../examples/authentication.rst:202
+msgid "Windows (SSPI)"
+msgstr ""
+
+#: ../../examples/authentication.rst:205
+msgid ""
+"First install the `winkerberos`_ module. Unlike authentication on Unix "
+"kinit is not used. If the user to authenticate is different from the user"
+" that owns the application process provide a password to authenticate::"
+msgstr ""
+
+#: ../../examples/authentication.rst:211
+msgid "Two extra ``authMechanismProperties`` are supported on Windows platforms:"
+msgstr ""
+
+#: ../../examples/authentication.rst:213
+msgid ""
+"CANONICALIZE_HOST_NAME - Uses the fully qualified domain name (FQDN) of "
+"the MongoDB host for the server principal (GSSAPI libraries on Unix do "
+"this by default)::"
+msgstr ""
+
+#: ../../examples/authentication.rst:219
+msgid ""
+"SERVICE_REALM - This is used when the user's realm is different from the "
+"service's realm::"
+msgstr ""
+
+#: ../../examples/authentication.rst:231
+msgid "SASL PLAIN (RFC 4616)"
+msgstr ""
+
+#: ../../examples/authentication.rst:234
+msgid ""
+"MongoDB Enterprise Edition version 2.6 and newer support the SASL PLAIN "
+"authentication mechanism, initially intended for delegating "
+"authentication to an LDAP server. Using the PLAIN mechanism is very "
+"similar to MONGODB-CR. These examples use the $external virtual database "
+"for LDAP support::"
+msgstr ""
+
+#: ../../examples/authentication.rst:244
+msgid ""
+"SASL PLAIN is a clear-text authentication mechanism. We **strongly** "
+"recommend that you connect to MongoDB using SSL with certificate "
+"validation when using the SASL PLAIN mechanism::"
+msgstr ""
+
+#: ../../examples/authentication.rst:261
+msgid "MONGODB-AWS"
+msgstr ""
+
+#: ../../examples/authentication.rst:264
+msgid ""
+"The MONGODB-AWS authentication mechanism is available in MongoDB 4.4+ and"
+" requires extra pymongo dependencies. To use it, install pymongo with the"
+" ``aws`` extra::"
+msgstr ""
+
+#: ../../examples/authentication.rst:270
+msgid ""
+"The MONGODB-AWS mechanism authenticates using AWS IAM credentials (an "
+"access key ID and a secret access key), `temporary AWS IAM credentials`_ "
+"obtained from an `AWS Security Token Service (STS)`_ `Assume Role`_ "
+"request, AWS Lambda `environment variables`_, or temporary AWS IAM "
+"credentials assigned to an `EC2 instance`_ or ECS task. The use of "
+"temporary credentials, in addition to an access key ID and a secret "
+"access key, also requires a security (or session) token."
+msgstr ""
+
+#: ../../examples/authentication.rst:278
+msgid ""
+"Credentials can be configured through the MongoDB URI, environment "
+"variables, or the local EC2 or ECS endpoint. The order in which the "
+"client searches for credentials is:"
+msgstr ""
+
+#: ../../examples/authentication.rst:282
+msgid "Credentials passed through the URI"
+msgstr ""
+
+#: ../../examples/authentication.rst:283
+msgid "Environment variables"
+msgstr ""
+
+#: ../../examples/authentication.rst:284
+msgid ""
+"ECS endpoint if and only if ``AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`` is"
+" set."
+msgstr ""
+
+#: ../../examples/authentication.rst:285
+msgid "EC2 endpoint"
+msgstr ""
+
+#: ../../examples/authentication.rst:287
+msgid ""
+"MONGODB-AWS authenticates against the \"$external\" virtual database, so "
+"none of the URIs in this section need to include the ``authSource`` URI "
+"option."
+msgstr ""
+
+#: ../../examples/authentication.rst:291
+msgid "AWS IAM credentials"
+msgstr ""
+
+#: ../../examples/authentication.rst:293
+msgid ""
+"Applications can authenticate using AWS IAM credentials by providing a "
+"valid access key id and secret access key pair as the username and "
+"password, respectively, in the MongoDB URI. A sample URI would be::"
+msgstr ""
+
+#: ../../examples/authentication.rst:301
+msgid ""
+"The access_key_id and secret_access_key passed into the URI MUST be "
+"`percent escaped`_."
+msgstr ""
+
+#: ../../examples/authentication.rst:305
+msgid "AssumeRole"
+msgstr ""
+
+#: ../../examples/authentication.rst:307
+msgid ""
+"Applications can authenticate using temporary credentials returned from "
+"an assume role request. These temporary credentials consist of an access "
+"key ID, a secret access key, and a security token passed into the URI. A "
+"sample URI would be::"
+msgstr ""
+
+#: ../../examples/authentication.rst:316
+msgid ""
+"The access_key_id, secret_access_key, and session_token passed into the "
+"URI MUST be `percent escaped`_."
+msgstr ""
+
+#: ../../examples/authentication.rst:320
+msgid "AWS Lambda (Environment Variables)"
+msgstr ""
+
+#: ../../examples/authentication.rst:322
+msgid ""
+"When the username and password are not provided and the MONGODB-AWS "
+"mechanism is set, the client will fallback to using the `environment "
+"variables`_ ``AWS_ACCESS_KEY_ID``, ``AWS_SECRET_ACCESS_KEY``, and "
+"``AWS_SESSION_TOKEN`` for the access key ID, secret access key, and "
+"session token, respectively::"
+msgstr ""
+
+#: ../../examples/authentication.rst:335
+msgid ""
+"No username, password, or session token is passed into the URI. PyMongo "
+"will use credentials set via the environment variables. These environment"
+" variables MUST NOT be `percent escaped`_."
+msgstr ""
+
+#: ../../examples/authentication.rst:340
+msgid "ECS Container"
+msgstr ""
+
+#: ../../examples/authentication.rst:342
+msgid ""
+"Applications can authenticate from an ECS container via temporary "
+"credentials assigned to the machine. A sample URI on an ECS container "
+"would be::"
+msgstr ""
+
+#: ../../examples/authentication.rst:350
+msgid ""
+"No username, password, or session token is passed into the URI. PyMongo "
+"will query the ECS container endpoint to obtain these credentials."
+msgstr ""
+
+#: ../../examples/authentication.rst:355
+msgid "EC2 Instance"
+msgstr ""
+
+#: ../../examples/authentication.rst:357
+msgid ""
+"Applications can authenticate from an EC2 instance via temporary "
+"credentials assigned to the machine. A sample URI on an EC2 machine would"
+" be::"
+msgstr ""
+
+#: ../../examples/authentication.rst:365
+msgid ""
+"No username, password, or session token is passed into the URI. PyMongo "
+"will query the EC2 instance endpoint to obtain these credentials."
+msgstr ""
+
+#: ../../examples/bulk.rst:2
+msgid "Bulk Write Operations"
+msgstr ""
+
+#: ../../examples/bulk.rst:10
+msgid ""
+"This tutorial explains how to take advantage of PyMongo's bulk write "
+"operation features. Executing write operations in batches reduces the "
+"number of network round trips, increasing write throughput."
+msgstr ""
+
+#: ../../examples/bulk.rst:16
+msgid "Bulk Insert"
+msgstr ""
+
+#: ../../examples/bulk.rst:20
+msgid ""
+"A batch of documents can be inserted by passing a list to the "
+":meth:`~pymongo.collection.Collection.insert_many` method. PyMongo will "
+"automatically split the batch into smaller sub-batches based on the "
+"maximum message size accepted by MongoDB, supporting very large bulk "
+"insert operations."
+msgstr ""
+
+#: ../../examples/bulk.rst:36
+msgid "Mixed Bulk Write Operations"
+msgstr ""
+
+#: ../../examples/bulk.rst:40
+msgid ""
+"PyMongo also supports executing mixed bulk write operations. A batch of "
+"insert, update, and remove operations can be executed together using the "
+"bulk write operations API."
+msgstr ""
+
+#: ../../examples/bulk.rst:47
+msgid "Ordered Bulk Write Operations"
+msgstr ""
+
+#: ../../examples/bulk.rst:49
+msgid ""
+"Ordered bulk write operations are batched and sent to the server in the "
+"order provided for serial execution. The return value is an instance of "
+":class:`~pymongo.results.BulkWriteResult` describing the type and count "
+"of operations performed."
+msgstr ""
+
+#: ../../examples/bulk.rst:77
+msgid ""
+"``nModified`` is only reported by MongoDB 2.6 and later. When connected "
+"to an earlier server version, or in certain mixed version sharding "
+"configurations, PyMongo omits this field from the results of a bulk write"
+" operation."
+msgstr ""
+
+#: ../../examples/bulk.rst:82
+msgid ""
+"The first write failure that occurs (e.g. duplicate key error) aborts the"
+" remaining operations, and PyMongo raises "
+":class:`~pymongo.errors.BulkWriteError`. The :attr:`details` attibute of "
+"the exception instance provides the execution results up until the "
+"failure occurred and details about the failure - including the operation "
+"that caused the failure."
+msgstr ""
+
+#: ../../examples/bulk.rst:118
+msgid "Unordered Bulk Write Operations"
+msgstr ""
+
+#: ../../examples/bulk.rst:120
+msgid ""
+"Unordered bulk write operations are batched and sent to the server in "
+"**arbitrary order** where they may be executed in parallel. Any errors "
+"that occur are reported after all operations are attempted."
+msgstr ""
+
+#: ../../examples/bulk.rst:124
+msgid ""
+"In the next example the first and third operations fail due to the unique"
+" constraint on _id. Since we are doing unordered execution the second and"
+" fourth operations succeed."
+msgstr ""
+
+#: ../../examples/bulk.rst:158
+msgid "Write Concern"
+msgstr ""
+
+#: ../../examples/bulk.rst:160
+msgid ""
+"Bulk operations are executed with the "
+":attr:`~pymongo.collection.Collection.write_concern` of the collection "
+"they are executed against. Write concern errors (e.g. wtimeout) will be "
+"reported after all operations are attempted, regardless of execution "
+"order."
+msgstr ""
+
+#: ../../examples/bulk.rst:182
+msgid "::"
+msgstr ""
+
+#: ../../examples/collations.rst:2
+msgid "Collations"
+msgstr ""
+
+#: ../../examples/collations.rst:4
+msgid "The API docs for :mod:`~pymongo.collation`."
+msgstr ""
+
+#: ../../examples/collations.rst:6
+msgid ""
+"Collations are a new feature in MongoDB version 3.4. They provide a set "
+"of rules to use when comparing strings that comply with the conventions "
+"of a particular language, such as Spanish or German. If no collation is "
+"specified, the server sorts strings based on a binary comparison. Many "
+"languages have specific ordering rules, and collations allow users to "
+"build applications that adhere to language-specific comparison rules."
+msgstr ""
+
+#: ../../examples/collations.rst:13
+msgid ""
+"In French, for example, the last accent in a given word determines the "
+"sorting order. The correct sorting order for the following four words in "
+"French is::"
+msgstr ""
+
+#: ../../examples/collations.rst:18
+msgid ""
+"Specifying a French collation allows users to sort string fields using "
+"the French sort order."
+msgstr ""
+
+#: ../../examples/collations.rst:22
+msgid "Usage"
+msgstr ""
+
+#: ../../examples/collations.rst:24
+msgid ""
+"Users can specify a collation for a :ref:`collection<collation-on-"
+"collection>`, an :ref:`index<collation-on-index>`, or a :ref:`CRUD "
+"command <collation-on-operation>`."
+msgstr ""
+
+#: ../../examples/collations.rst:30
+msgid "Collation Parameters:"
+msgstr ""
+
+#: ../../examples/collations.rst:32
+msgid ""
+"Collations can be specified with the "
+":class:`~pymongo.collation.Collation` model or with plain Python "
+"dictionaries. The structure is the same::"
+msgstr ""
+
+#: ../../examples/collations.rst:44
+msgid ""
+"The only required parameter is ``locale``, which the server parses as an "
+"`ICU format locale ID <http://userguide.icu-project.org/locale>`_. For "
+"example, set ``locale`` to ``en_US`` to represent US English or ``fr_CA``"
+" to represent Canadian French."
+msgstr ""
+
+#: ../../examples/collations.rst:49
+msgid ""
+"For a complete description of the available parameters, see the MongoDB "
+"`manual </>`_."
+msgstr ""
+
+#: ../../examples/collations.rst:57
+msgid "Assign a Default Collation to a Collection"
+msgstr ""
+
+#: ../../examples/collations.rst:59
+msgid ""
+"The following example demonstrates how to create a new collection called "
+"``contacts`` and assign a default collation with the ``fr_CA`` locale. "
+"This operation ensures that all queries that are run against the "
+"``contacts`` collection use the ``fr_CA`` collation unless another "
+"collation is explicitly specified::"
+msgstr ""
+
+#: ../../examples/collations.rst:75
+msgid "Assign a Default Collation to an Index"
+msgstr ""
+
+#: ../../examples/collations.rst:77
+msgid "When creating a new index, you can specify a default collation."
+msgstr ""
+
+#: ../../examples/collations.rst:79
+msgid ""
+"The following example shows how to create an index on the ``name`` field "
+"of the ``contacts`` collection, with the ``unique`` parameter enabled and"
+" a default collation with ``locale`` set to ``fr_CA``::"
+msgstr ""
+
+#: ../../examples/collations.rst:94
+msgid "Specify a Collation for a Query"
+msgstr ""
+
+#: ../../examples/collations.rst:96
+msgid ""
+"Individual queries can specify a collation to use when sorting results. "
+"The following example demonstrates a query that runs on the ``contacts`` "
+"collection in database ``test``. It matches on documents that contain "
+"``New York`` in the ``city`` field, and sorts on the ``name`` field with "
+"the ``fr_CA`` collation::"
+msgstr ""
+
+#: ../../examples/collations.rst:110
+msgid "Other Query Types"
+msgstr ""
+
+#: ../../examples/collations.rst:112
+msgid ""
+"You can use collations to control document matching rules for several "
+"different types of queries. All the various update and delete methods "
+"(:meth:`~pymongo.collection.Collection.update_one`, "
+":meth:`~pymongo.collection.Collection.update_many`, "
+":meth:`~pymongo.collection.Collection.delete_one`, etc.) support "
+"collation, and you can create query filters which employ collations to "
+"comply with any of the languages and variants available to the ``locale``"
+" parameter."
+msgstr ""
+
+#: ../../examples/collations.rst:120
+msgid ""
+"The following example uses a collation with ``strength`` set to "
+":const:`~pymongo.collation.CollationStrength.SECONDARY`, which considers "
+"only the base character and character accents in string comparisons, but "
+"not case sensitivity, for example. All documents in the ``contacts`` "
+"collection with ``jürgen`` (case-insensitive) in the ``first_name`` field"
+" are updated::"
+msgstr ""
+
+#: ../../examples/copydb.rst:2
+msgid "Copying a Database"
+msgstr ""
+
+#: ../../examples/copydb.rst:4
+msgid ""
+"To copy a database within a single mongod process, or between mongod "
+"servers, simply connect to the target mongod and use the "
+":meth:`~pymongo.database.Database.command` method::"
+msgstr ""
+
+#: ../../examples/copydb.rst:14
+msgid "To copy from a different mongod server that is not password-protected::"
+msgstr ""
+
+#: ../../examples/copydb.rst:21
+msgid ""
+"If the target server is password-protected, authenticate to the \"admin\""
+" database::"
+msgstr ""
+
+#: ../../examples/copydb.rst:32
+msgid "See the :doc:`authentication examples </examples/authentication>`."
+msgstr ""
+
+#: ../../examples/copydb.rst:34
+msgid ""
+"If the **source** server is password-protected, use the `copyDatabase "
+"function in the mongo shell`_."
+msgstr ""
+
+#: ../../examples/copydb.rst:37
+msgid ""
+"Versions of PyMongo before 3.0 included a ``copy_database`` helper "
+"method, but it has been removed."
+msgstr ""
+
+#: ../../examples/custom_type.rst:2
+msgid "Custom Type Example"
+msgstr ""
+
+#: ../../examples/custom_type.rst:4
+msgid ""
+"This is an example of using a custom type with PyMongo. The example here "
+"shows how to subclass :class:`~bson.codec_options.TypeCodec` to write a "
+"type codec, which is used to populate a "
+":class:`~bson.codec_options.TypeRegistry`. The type registry can then be "
+"used to create a custom-type-aware "
+":class:`~pymongo.collection.Collection`. Read and write operations issued"
+" against the resulting collection object transparently manipulate "
+"documents as they are saved to or retrieved from MongoDB."
+msgstr ""
+
+#: ../../examples/custom_type.rst:14
+msgid "Setting Up"
+msgstr ""
+
+#: ../../examples/custom_type.rst:16
+msgid "We'll start by getting a clean database to use for the example:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:26
+msgid ""
+"Since the purpose of the example is to demonstrate working with custom "
+"types, we'll need a custom data type to use. For this example, we will be"
+" working with the :py:class:`~decimal.Decimal` type from Python's "
+"standard library. Since the BSON library's "
+":class:`~bson.decimal128.Decimal128` type (that implements the IEEE 754 "
+"decimal128 decimal-based floating-point numbering format) is distinct "
+"from Python's built-in :py:class:`~decimal.Decimal` type, attempting to "
+"save an instance of ``Decimal`` with PyMongo, results in an "
+":exc:`~bson.errors.InvalidDocument` exception."
+msgstr ""
+
+#: ../../examples/custom_type.rst:48
+msgid "The :class:`~bson.codec_options.TypeCodec` Class"
+msgstr ""
+
+#: ../../examples/custom_type.rst:52
+msgid ""
+"In order to encode a custom type, we must first define a **type codec** "
+"for that type. A type codec describes how an instance of a custom type "
+"can be *transformed* to and/or from one of the types :mod:`~bson` already"
+" understands. Depending on the desired functionality, users must choose "
+"from the following base classes when defining type codecs:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:58
+msgid ""
+":class:`~bson.codec_options.TypeEncoder`: subclass this to define a codec"
+" that encodes a custom Python type to a known BSON type. Users must "
+"implement the ``python_type`` property/attribute and the "
+"``transform_python`` method."
+msgstr ""
+
+#: ../../examples/custom_type.rst:61
+msgid ""
+":class:`~bson.codec_options.TypeDecoder`: subclass this to define a codec"
+" that decodes a specified BSON type into a custom Python type. Users must"
+" implement the ``bson_type`` property/attribute and the "
+"``transform_bson`` method."
+msgstr ""
+
+#: ../../examples/custom_type.rst:64
+msgid ""
+":class:`~bson.codec_options.TypeCodec`: subclass this to define a codec "
+"that can both encode and decode a custom type. Users must implement the "
+"``python_type`` and ``bson_type`` properties/attributes, as well as the "
+"``transform_python`` and ``transform_bson`` methods."
+msgstr ""
+
+#: ../../examples/custom_type.rst:70
+msgid ""
+"The type codec for our custom type simply needs to define how a "
+":py:class:`~decimal.Decimal` instance can be converted into a "
+":class:`~bson.decimal128.Decimal128` instance and vice-versa. Since we "
+"are interested in both encoding and decoding our custom type, we use the "
+"``TypeCodec`` base class to define our codec:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:97
+msgid "The :class:`~bson.codec_options.TypeRegistry` Class"
+msgstr ""
+
+#: ../../examples/custom_type.rst:101
+msgid ""
+"Before we can begin encoding and decoding our custom type objects, we "
+"must first inform PyMongo about the corresponding codec. This is done by "
+"creating a :class:`~bson.codec_options.TypeRegistry` instance:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:111
+msgid ""
+"Note that type registries can be instantiated with any number of type "
+"codecs. Once instantiated, registries are immutable and the only way to "
+"add codecs to a registry is to create a new one."
+msgstr ""
+
+#: ../../examples/custom_type.rst:117
+msgid "Putting It Together"
+msgstr ""
+
+#: ../../examples/custom_type.rst:119
+msgid ""
+"Finally, we can define a :class:`~bson.codec_options.CodecOptions` "
+"instance with our ``type_registry`` and use it to get a "
+":class:`~pymongo.collection.Collection` object that understands the "
+":py:class:`~decimal.Decimal` data type:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:131
+msgid ""
+"Now, we can seamlessly encode and decode instances of "
+":py:class:`~decimal.Decimal`:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:144
+msgid ""
+"We can see what's actually being saved to the database by creating a "
+"fresh collection object without the customized codec options and using "
+"that to query MongoDB:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:156
+msgid "Encoding Subtypes"
+msgstr ""
+
+#: ../../examples/custom_type.rst:158
+msgid ""
+"Consider the situation where, in addition to encoding "
+":py:class:`~decimal.Decimal`, we also need to encode a type that "
+"subclasses ``Decimal``. PyMongo does this automatically for types that "
+"inherit from Python types that are BSON-encodable by default, but the "
+"type codec system described above does not offer the same flexibility."
+msgstr ""
+
+#: ../../examples/custom_type.rst:164
+msgid ""
+"Consider this subtype of ``Decimal`` that has a method to return its "
+"value as an integer:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:174
+msgid ""
+"If we try to save an instance of this type without first registering a "
+"type codec for it, we get an error:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:184
+msgid ""
+"In order to proceed further, we must define a type codec for "
+"``DecimalInt``. This is trivial to do since the same transformation as "
+"the one used for ``Decimal`` is adequate for encoding ``DecimalInt`` as "
+"well:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:200
+msgid ""
+"No attempt is made to modify decoding behavior because without additional"
+" information, it is impossible to discern which incoming "
+":class:`~bson.decimal128.Decimal128` value needs to be decoded as "
+"``Decimal`` and which needs to be decoded as ``DecimalInt``. This example"
+" only considers the situation where a user wants to *encode* documents "
+"containing either of these types."
+msgstr ""
+
+#: ../../examples/custom_type.rst:207
+msgid ""
+"After creating a new codec options object and using it to get a "
+"collection object, we can seamlessly encode instances of ``DecimalInt``:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:222
+msgid ""
+"Note that the ``transform_bson`` method of the base codec class results "
+"in these values being decoded as ``Decimal`` (and not ``DecimalInt``)."
+msgstr ""
+
+#: ../../examples/custom_type.rst:229
+msgid "Decoding :class:`~bson.binary.Binary` Types"
+msgstr ""
+
+#: ../../examples/custom_type.rst:231
+msgid ""
+"The decoding treatment of :class:`~bson.binary.Binary` types having "
+"``subtype = 0`` by the :mod:`bson` module varies slightly depending on "
+"the version of the Python runtime in use. This must be taken into account"
+" while writing a ``TypeDecoder`` that modifies how this datatype is "
+"decoded."
+msgstr ""
+
+#: ../../examples/custom_type.rst:236
+msgid ""
+"On Python 3.x, :class:`~bson.binary.Binary` data (``subtype = 0``) is "
+"decoded as a ``bytes`` instance:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:250
+msgid ""
+"On Python 2.7.x, the same data is decoded as a "
+":class:`~bson.binary.Binary` instance:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:262
+msgid ""
+"As a consequence of this disparity, users must set the ``bson_type`` "
+"attribute on their :class:`~bson.codec_options.TypeDecoder` classes "
+"differently, depending on the python version in use."
+msgstr ""
+
+#: ../../examples/custom_type.rst:269
+msgid ""
+"For codebases requiring compatibility with both Python 2 and 3, type "
+"decoders will have to be registered for both possible ``bson_type`` "
+"values."
+msgstr ""
+
+#: ../../examples/custom_type.rst:276
+msgid "The ``fallback_encoder`` Callable"
+msgstr ""
+
+#: ../../examples/custom_type.rst:281
+msgid ""
+"In addition to type codecs, users can also register a callable to encode "
+"types that BSON doesn't recognize and for which no type codec has been "
+"registered. This callable is the **fallback encoder** and like the "
+"``transform_python`` method, it accepts an unencodable value as a "
+"parameter and returns a BSON-encodable value. The following fallback "
+"encoder encodes python's :py:class:`~decimal.Decimal` type to a "
+":class:`~bson.decimal128.Decimal128`:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:295
+msgid ""
+"After declaring the callback, we must create a type registry and codec "
+"options with this fallback encoder before it can be used for initializing"
+" a collection:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:305
+msgid "We can now seamlessly encode instances of :py:class:`~decimal.Decimal`:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:318
+msgid ""
+"Fallback encoders are invoked *after* attempts to encode the given value "
+"with standard BSON encoders and any configured type encoders have failed."
+" Therefore, in a type registry configured with a type encoder and "
+"fallback encoder that both target the same custom type, the behavior "
+"specified in the type encoder will prevail."
+msgstr ""
+
+#: ../../examples/custom_type.rst:325
+msgid ""
+"Because fallback encoders don't need to declare the types that they "
+"encode beforehand, they can be used to support interesting use-cases that"
+" cannot be serviced by ``TypeEncoder``. One such use-case is described in"
+" the next section."
+msgstr ""
+
+#: ../../examples/custom_type.rst:332
+msgid "Encoding Unknown Types"
+msgstr ""
+
+#: ../../examples/custom_type.rst:334
+msgid ""
+"In this example, we demonstrate how a fallback encoder can be used to "
+"save arbitrary objects to the database. We will use the the standard "
+"library's :py:mod:`pickle` module to serialize the unknown types and so "
+"naturally, this approach only works for types that are picklable."
+msgstr ""
+
+#: ../../examples/custom_type.rst:339
+msgid "We start by defining some arbitrary custom types:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:355
+msgid ""
+"We also define a fallback encoder that pickles whatever objects it "
+"receives and returns them as :class:`~bson.binary.Binary` instances with "
+"a custom subtype. The custom subtype, in turn, allows us to write a "
+"TypeDecoder that identifies pickled artifacts upon retrieval and "
+"transparently decodes them back into Python objects:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:378
+msgid ""
+"The above example is written assuming the use of Python 3. If you are "
+"using Python 2, ``bson_type`` must be set to ``Binary``. See the :ref"
+":`decoding-binary-types` section for a detailed explanation."
+msgstr ""
+
+#: ../../examples/custom_type.rst:383
+msgid "Finally, we create a ``CodecOptions`` instance:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:390
+msgid "We can now round trip our custom objects to MongoDB:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:403
+msgid "Limitations"
+msgstr ""
+
+#: ../../examples/custom_type.rst:405
+msgid ""
+"PyMongo's type codec and fallback encoder features have the following "
+"limitations:"
+msgstr ""
+
+#: ../../examples/custom_type.rst:408
+msgid ""
+"Users cannot customize the encoding behavior of Python types that PyMongo"
+" already understands like ``int`` and ``str`` (the 'built-in types'). "
+"Attempting to instantiate a type registry with one or more codecs that "
+"act upon a built-in type results in a ``TypeError``. This limitation "
+"extends to all subtypes of the standard types."
+msgstr ""
+
+#: ../../examples/custom_type.rst:413
+msgid ""
+"Chaining type encoders is not supported. A custom type value, once "
+"transformed by a codec's ``transform_python`` method, *must* result in a "
+"type that is either BSON-encodable by default, or can be transformed by "
+"the fallback encoder into something BSON-encodable--it *cannot* be "
+"transformed a second time by a different type codec."
+msgstr ""
+
+#: ../../examples/custom_type.rst:418
+msgid ""
+"The :meth:`~pymongo.database.Database.command` method does not apply the "
+"user's TypeDecoders while decoding the command response document."
+msgstr ""
+
+#: ../../examples/custom_type.rst:420
+msgid ""
+":mod:`gridfs` does not apply custom type encoding or decoding to any "
+"documents received from or to returned to the user."
+msgstr ""
+
+#: ../../examples/datetimes.rst:2
+msgid "Datetimes and Timezones"
+msgstr ""
+
+#: ../../examples/datetimes.rst:13
+msgid ""
+"These examples show how to handle Python :class:`datetime.datetime` "
+"objects correctly in PyMongo."
+msgstr ""
+
+#: ../../examples/datetimes.rst:17
+msgid "Basic Usage"
+msgstr ""
+
+#: ../../examples/datetimes.rst:19
+msgid ""
+"PyMongo uses :class:`datetime.datetime` objects for representing dates "
+"and times in MongoDB documents. Because MongoDB assumes that dates and "
+"times are in UTC, care should be taken to ensure that dates and times "
+"written to the database reflect UTC. For example, the following code "
+"stores the current UTC date and time into MongoDB:"
+msgstr ""
+
+#: ../../examples/datetimes.rst:30
+msgid ""
+"Always use :meth:`datetime.datetime.utcnow`, which returns the current "
+"time in UTC, instead of :meth:`datetime.datetime.now`, which returns the "
+"current local time. Avoid doing this:"
+msgstr ""
+
+#: ../../examples/datetimes.rst:39
+msgid ""
+"The value for `last_modified` is very different between these two "
+"examples, even though both documents were stored at around the same local"
+" time. This will be confusing to the application that reads them:"
+msgstr ""
+
+#: ../../examples/datetimes.rst:49
+msgid ""
+":class:`bson.codec_options.CodecOptions` has a `tz_aware` option that "
+"enables \"aware\" :class:`datetime.datetime` objects, i.e., datetimes "
+"that know what timezone they're in. By default, PyMongo retrieves naive "
+"datetimes:"
+msgstr ""
+
+#: ../../examples/datetimes.rst:65
+msgid "Saving Datetimes with Timezones"
+msgstr ""
+
+#: ../../examples/datetimes.rst:67
+msgid ""
+"When storing :class:`datetime.datetime` objects that specify a timezone "
+"(i.e. they have a `tzinfo` property that isn't ``None``), PyMongo will "
+"convert those datetimes to UTC automatically:"
+msgstr ""
+
+#: ../../examples/datetimes.rst:82
+msgid "Reading Time"
+msgstr ""
+
+#: ../../examples/datetimes.rst:84
+msgid ""
+"As previously mentioned, by default all :class:`datetime.datetime` "
+"objects returned by PyMongo will be naive but reflect UTC (i.e. the time "
+"as stored in MongoDB). By setting the `tz_aware` option on "
+":class:`~bson.codec_options.CodecOptions`, :class:`datetime.datetime` "
+"objects will be timezone-aware and have a `tzinfo` property that reflects"
+" the UTC timezone."
+msgstr ""
+
+#: ../../examples/datetimes.rst:91
+msgid ""
+"PyMongo 3.1 introduced a `tzinfo` property that can be set on "
+":class:`~bson.codec_options.CodecOptions` to convert "
+":class:`datetime.datetime` objects to local time automatically. For "
+"example, if we wanted to read all times out of MongoDB in US/Pacific "
+"time:"
+msgstr ""
+
+#: ../../examples/encryption.rst:4
+msgid "Client-Side Field Level Encryption"
+msgstr ""
+
+#: ../../examples/encryption.rst:6
+msgid ""
+"New in MongoDB 4.2, client-side field level encryption allows an "
+"application to encrypt specific data fields in addition to pre-existing "
+"MongoDB encryption features such as `Encryption at Rest "
+"<https://dochub.mongodb.org/core/security-encryption-at-rest>`_ and "
+"`TLS/SSL (Transport Encryption) <https://dochub.mongodb.org/core"
+"/security-tls-transport-encryption>`_."
+msgstr ""
+
+#: ../../examples/encryption.rst:13
+msgid ""
+"With field level encryption, applications can encrypt fields in documents"
+" *prior* to transmitting data over the wire to the server. Client-side "
+"field level encryption supports workloads where applications must "
+"guarantee that unauthorized parties, including server administrators, "
+"cannot read the encrypted data."
+msgstr ""
+
+msgid "The MongoDB documentation on"
+msgstr ""
+
+#: ../../examples/encryption.rst:22 ../../examples/tls.rst:10
+msgid "Dependencies"
+msgstr ""
+
+#: ../../examples/encryption.rst:24
+msgid ""
+"To get started using client-side field level encryption in your project, "
+"you will need to install the `pymongocrypt "
+"<https://pypi.org/project/pymongocrypt/>`_ library as well as the driver "
+"itself. Install both the driver and a compatible version of pymongocrypt "
+"like this::"
+msgstr ""
+
+#: ../../examples/encryption.rst:32
+msgid ""
+"Note that installing on Linux requires pip 19 or later for manylinux2010 "
+"wheel support. For more information about installing pymongocrypt see "
+"`the installation instructions on the project's PyPI page "
+"<https://pypi.org/project/pymongocrypt/>`_."
+msgstr ""
+
+#: ../../examples/encryption.rst:38
+msgid "mongocryptd"
+msgstr ""
+
+#: ../../examples/encryption.rst:40
+msgid ""
+"The ``mongocryptd`` binary is required for automatic client-side "
+"encryption and is included as a component in the `MongoDB Enterprise "
+"Server package <https://dochub.mongodb.org/core/install-mongodb-"
+"enterprise>`_. For detailed installation instructions see `the MongoDB "
+"documentation on mongocryptd <https://dochub.mongodb.org/core/client-"
+"side-field-level-encryption-mongocryptd>`_."
+msgstr ""
+
+#: ../../examples/encryption.rst:47
+msgid "``mongocryptd`` performs the following:"
+msgstr ""
+
+#: ../../examples/encryption.rst:49
+msgid ""
+"Parses the automatic encryption rules specified to the database "
+"connection. If the JSON schema contains invalid automatic encryption "
+"syntax or any document validation syntax, ``mongocryptd`` returns an "
+"error."
+msgstr ""
+
+#: ../../examples/encryption.rst:52
+msgid ""
+"Uses the specified automatic encryption rules to mark fields in read and "
+"write operations for encryption."
+msgstr ""
+
+#: ../../examples/encryption.rst:54
+msgid ""
+"Rejects read/write operations that may return unexpected or incorrect "
+"results when applied to an encrypted field. For supported and unsupported"
+" operations, see `Read/Write Support with Automatic Field Level "
+"Encryption <https://dochub.mongodb.org/core/client-side-field-level-"
+"encryption-read-write-support>`_."
+msgstr ""
+
+#: ../../examples/encryption.rst:59
+msgid ""
+"A MongoClient configured with auto encryption will automatically spawn "
+"the ``mongocryptd`` process from the application's ``PATH``. Applications"
+" can control the spawning behavior as part of the automatic encryption "
+"options. For example to set the path to the ``mongocryptd`` process::"
+msgstr ""
+
+#: ../../examples/encryption.rst:68
+msgid ""
+"To control the logging output of ``mongocryptd`` pass options using "
+"``mongocryptd_spawn_args``::"
+msgstr ""
+
+#: ../../examples/encryption.rst:75
+msgid ""
+"If your application wishes to manage the ``mongocryptd`` process "
+"manually, it is possible to disable spawning ``mongocryptd``::"
+msgstr ""
+
+#: ../../examples/encryption.rst:84
+msgid ""
+"``mongocryptd`` is only responsible for supporting automatic client-side "
+"field level encryption and does not itself perform any encryption or "
+"decryption."
+msgstr ""
+
+#: ../../examples/encryption.rst:90
+msgid "Automatic Client-Side Field Level Encryption"
+msgstr ""
+
+#: ../../examples/encryption.rst:92
+msgid ""
+"Automatic client-side field level encryption is enabled by creating a "
+":class:`~pymongo.mongo_client.MongoClient` with the "
+"``auto_encryption_opts`` option set to an instance of "
+":class:`~pymongo.encryption_options.AutoEncryptionOpts`. The following "
+"examples show how to setup automatic client-side field level encryption "
+"using :class:`~pymongo.encryption.ClientEncryption` to create a new "
+"encryption data key."
+msgstr ""
+
+#: ../../examples/encryption.rst:100
+msgid ""
+"Automatic client-side field level encryption requires MongoDB 4.2 "
+"enterprise or a MongoDB 4.2 Atlas cluster. The community version of the "
+"server supports automatic decryption as well as :ref:`explicit-client-"
+"side-encryption`."
+msgstr ""
+
+#: ../../examples/encryption.rst:106
+msgid "Providing Local Automatic Encryption Rules"
+msgstr ""
+
+#: ../../examples/encryption.rst:108
+msgid ""
+"The following example shows how to specify automatic encryption rules via"
+" the ``schema_map`` option. The automatic encryption rules are expressed "
+"using a `strict subset of the JSON Schema syntax "
+"<https://dochub.mongodb.org/core/client-side-field-level-encryption-"
+"automatic-encryption-rules>`_."
+msgstr ""
+
+#: ../../examples/encryption.rst:113
+msgid ""
+"Supplying a ``schema_map`` provides more security than relying on JSON "
+"Schemas obtained from the server. It protects against a malicious server "
+"advertising a false JSON Schema, which could trick the client into "
+"sending unencrypted data that should be encrypted."
+msgstr ""
+
+#: ../../examples/encryption.rst:118
+msgid ""
+"JSON Schemas supplied in the ``schema_map`` only apply to configuring "
+"automatic client-side field level encryption. Other validation rules in "
+"the JSON schema will not be enforced by the driver and will result in an "
+"error.::"
+msgstr ""
+
+#: ../../examples/encryption.rst:226
+msgid "Server-Side Field Level Encryption Enforcement"
+msgstr ""
+
+#: ../../examples/encryption.rst:228
+msgid ""
+"The MongoDB 4.2 server supports using schema validation to enforce "
+"encryption of specific fields in a collection. This schema validation "
+"will prevent an application from inserting unencrypted values for any "
+"fields marked with the ``\"encrypt\"`` JSON schema keyword."
+msgstr ""
+
+#: ../../examples/encryption.rst:233
+msgid ""
+"The following example shows how to setup automatic client-side field "
+"level encryption using :class:`~pymongo.encryption.ClientEncryption` to "
+"create a new encryption data key and create a collection with the "
+"`Automatic Encryption JSON Schema Syntax <https://dochub.mongodb.org/core"
+"/client-side-field-level-encryption-automatic-encryption-rules>`_::"
+msgstr ""
+
+#: ../../examples/encryption.rst:342
+msgid "Explicit Encryption"
+msgstr ""
+
+#: ../../examples/encryption.rst:344
+msgid ""
+"Explicit encryption is a MongoDB community feature and does not use the "
+"``mongocryptd`` process. Explicit encryption is provided by the "
+":class:`~pymongo.encryption.ClientEncryption` class, for example::"
+msgstr ""
+
+#: ../../examples/encryption.rst:419
+msgid "Explicit Encryption with Automatic Decryption"
+msgstr ""
+
+#: ../../examples/encryption.rst:421
+msgid ""
+"Although automatic encryption requires MongoDB 4.2 enterprise or a "
+"MongoDB 4.2 Atlas cluster, automatic *decryption* is supported for all "
+"users. To configure automatic *decryption* without automatic *encryption*"
+" set ``bypass_auto_encryption=True`` in "
+":class:`~pymongo.encryption_options.AutoEncryptionOpts`::"
+msgstr ""
+
+#: ../../examples/geo.rst:2
+msgid "Geospatial Indexing Example"
+msgstr ""
+
+#: ../../examples/geo.rst:10
+msgid ""
+"This example shows how to create and use a :data:`~pymongo.GEO2D` index "
+"in PyMongo. To create a spherical (earth-like) geospatial index use "
+":data:`~pymongo.GEOSPHERE` instead."
+msgstr ""
+
+#: ../../examples/geo.rst:16
+msgid "Creating a Geospatial Index"
+msgstr ""
+
+#: ../../examples/geo.rst:18
+msgid "Creating a geospatial index in pymongo is easy:"
+msgstr ""
+
+#: ../../examples/geo.rst:28
+msgid "Inserting Places"
+msgstr ""
+
+#: ../../examples/geo.rst:30
+msgid ""
+"Locations in MongoDB are represented using either embedded documents or "
+"lists where the first two elements are coordinates. Here, we'll insert a "
+"couple of example locations:"
+msgstr ""
+
+#: ../../examples/geo.rst:43
+msgid ""
+"If specifying latitude and longitude coordinates in "
+":data:`~pymongo.GEOSPHERE`, list the **longitude** first and then "
+"**latitude**."
+msgstr ""
+
+#: ../../examples/geo.rst:46
+msgid "Querying"
+msgstr ""
+
+#: ../../examples/geo.rst:48
+msgid "Using the geospatial index we can find documents near another point:"
+msgstr ""
+
+#: ../../examples/geo.rst:60
+msgid "If using :data:`pymongo.GEOSPHERE`, using $nearSphere is recommended."
+msgstr ""
+
+#: ../../examples/geo.rst:62
+msgid "The $maxDistance operator requires the use of :class:`~bson.son.SON`:"
+msgstr ""
+
+#: ../../examples/geo.rst:75
+msgid ""
+"It's also possible to query for all items within a given rectangle "
+"(specified by lower-left and upper-right coordinates):"
+msgstr ""
+
+#: ../../examples/geo.rst:86
+msgid "Or circle (specified by center point and radius):"
+msgstr ""
+
+#: ../../examples/geo.rst:98
+msgid "geoNear queries are also supported using :class:`~bson.son.SON`::"
+msgstr ""
+
+#: ../../examples/geo.rst:104
+msgid ""
+"Starting in MongoDB version 4.0, MongoDB deprecates the **geoNear** "
+"command. Use one of the following operations instead."
+msgstr ""
+
+#: ../../examples/geo.rst:106
+msgid "$geoNear - aggregation stage."
+msgstr ""
+
+#: ../../examples/geo.rst:107
+msgid "$near - query operator."
+msgstr ""
+
+#: ../../examples/geo.rst:108
+msgid "$nearSphere - query operator."
+msgstr ""
+
+#: ../../examples/gevent.rst:2
+msgid "Gevent"
+msgstr ""
+
+#: ../../examples/gevent.rst:4
+msgid ""
+"PyMongo supports `Gevent <http://www.gevent.org/>`_. Simply call Gevent's"
+" ``monkey.patch_all()`` before loading any other modules:"
+msgstr ""
+
+#: ../../examples/gevent.rst:15
+msgid ""
+"PyMongo uses thread and socket functions from the Python standard "
+"library. Gevent's monkey-patching replaces those standard functions so "
+"that PyMongo does asynchronous I/O with non-blocking sockets, and "
+"schedules operations on greenlets instead of threads."
+msgstr ""
+
+#: ../../examples/gevent.rst:21
+msgid "Avoid blocking in Hub.join"
+msgstr ""
+
+#: ../../examples/gevent.rst:23
+msgid ""
+"By default, PyMongo uses threads to discover and monitor your servers' "
+"topology (see :ref:`health-monitoring`). If you execute "
+"``monkey.patch_all()`` when your application first begins, PyMongo "
+"automatically uses greenlets instead of threads."
+msgstr ""
+
+#: ../../examples/gevent.rst:28
+msgid ""
+"When shutting down, if your application calls "
+":meth:`~gevent.hub.Hub.join` on Gevent's :class:`~gevent.hub.Hub` without"
+" first terminating these background greenlets, the call to "
+":meth:`~gevent.hub.Hub.join` blocks indefinitely. You therefore **must "
+"close or dereference** any active "
+":class:`~pymongo.mongo_client.MongoClient` before exiting."
+msgstr ""
+
+#: ../../examples/gevent.rst:34
+msgid ""
+"An example solution to this issue in some application frameworks is a "
+"signal handler to end background greenlets when your application receives"
+" SIGHUP:"
+msgstr ""
+
+#: ../../examples/gevent.rst:47
+msgid ""
+"Applications using uWSGI prior to 1.9.16 are affected by this issue, or "
+"newer uWSGI versions with the ``-gevent-wait-for-hub`` option. See `the "
+"uWSGI changelog for details <https://uwsgi-"
+"docs.readthedocs.io/en/latest/Changelog-1.9.16.html#important-change-in-"
+"the-gevent-plugin-shutdown-reload-procedure>`_."
+msgstr ""
+
+#: ../../examples/gridfs.rst:2
+msgid "GridFS Example"
+msgstr ""
+
+#: ../../examples/gridfs.rst:10
+msgid ""
+"This example shows how to use :mod:`gridfs` to store large binary objects"
+" (e.g. files) in MongoDB."
+msgstr ""
+
+#: ../../examples/gridfs.rst:13
+msgid "The API docs for :mod:`gridfs`."
+msgstr ""
+
+#: ../../examples/gridfs.rst:15
+msgid ""
+"`This blog post <http://dirolf.com/2010/03/29/new-gridfs-implementation-"
+"for-pymongo.html>`_ for some motivation behind this API."
+msgstr ""
+
+#: ../../examples/gridfs.rst:22
+msgid "We start by creating a :class:`~gridfs.GridFS` instance to use:"
+msgstr ""
+
+#: ../../examples/gridfs.rst:32
+msgid ""
+"Every :class:`~gridfs.GridFS` instance is created with and will operate "
+"on a specific :class:`~pymongo.database.Database` instance."
+msgstr ""
+
+#: ../../examples/gridfs.rst:36
+msgid "Saving and Retrieving Data"
+msgstr ""
+
+#: ../../examples/gridfs.rst:38
+msgid ""
+"The simplest way to work with :mod:`gridfs` is to use its key/value "
+"interface (the :meth:`~gridfs.GridFS.put` and :meth:`~gridfs.GridFS.get` "
+"methods). To write data to GridFS, use :meth:`~gridfs.GridFS.put`:"
+msgstr ""
+
+#: ../../examples/gridfs.rst:47
+msgid ""
+":meth:`~gridfs.GridFS.put` creates a new file in GridFS, and returns the "
+"value of the file document's ``\"_id\"`` key. Given that ``\"_id\"`` we "
+"can use :meth:`~gridfs.GridFS.get` to get back the contents of the file:"
+msgstr ""
+
+#: ../../examples/gridfs.rst:57
+msgid ""
+":meth:`~gridfs.GridFS.get` returns a file-like object, so we get the "
+"file's contents by calling :meth:`~gridfs.grid_file.GridOut.read`."
+msgstr ""
+
+#: ../../examples/gridfs.rst:60
+msgid ""
+"In addition to putting a :class:`str` as a GridFS file, we can also put "
+"any file-like object (an object with a :meth:`read` method). GridFS will "
+"handle reading the file in chunk-sized segments automatically. We can "
+"also add additional attributes to the file as keyword arguments:"
+msgstr ""
+
+#: ../../examples/gridfs.rst:79
+msgid ""
+"The attributes we set in :meth:`~gridfs.GridFS.put` are stored in the "
+"file document, and retrievable after calling :meth:`~gridfs.GridFS.get`. "
+"Some attributes (like ``\"filename\"``) are special and are defined in "
+"the GridFS specification - see that document for more details."
+msgstr ""
+
+#: ../../examples/high_availability.rst:2
+msgid "High Availability and PyMongo"
+msgstr ""
+
+#: ../../examples/high_availability.rst:4
+msgid ""
+"PyMongo makes it easy to write highly available applications whether you "
+"use a `single replica set <http://dochub.mongodb.org/core/rs>`_ or a "
+"`large sharded cluster "
+"<http://www.mongodb.org/display/DOCS/Sharding+Introduction>`_."
+msgstr ""
+
+#: ../../examples/high_availability.rst:10
+#: ../../examples/high_availability.rst:78
+msgid "Connecting to a Replica Set"
+msgstr ""
+
+#: ../../examples/high_availability.rst:12
+msgid ""
+"PyMongo makes working with `replica sets "
+"<http://dochub.mongodb.org/core/rs>`_ easy. Here we'll launch a new "
+"replica set and show how to handle both initialization and normal "
+"connections with PyMongo."
+msgstr ""
+
+#: ../../examples/high_availability.rst:20
+msgid "Starting a Replica Set"
+msgstr ""
+
+#: ../../examples/high_availability.rst:22
+msgid ""
+"The main `replica set documentation <http://dochub.mongodb.org/core/rs>`_"
+" contains extensive information about setting up a new replica set or "
+"migrating an existing MongoDB setup, be sure to check that out. Here, "
+"we'll just do the bare minimum to get a three node replica set setup "
+"locally."
+msgstr ""
+
+#: ../../examples/high_availability.rst:28
+msgid ""
+"Replica sets should always use multiple nodes in production - putting all"
+" set members on the same physical node is only recommended for testing "
+"and development."
+msgstr ""
+
+#: ../../examples/high_availability.rst:32
+msgid ""
+"We start three ``mongod`` processes, each on a different port and with a "
+"different dbpath, but all using the same replica set name \"foo\"."
+msgstr ""
+
+#: ../../examples/high_availability.rst:49
+msgid "Initializing the Set"
+msgstr ""
+
+#: ../../examples/high_availability.rst:51
+msgid ""
+"At this point all of our nodes are up and running, but the set has yet to"
+" be initialized. Until the set is initialized no node will become the "
+"primary, and things are essentially \"offline\"."
+msgstr ""
+
+#: ../../examples/high_availability.rst:55
+msgid ""
+"To initialize the set we need to connect to a single node and run the "
+"initiate command::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:61
+msgid ""
+"We could have connected to any of the other nodes instead, but only the "
+"node we initiate from is allowed to contain any initial data."
+msgstr ""
+
+#: ../../examples/high_availability.rst:65
+msgid "After connecting, we run the initiate command to get things started::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:74
+msgid ""
+"The three ``mongod`` servers we started earlier will now coordinate and "
+"come online as a replica set."
+msgstr ""
+
+#: ../../examples/high_availability.rst:80
+msgid ""
+"The initial connection as made above is a special case for an "
+"uninitialized replica set. Normally we'll want to connect differently. A "
+"connection to a replica set can be made using the "
+":meth:`~pymongo.mongo_client.MongoClient` constructor, specifying one or "
+"more members of the set, along with the replica set name. Any of the "
+"following connects to the replica set we just created::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:96
+msgid ""
+"The addresses passed to :meth:`~pymongo.mongo_client.MongoClient` are "
+"called the *seeds*. As long as at least one of the seeds is online, "
+"MongoClient discovers all the members in the replica set, and determines "
+"which is the current primary and which are secondaries or arbiters. Each "
+"seed must be the address of a single mongod. Multihomed and round robin "
+"DNS addresses are **not** supported."
+msgstr ""
+
+#: ../../examples/high_availability.rst:103
+msgid ""
+"The :class:`~pymongo.mongo_client.MongoClient` constructor is non-"
+"blocking: the constructor returns immediately while the client connects "
+"to the replica set using background threads. Note how, if you create a "
+"client and immediately print the string representation of its "
+":attr:`~pymongo.mongo_client.MongoClient.nodes` attribute, the list may "
+"be empty initially. If you wait a moment, MongoClient discovers the whole"
+" replica set::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:116
+msgid ""
+"You need not wait for replica set discovery in your application, however."
+" If you need to do any operation with a MongoClient, such as a "
+":meth:`~pymongo.collection.Collection.find` or an "
+":meth:`~pymongo.collection.Collection.insert_one`, the client waits to "
+"discover a suitable member before it attempts the operation."
+msgstr ""
+
+#: ../../examples/high_availability.rst:123
+msgid "Handling Failover"
+msgstr ""
+
+#: ../../examples/high_availability.rst:125
+msgid ""
+"When a failover occurs, PyMongo will automatically attempt to find the "
+"new primary node and perform subsequent operations on that node. This "
+"can't happen completely transparently, however. Here we'll perform an "
+"example failover to illustrate how everything behaves. First, we'll "
+"connect to the replica set and perform a couple of basic operations::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:137
+msgid ""
+"By checking the host and port, we can see that we're connected to "
+"*localhost:27017*, which is the current primary::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:143
+msgid ""
+"Now let's bring down that node and see what happens when we run our query"
+" again::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:150
+msgid ""
+"We get an :class:`~pymongo.errors.AutoReconnect` exception. This means "
+"that the driver was not able to connect to the old primary (which makes "
+"sense, as we killed the server), but that it will attempt to "
+"automatically reconnect on subsequent operations. When this exception is "
+"raised our application code needs to decide whether to retry the "
+"operation or to simply continue, accepting the fact that the operation "
+"might have failed."
+msgstr ""
+
+#: ../../examples/high_availability.rst:158
+msgid ""
+"On subsequent attempts to run the query we might continue to see this "
+"exception. Eventually, however, the replica set will failover and elect a"
+" new primary (this should take no more than a couple of seconds in "
+"general). At that point the driver will connect to the new primary and "
+"the operation will succeed::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:169
+msgid ""
+"Bring the former primary back up. It will rejoin the set as a secondary. "
+"Now we can move to the next section: distributing reads to secondaries."
+msgstr ""
+
+#: ../../examples/high_availability.rst:175
+msgid "Secondary Reads"
+msgstr ""
+
+#: ../../examples/high_availability.rst:177
+msgid ""
+"By default an instance of MongoClient sends queries to the primary member"
+" of the replica set. To use secondaries for queries we have to change the"
+" read preference::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:188
+msgid ""
+"Now all queries will be sent to the secondary members of the set. If "
+"there are no secondary members the primary will be used as a fallback. If"
+" you have queries you would prefer to never send to the primary you can "
+"specify that using the ``secondary`` read preference."
+msgstr ""
+
+#: ../../examples/high_availability.rst:193
+msgid ""
+"By default the read preference of a :class:`~pymongo.database.Database` "
+"is inherited from its MongoClient, and the read preference of a "
+":class:`~pymongo.collection.Collection` is inherited from its Database. "
+"To use a different read preference use the "
+":meth:`~pymongo.mongo_client.MongoClient.get_database` method, or the "
+":meth:`~pymongo.database.Database.get_collection` method::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:210
+msgid ""
+"You can also change the read preference of an existing "
+":class:`~pymongo.collection.Collection` with the "
+":meth:`~pymongo.collection.Collection.with_options` method::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:220
+msgid ""
+"Note that since most database commands can only be sent to the primary of"
+" a replica set, the :meth:`~pymongo.database.Database.command` method "
+"does not obey the Database's "
+":attr:`~pymongo.database.Database.read_preference`, but you can pass an "
+"explicit read preference to the method::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:228
+msgid ""
+"Reads are configured using three options: **read preference**, **tag "
+"sets**, and **local threshold**."
+msgstr ""
+
+#: ../../examples/high_availability.rst:231
+msgid "**Read preference**:"
+msgstr ""
+
+#: ../../examples/high_availability.rst:233
+msgid ""
+"Read preference is configured using one of the classes from "
+":mod:`~pymongo.read_preferences` "
+"(:class:`~pymongo.read_preferences.Primary`, "
+":class:`~pymongo.read_preferences.PrimaryPreferred`, "
+":class:`~pymongo.read_preferences.Secondary`, "
+":class:`~pymongo.read_preferences.SecondaryPreferred`, or "
+":class:`~pymongo.read_preferences.Nearest`). For convenience, we also "
+"provide :class:`~pymongo.read_preferences.ReadPreference` with the "
+"following attributes:"
+msgstr ""
+
+#: ../../examples/high_availability.rst:242
+msgid ""
+"``PRIMARY``: Read from the primary. This is the default read preference, "
+"and provides the strongest consistency. If no primary is available, raise"
+" :class:`~pymongo.errors.AutoReconnect`."
+msgstr ""
+
+#: ../../examples/high_availability.rst:246
+msgid ""
+"``PRIMARY_PREFERRED``: Read from the primary if available, otherwise read"
+" from a secondary."
+msgstr ""
+
+#: ../../examples/high_availability.rst:249
+msgid ""
+"``SECONDARY``: Read from a secondary. If no matching secondary is "
+"available, raise :class:`~pymongo.errors.AutoReconnect`."
+msgstr ""
+
+#: ../../examples/high_availability.rst:252
+msgid ""
+"``SECONDARY_PREFERRED``: Read from a secondary if available, otherwise "
+"from the primary."
+msgstr ""
+
+#: ../../examples/high_availability.rst:255
+msgid "``NEAREST``: Read from any available member."
+msgstr ""
+
+#: ../../examples/high_availability.rst:257
+msgid "**Tag sets**:"
+msgstr ""
+
+#: ../../examples/high_availability.rst:259
+msgid ""
+"Replica-set members can be `tagged "
+"<http://www.mongodb.org/display/DOCS/Data+Center+Awareness>`_ according "
+"to any criteria you choose. By default, PyMongo ignores tags when "
+"choosing a member to read from, but your read preference can be "
+"configured with a ``tag_sets`` parameter. ``tag_sets`` must be a list of "
+"dictionaries, each dict providing tag values that the replica set member "
+"must match. PyMongo tries each set of tags in turn until it finds a set "
+"of tags with at least one matching member. For example, to prefer reads "
+"from the New York data center, but fall back to the San Francisco data "
+"center, tag your replica set members according to their location and "
+"create a MongoClient like so::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:277
+msgid ""
+"MongoClient tries to find secondaries in New York, then San Francisco, "
+"and raises :class:`~pymongo.errors.AutoReconnect` if none are available. "
+"As an additional fallback, specify a final, empty tag set, ``{}``, which "
+"means \"read from any member that matches the mode, ignoring tags.\""
+msgstr ""
+
+#: ../../examples/high_availability.rst:282
+msgid "See :mod:`~pymongo.read_preferences` for more information."
+msgstr ""
+
+#: ../../examples/high_availability.rst:286
+msgid "**Local threshold**:"
+msgstr ""
+
+#: ../../examples/high_availability.rst:288
+msgid ""
+"If multiple members match the read preference and tag sets, PyMongo reads"
+" from among the nearest members, chosen according to ping time. By "
+"default, only members whose ping times are within 15 milliseconds of the "
+"nearest are used for queries. You can choose to distribute reads among "
+"members with higher latencies by setting ``localThresholdMS`` to a larger"
+" number::"
+msgstr ""
+
+#: ../../examples/high_availability.rst:300
+msgid ""
+"In this case, PyMongo distributes reads among matching members within 35 "
+"milliseconds of the closest member's ping time."
+msgstr ""
+
+#: ../../examples/high_availability.rst:303
+msgid ""
+"``localThresholdMS`` is ignored when talking to a replica set *through* a"
+" mongos. The equivalent is the localThreshold_ command line option."
+msgstr ""
+
+#: ../../examples/high_availability.rst:312
+msgid "Health Monitoring"
+msgstr ""
+
+#: ../../examples/high_availability.rst:314
+msgid ""
+"When MongoClient is initialized it launches background threads to monitor"
+" the replica set for changes in:"
+msgstr ""
+
+#: ../../examples/high_availability.rst:317
+msgid ""
+"Health: detect when a member goes down or comes up, or if a different "
+"member becomes primary"
+msgstr ""
+
+#: ../../examples/high_availability.rst:319
+msgid ""
+"Configuration: detect when members are added or removed, and detect "
+"changes in members' tags"
+msgstr ""
+
+#: ../../examples/high_availability.rst:321
+msgid "Latency: track a moving average of each member's ping time"
+msgstr ""
+
+#: ../../examples/high_availability.rst:323
+msgid ""
+"Replica-set monitoring ensures queries are continually routed to the "
+"proper members as the state of the replica set changes."
+msgstr ""
+
+#: ../../examples/high_availability.rst:329
+msgid "mongos Load Balancing"
+msgstr ""
+
+#: ../../examples/high_availability.rst:331
+msgid ""
+"An instance of :class:`~pymongo.mongo_client.MongoClient` can be "
+"configured with a list of addresses of mongos servers:"
+msgstr ""
+
+#: ../../examples/high_availability.rst:336
+msgid ""
+"Each member of the list must be a single mongos server. Multihomed and "
+"round robin DNS addresses are **not** supported. The client continuously "
+"monitors all the mongoses' availability, and its network latency to each."
+msgstr ""
+
+#: ../../examples/high_availability.rst:340
+msgid ""
+"PyMongo distributes operations evenly among the set of mongoses within "
+"its ``localThresholdMS`` (similar to how it `distributes reads to "
+"secondaries`_ in a replica set). By default the threshold is 15 ms."
+msgstr ""
+
+#: ../../examples/high_availability.rst:344
+msgid ""
+"The lowest-latency server, and all servers with latencies no more than "
+"``localThresholdMS`` beyond the lowest-latency server's, receive "
+"operations equally. For example, if we have three mongoses:"
+msgstr ""
+
+#: ../../examples/high_availability.rst:348
+msgid "host1: 20 ms"
+msgstr ""
+
+#: ../../examples/high_availability.rst:349
+msgid "host2: 35 ms"
+msgstr ""
+
+#: ../../examples/high_availability.rst:350
+msgid "host3: 40 ms"
+msgstr ""
+
+#: ../../examples/high_availability.rst:352
+msgid ""
+"By default the ``localThresholdMS`` is 15 ms, so PyMongo uses host1 and "
+"host2 evenly. It uses host1 because its network latency to the driver is "
+"shortest. It uses host2 because its latency is within 15 ms of the "
+"lowest-latency server's. But it excuses host3: host3 is 20ms beyond the "
+"lowest-latency server."
+msgstr ""
+
+#: ../../examples/high_availability.rst:357
+msgid ""
+"If we set ``localThresholdMS`` to 30 ms all servers are within the "
+"threshold:"
+msgstr ""
+
+#: ../../examples/high_availability.rst:361
+msgid ""
+"Do **not** connect PyMongo to a pool of mongos instances through a load "
+"balancer. A single socket connection must always be routed to the same "
+"mongos instance for proper cursor support."
+msgstr ""
+
+#: ../../examples/index.rst:2
+msgid "Examples"
+msgstr ""
+
+#: ../../examples/index.rst:4
+msgid ""
+"The examples in this section are intended to give in depth overviews of "
+"how to accomplish specific tasks with MongoDB and PyMongo."
+msgstr ""
+
+#: ../../examples/index.rst:7
+msgid ""
+"Unless otherwise noted, all examples assume that a MongoDB instance is "
+"running on the default host and port. Assuming you have `downloaded and "
+"installed <http://www.mongodb.org/display/DOCS/Getting+Started>`_ "
+"MongoDB, you can start it like so:"
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:4
+msgid "PyMongo and mod_wsgi"
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:6
+msgid ""
+"To run your application under `mod_wsgi "
+"<http://code.google.com/p/modwsgi/>`_, follow these guidelines:"
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:9
+msgid "Run ``mod_wsgi`` in daemon mode with the ``WSGIDaemonProcess`` directive."
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:10
+msgid "Assign each application to a separate daemon with ``WSGIProcessGroup``."
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:11
+msgid ""
+"Use ``WSGIApplicationGroup %{GLOBAL}`` to ensure your application is "
+"running in the daemon's main Python interpreter, not a sub interpreter."
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:14
+msgid ""
+"For example, this ``mod_wsgi`` configuration ensures an application runs "
+"in the main interpreter::"
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:24
+msgid ""
+"If you have multiple applications that use PyMongo, put each in a "
+"separate daemon, still in the global application group::"
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:43
+msgid ""
+"Background: ``mod_wsgi`` can run in \"embedded\" mode when only "
+"WSGIScriptAlias is set, or \"daemon\" mode with WSGIDaemonProcess. In "
+"daemon mode, ``mod_wsgi`` can run your application in the Python main "
+"interpreter, or in sub interpreters. The correct way to run a PyMongo "
+"application is in daemon mode, using the main interpreter."
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:49
+msgid ""
+"Python C extensions in general have issues running in multiple Python sub"
+" interpreters. These difficulties are explained in the documentation for "
+"`Py_NewInterpreter "
+"<http://docs.python.org/2/c-api/init.html#Py_NewInterpreter>`_ and in the"
+" `Multiple Python Sub Interpreters "
+"<https://code.google.com/p/modwsgi/wiki/ApplicationIssues#Multiple_Python_Sub_Interpreters>`_"
+" section of the ``mod_wsgi`` documentation."
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:56
+msgid ""
+"Beginning with PyMongo 2.7, the C extension for BSON detects when it is "
+"running in a sub interpreter and activates a workaround, which adds a "
+"small cost to BSON decoding. To avoid this cost, use "
+"``WSGIApplicationGroup %{GLOBAL}`` to ensure your application runs in the"
+" main interpreter."
+msgstr ""
+
+#: ../../examples/mod_wsgi.rst:61
+msgid ""
+"Since your program runs in the main interpreter it should not share its "
+"process with any other applications, lest they interfere with each "
+"other's state. Each application should have its own daemon process, as "
+"shown in the example above."
+msgstr ""
+
+#: ../../examples/server_selection.rst:2
+msgid "Server Selector Example"
+msgstr ""
+
+#: ../../examples/server_selection.rst:4
+msgid ""
+"Users can exert fine-grained control over the `server selection "
+"algorithm`_ by setting the `server_selector` option on the "
+":class:`~pymongo.MongoClient` to an appropriate callable. This example "
+"shows how to use this functionality to prefer servers running on "
+"``localhost``."
+msgstr ""
+
+#: ../../examples/server_selection.rst:12
+msgid ""
+"Use of custom server selector functions is a power user feature. Misusing"
+" custom server selectors can have unintended consequences such as "
+"degraded read/write performance."
+msgstr ""
+
+#: ../../examples/server_selection.rst:26
+msgid "Example: Selecting Servers Running on ``localhost``"
+msgstr ""
+
+#: ../../examples/server_selection.rst:28
+msgid ""
+"To start, we need to write the server selector function that will be "
+"used. The server selector function should accept a list of "
+":class:`~pymongo.server_description.ServerDescription` objects and return"
+" a list of server descriptions that are suitable for the read or write "
+"operation. A server selector must not create or modify "
+":class:`~pymongo.server_description.ServerDescription` objects, and must "
+"return the selected instances unchanged."
+msgstr ""
+
+#: ../../examples/server_selection.rst:36
+msgid ""
+"In this example, we write a server selector that prioritizes servers "
+"running on ``localhost``. This can be desirable when using a sharded "
+"cluster with multiple ``mongos``, as locally run queries are likely to "
+"see lower latency and higher throughput. Please note, however, that it is"
+" highly dependent on the application if preferring ``localhost`` is "
+"beneficial or not."
+msgstr ""
+
+#: ../../examples/server_selection.rst:42
+msgid ""
+"In addition to comparing the hostname with ``localhost``, our server "
+"selector function accounts for the edge case when no servers are running "
+"on ``localhost``. In this case, we allow the default server selection "
+"logic to prevail by passing through the received server description list "
+"unchanged. Failure to do this would render the client unable to "
+"communicate with MongoDB in the event that no servers were running on "
+"``localhost``."
+msgstr ""
+
+#: ../../examples/server_selection.rst:50
+msgid ""
+"The described server selection logic is implemented in the following "
+"server selector function:"
+msgstr ""
+
+#: ../../examples/server_selection.rst:67
+msgid ""
+"Finally, we can create a :class:`~pymongo.MongoClient` instance with this"
+" server selector."
+msgstr ""
+
+#: ../../examples/server_selection.rst:78
+msgid "Server Selection Process"
+msgstr ""
+
+#: ../../examples/server_selection.rst:80
+msgid ""
+"This section dives deeper into the server selection process for reads and"
+" writes. In the case of a write, the driver performs the following "
+"operations (in order) during the selection process:"
+msgstr ""
+
+#: ../../examples/server_selection.rst:85
+msgid ""
+"Select all writeable servers from the list of known hosts. For a replica "
+"set this is the primary, while for a sharded cluster this is all the "
+"known mongoses."
+msgstr ""
+
+#: ../../examples/server_selection.rst:88
+msgid ""
+"Apply the user-defined server selector function. Note that the custom "
+"server selector is **not** called if there are no servers left from the "
+"previous filtering stage."
+msgstr ""
+
+#: ../../examples/server_selection.rst:92
+msgid ""
+"Apply the ``localThresholdMS`` setting to the list of remaining hosts. "
+"This whittles the host list down to only contain servers whose latency is"
+" at most ``localThresholdMS`` milliseconds higher than the lowest "
+"observed latency."
+msgstr ""
+
+#: ../../examples/server_selection.rst:96
+msgid ""
+"Select a server at random from the remaining host list. The desired "
+"operation is then performed against the selected server."
+msgstr ""
+
+#: ../../examples/server_selection.rst:100
+msgid ""
+"In the case of **reads** the process is identical except for the first "
+"step. Here, instead of selecting all writeable servers, we select all "
+"servers matching the user's "
+":class:`~pymongo.read_preferences.ReadPreference` from the list of known "
+"hosts. As an example, for a 3-member replica set with a "
+":class:`~pymongo.read_preferences.Secondary` read preference, we would "
+"select all available secondaries."
+msgstr ""
+
+#: ../../examples/tailable.rst:2
+msgid "Tailable Cursors"
+msgstr ""
+
+#: ../../examples/tailable.rst:4
+msgid ""
+"By default, MongoDB will automatically close a cursor when the client has"
+" exhausted all results in the cursor. However, for `capped collections "
+"<https://docs.mongodb.org/manual/core/capped-collections/>`_ you may use "
+"a `tailable cursor <https://docs.mongodb.org/manual/reference/glossary"
+"/#term-tailable-cursor>`_ that remains open after the client exhausts the"
+" results in the initial cursor."
+msgstr ""
+
+#: ../../examples/tailable.rst:11
+msgid ""
+"The following is a basic example of using a tailable cursor to tail the "
+"oplog of a replica set member::"
+msgstr ""
+
+#: ../../examples/tls.rst:2
+msgid "TLS/SSL and PyMongo"
+msgstr ""
+
+#: ../../examples/tls.rst:4
+msgid ""
+"PyMongo supports connecting to MongoDB over TLS/SSL. This guide covers "
+"the configuration options supported by PyMongo. See `the server "
+"documentation <http://docs.mongodb.org/manual/tutorial/configure-ssl/>`_ "
+"to configure MongoDB."
+msgstr ""
+
+#: ../../examples/tls.rst:12
+msgid ""
+"For connections using TLS/SSL, PyMongo may require third party "
+"dependencies as determined by your version of Python. With PyMongo 3.3+, "
+"you can install PyMongo 3.3+ and any TLS/SSL-related dependencies using "
+"the following pip command::"
+msgstr ""
+
+#: ../../examples/tls.rst:19
+msgid ""
+"Starting with PyMongo 3.11 this installs `PyOpenSSL "
+"<https://pypi.org/project/pyOpenSSL/>`_, `requests`_ and "
+"`service_identity <https://pypi.org/project/service_identity/>`_ for "
+"users of Python versions older than 2.7.9. PyOpenSSL supports SNI for "
+"these old Python versions allowing applictions to connect to Altas free "
+"and shared tier instances."
+msgstr ""
+
+#: ../../examples/tls.rst:27
+msgid ""
+"Earlier versions of PyMongo require you to manually install the "
+"dependencies listed below."
+msgstr ""
+
+#: ../../examples/tls.rst:31
+msgid "Python 2.x"
+msgstr ""
+
+#: ../../examples/tls.rst:32
+msgid "The `ipaddress`_ module is required on all platforms."
+msgstr ""
+
+#: ../../examples/tls.rst:34
+msgid "When using CPython < 2.7.9 or PyPy < 2.5.1:"
+msgstr ""
+
+#: ../../examples/tls.rst:36
+msgid "On Windows, the `wincertstore`_ module is required."
+msgstr ""
+
+#: ../../examples/tls.rst:37
+msgid "On all other platforms, the `certifi`_ module is required."
+msgstr ""
+
+#: ../../examples/tls.rst:43
+msgid ""
+"Industry best practices recommend, and some regulations require, the use "
+"of TLS 1.1 or newer. Though no application changes are required for "
+"PyMongo to make use of the newest protocols, some operating systems or "
+"versions may not provide an OpenSSL version new enough to support them."
+msgstr ""
+
+#: ../../examples/tls.rst:48
+msgid ""
+"Users of macOS older than 10.13 (High Sierra) will need to install Python"
+" from `python.org`_, `homebrew`_, `macports`_, or another similar source."
+msgstr ""
+
+#: ../../examples/tls.rst:51
+msgid ""
+"Users of Linux or other non-macOS Unix can check their OpenSSL version "
+"like this::"
+msgstr ""
+
+#: ../../examples/tls.rst:56
+msgid ""
+"If the version number is less than 1.0.1 support for TLS 1.1 or newer is "
+"not available. Contact your operating system vendor for a solution or "
+"upgrade to a newer distribution."
+msgstr ""
+
+#: ../../examples/tls.rst:60
+msgid ""
+"You can check your Python interpreter by installing the `requests`_ "
+"module and executing the following command::"
+msgstr ""
+
+#: ../../examples/tls.rst:65
+msgid "You should see \"TLS 1.X\" where X is >= 1."
+msgstr ""
+
+#: ../../examples/tls.rst:67
+msgid "You can read more about TLS versions and their security implications here:"
+msgstr ""
+
+#: ../../examples/tls.rst:69
+msgid "`<https://www.owasp.org/index.php/Transport_Layer_Protection_Cheat_Sheet#Rule_-_Only_Support_Strong_Protocols>`_"
+msgstr ""
+
+#: ../../examples/tls.rst:77
+msgid "Basic configuration"
+msgstr ""
+
+#: ../../examples/tls.rst:79
+msgid ""
+"In many cases connecting to MongoDB over TLS/SSL requires nothing more "
+"than passing ``ssl=True`` as a keyword argument to "
+":class:`~pymongo.mongo_client.MongoClient`::"
+msgstr ""
+
+#: ../../examples/tls.rst:85
+msgid "Or passing ``ssl=true`` in the URI::"
+msgstr ""
+
+#: ../../examples/tls.rst:89
+msgid ""
+"This configures PyMongo to connect to the server using TLS, verify the "
+"server's certificate and verify that the host you are attempting to "
+"connect to is listed by that certificate."
+msgstr ""
+
+#: ../../examples/tls.rst:94
+msgid "Certificate verification policy"
+msgstr ""
+
+#: ../../examples/tls.rst:96
+msgid ""
+"By default, PyMongo is configured to require a certificate from the "
+"server when TLS is enabled. This is configurable using the "
+"`ssl_cert_reqs` option. To disable this requirement pass "
+"``ssl.CERT_NONE`` as a keyword parameter::"
+msgstr ""
+
+#: ../../examples/tls.rst:105 ../../examples/tls.rst:123
+#: ../../examples/tls.rst:139
+msgid "Or, in the URI::"
+msgstr ""
+
+#: ../../examples/tls.rst:111
+msgid "Specifying a CA file"
+msgstr ""
+
+#: ../../examples/tls.rst:113
+msgid ""
+"In some cases you may want to configure PyMongo to use a specific set of "
+"CA certificates. This is most often the case when you are acting as your "
+"own certificate authority rather than using server certificates signed by"
+" a well known authority. The `ssl_ca_certs` option takes a path to a CA "
+"file. It can be passed as a keyword argument::"
+msgstr ""
+
+#: ../../examples/tls.rst:129
+msgid "Specifying a certificate revocation list"
+msgstr ""
+
+#: ../../examples/tls.rst:131
+msgid ""
+"Python 2.7.9+ (pypy 2.5.1+) and 3.4+ provide support for certificate "
+"revocation lists. The `ssl_crlfile` option takes a path to a CRL file. It"
+" can be passed as a keyword argument::"
+msgstr ""
+
+#: ../../examples/tls.rst:144
+msgid "Certificate revocation lists and :ref:`OCSP` cannot be used together."
+msgstr ""
+
+#: ../../examples/tls.rst:147
+msgid "Client certificates"
+msgstr ""
+
+#: ../../examples/tls.rst:149
+msgid ""
+"PyMongo can be configured to present a client certificate using the "
+"`ssl_certfile` option::"
+msgstr ""
+
+#: ../../examples/tls.rst:156
+msgid ""
+"If the private key for the client certificate is stored in a separate "
+"file use the `ssl_keyfile` option::"
+msgstr ""
+
+#: ../../examples/tls.rst:164
+msgid ""
+"Python 2.7.9+ (pypy 2.5.1+) and 3.3+ support providing a password or "
+"passphrase to decrypt encrypted private keys. Use the "
+"`ssl_pem_passphrase` option::"
+msgstr ""
+
+#: ../../examples/tls.rst:174
+msgid "These options can also be passed as part of the MongoDB URI."
+msgstr ""
+
+#: ../../examples/tls.rst:179
+msgid "OCSP"
+msgstr ""
+
+#: ../../examples/tls.rst:181
+msgid ""
+"Starting with PyMongo 3.11, if PyMongo was installed with the \"ocsp\" "
+"extra::"
+msgstr ""
+
+#: ../../examples/tls.rst:185
+msgid ""
+"certificate revocation checking is enabled by way of `OCSP (Online "
+"Certification Status Protocol) "
+"<https://en.wikipedia.org/wiki/Online_Certificate_Status_Protocol>`_. "
+"MongoDB 4.4+ `staples OCSP responses "
+"<https://en.wikipedia.org/wiki/OCSP_stapling>`_ to the TLS handshake "
+"which PyMongo will verify, failing the TLS handshake if the stapled OCSP "
+"response is invalid or indicates that the peer certificate is revoked."
+msgstr ""
+
+#: ../../examples/tls.rst:192
+msgid ""
+"When connecting to a server version older than 4.4, or when a 4.4+ "
+"version of MongoDB does not staple an OCSP response, PyMongo will attempt"
+" to connect directly to an OCSP endpoint if the peer certificate "
+"specified one. The TLS handshake will only fail in this case if the "
+"response indicates that the certificate is revoked. Invalid or malformed "
+"responses will be ignored, favoring availability over maximum security."
+msgstr ""
+
+#: ../../examples/tls.rst:201
+msgid "Troubleshooting TLS Errors"
+msgstr ""
+
+#: ../../examples/tls.rst:203
+msgid ""
+"TLS errors often fall into three categories - certificate verification "
+"failure, protocol version mismatch or certificate revocation checking "
+"failure. An error message similar to the following means that OpenSSL was"
+" not able to verify the server's certificate::"
+msgstr ""
+
+#: ../../examples/tls.rst:210
+msgid ""
+"This often occurs because OpenSSL does not have access to the system's "
+"root certificates or the certificates are out of date. Linux users should"
+" ensure that they have the latest root certificate updates installed from"
+" their Linux vendor. macOS users using Python 3.6.0 or newer downloaded "
+"from python.org `may have to run a script included with python "
+"<https://bugs.python.org/issue29065#msg283984>`_ to install root "
+"certificates::"
+msgstr ""
+
+#: ../../examples/tls.rst:220
+msgid ""
+"Users of older PyPy portable versions may have to `set an environment "
+"variable <https://github.com/squeaky-pl/portable-pypy/issues/15>`_ to "
+"tell OpenSSL where to find root certificates. This is easily done using "
+"the `certifi module <https://pypi.org/project/certifi/>`_ from pypi::"
+msgstr ""
+
+#: ../../examples/tls.rst:228
+msgid ""
+"An error message similar to the following message means that the OpenSSL "
+"version used by Python does not support a new enough TLS protocol to "
+"connect to the server::"
+msgstr ""
+
+#: ../../examples/tls.rst:234
+msgid ""
+"Industry best practices recommend, and some regulations require, that "
+"older TLS protocols be disabled in some MongoDB deployments. Some "
+"deployments may disable TLS 1.0, others may disable TLS 1.0 and TLS 1.1. "
+"See the warning earlier in this document for troubleshooting steps and "
+"solutions."
+msgstr ""
+
+#: ../../examples/tls.rst:239
+msgid ""
+"An error message similar to the following message means that certificate "
+"revocation checking failed::"
+msgstr ""
+
+#: ../../examples/tls.rst:244
+msgid "See :ref:`OCSP` for more details."
+msgstr ""
+
+#: ../../examples/uuid.rst:4
+msgid "Handling UUID Data"
+msgstr ""
+
+#: ../../examples/uuid.rst:6
+msgid ""
+"PyMongo ships with built-in support for dealing with UUID types. It is "
+"straightforward to store native :class:`uuid.UUID` objects to MongoDB and"
+" retrieve them as native :class:`uuid.UUID` objects::"
+msgstr ""
+
+#: ../../examples/uuid.rst:33
+msgid ""
+"Native :class:`uuid.UUID` objects can also be used as part of MongoDB "
+"queries::"
+msgstr ""
+
+#: ../../examples/uuid.rst:39
+msgid ""
+"The above examples illustrate the simplest of use-cases - one where the "
+"UUID is generated by, and used in the same application. However, the "
+"situation can be significantly more complex when dealing with a MongoDB "
+"deployment that contains UUIDs created by other drivers as the Java and "
+"CSharp drivers have historically encoded UUIDs using a byte-order that is"
+" different from the one used by PyMongo. Applications that require "
+"interoperability across these drivers must specify the appropriate "
+":class:`~bson.binary.UuidRepresentation`."
+msgstr ""
+
+#: ../../examples/uuid.rst:48
+msgid ""
+"In the following sections, we describe how drivers have historically "
+"differed in their encoding of UUIDs, and how applications can use the "
+":class:`~bson.binary.UuidRepresentation` configuration option to maintain"
+" cross-language compatibility."
+msgstr ""
+
+#: ../../examples/uuid.rst:53
+msgid ""
+"New applications that do not share a MongoDB deployment with any other "
+"application and that have never stored UUIDs in MongoDB should use the "
+"``standard`` UUID representation for cross-language compatibility. See "
+":ref:`configuring-uuid-representation` for details on how to configure "
+"the :class:`~bson.binary.UuidRepresentation`."
+msgstr ""
+
+#: ../../examples/uuid.rst:62
+msgid "Legacy Handling of UUID Data"
+msgstr ""
+
+#: ../../examples/uuid.rst:64
+msgid ""
+"Historically, MongoDB Drivers have used different byte-ordering while "
+"serializing UUID types to :class:`~bson.binary.Binary`. Consider, for "
+"instance, a UUID with the following canonical textual representation::"
+msgstr ""
+
+#: ../../examples/uuid.rst:71
+msgid "This UUID would historically be serialized by the Python driver as::"
+msgstr ""
+
+#: ../../examples/uuid.rst:75
+msgid "The same UUID would historically be serialized by the C# driver as::"
+msgstr ""
+
+#: ../../examples/uuid.rst:79
+msgid ""
+"Finally, the same UUID would historically be serialized by the Java "
+"driver as::"
+msgstr ""
+
+#: ../../examples/uuid.rst:83
+msgid ""
+"For in-depth information about the the byte-order historically used by "
+"different drivers, see the `Handling of Native UUID Types Specification "
+"<https://github.com/mongodb/specifications/blob/master/source/uuid.rst>`_."
+msgstr ""
+
+#: ../../examples/uuid.rst:88
+msgid ""
+"This difference in the byte-order of UUIDs encoded by different drivers "
+"can result in highly unintuitive behavior in some scenarios. We detail "
+"two such scenarios in the next sections."
+msgstr ""
+
+#: ../../examples/uuid.rst:93
+msgid "Scenario 1: Applications Share a MongoDB Deployment"
+msgstr ""
+
+#: ../../examples/uuid.rst:95
+msgid "Consider the following situation:"
+msgstr ""
+
+#: ../../examples/uuid.rst:97
+msgid ""
+"Application ``C`` written in C# generates a UUID and uses it as the "
+"``_id`` of a document that it proceeds to insert into the ``uuid_test`` "
+"collection of the ``example_db`` database. Let's assume that the "
+"canonical textual representation of the generated UUID is::"
+msgstr ""
+
+#: ../../examples/uuid.rst:104
+msgid ""
+"Application ``P`` written in Python attempts to ``find`` the document "
+"written by application ``C`` in the following manner::"
+msgstr ""
+
+#: ../../examples/uuid.rst:111
+msgid ""
+"In this instance, ``result`` will never be the document that was inserted"
+" by application ``C`` in the previous step. This is because of the "
+"different byte-order used by the C# driver for representing UUIDs as BSON"
+" Binary. The following query, on the other hand, will successfully find "
+"this document::"
+msgstr ""
+
+#: ../../examples/uuid.rst:119
+msgid ""
+"This example demonstrates how the differing byte-order used by different "
+"drivers can hamper interoperability. To workaround this problem, users "
+"should configure their ``MongoClient`` with the appropriate "
+":class:`~bson.binary.UuidRepresentation` (in this case, ``client`` in "
+"application ``P`` can be configured to use the "
+":data:`~bson.binary.UuidRepresentation.CSHARP_LEGACY` representation to "
+"avoid the unintuitive behavior) as described in :ref:`configuring-uuid-"
+"representation`."
+msgstr ""
+
+#: ../../examples/uuid.rst:129
+msgid "Scenario 2: Round-Tripping UUIDs"
+msgstr ""
+
+#: ../../examples/uuid.rst:131
+msgid ""
+"In the following examples, we see how using a misconfigured "
+":class:`~bson.binary.UuidRepresentation` can cause an application to "
+"inadvertently change the :class:`~bson.binary.Binary` subtype, and in "
+"some cases, the bytes of the :class:`~bson.binary.Binary` field itself "
+"when round-tripping documents containing UUIDs."
+msgstr ""
+
+#: ../../examples/uuid.rst:137
+msgid "Consider the following situation::"
+msgstr ""
+
+#: ../../examples/uuid.rst:163
+msgid ""
+"In this example, round-tripping the document using the incorrect "
+":class:`~bson.binary.UuidRepresentation` (``STANDARD`` instead of "
+"``PYTHON_LEGACY``) changes the :class:`~bson.binary.Binary` subtype as a "
+"side-effect. **Note that this can also happen when the situation is "
+"reversed - i.e. when the original document is written using ``STANDARD`` "
+"representation and then round-tripped using the ``PYTHON_LEGACY`` "
+"representation.**"
+msgstr ""
+
+#: ../../examples/uuid.rst:170
+msgid ""
+"In the next example, we see the consequences of incorrectly using a "
+"representation that modifies byte-order (``CSHARP_LEGACY`` or "
+"``JAVA_LEGACY``) when round-tripping documents::"
+msgstr ""
+
+#: ../../examples/uuid.rst:200
+msgid ""
+"In this case, using the incorrect "
+":class:`~bson.binary.UuidRepresentation` (``JAVA_LEGACY`` instead of "
+"``STANDARD``) changes the :class:`~bson.binary.Binary` bytes and subtype "
+"as a side-effect. **Note that this happens when any representation that "
+"manipulates byte-order (``CSHARP_LEGACY`` or ``JAVA_LEGACY``) is "
+"incorrectly used to round-trip UUIDs written with ``STANDARD``. When the "
+"situation is reversed - i.e. when the original document is written using "
+"``CSHARP_LEGACY`` or ``JAVA_LEGACY`` and then round-tripped using "
+"``STANDARD`` - only the :class:`~bson.binary.Binary` subtype is "
+"changed.**"
+msgstr ""
+
+#: ../../examples/uuid.rst:210
+msgid ""
+"Starting in PyMongo 4.0, these issue will be resolved as the ``STANDARD``"
+" representation will decode Binary subtype 3 fields as "
+":class:`~bson.binary.Binary` objects of subtype 3 (instead of "
+":class:`uuid.UUID`), and each of the ``LEGACY_*`` representations will "
+"decode Binary subtype 4 fields to :class:`~bson.binary.Binary` objects of"
+" subtype 4 (instead of :class:`uuid.UUID`)."
+msgstr ""
+
+#: ../../examples/uuid.rst:220
+msgid "Configuring a UUID Representation"
+msgstr ""
+
+#: ../../examples/uuid.rst:222
+msgid ""
+"Users can workaround the problems described above by configuring their "
+"applications with the appropriate "
+":class:`~bson.binary.UuidRepresentation`. Configuring the representation "
+"modifies PyMongo's behavior while encoding :class:`uuid.UUID` objects to "
+"BSON and decoding Binary subtype 3 and 4 fields from BSON."
+msgstr ""
+
+#: ../../examples/uuid.rst:228
+msgid "Applications can set the UUID representation in one of the following ways:"
+msgstr ""
+
+#: ../../examples/uuid.rst:230
+msgid ""
+"At the ``MongoClient`` level using the ``uuidRepresentation`` URI option,"
+" e.g.::"
+msgstr ""
+
+#: ../../examples/uuid.rst:235
+msgid "Valid values are:"
+msgstr ""
+
+#: ../../examples/uuid.rst:240
+msgid "Value"
+msgstr ""
+
+#: ../../examples/uuid.rst:241 ../../examples/uuid.rst:277
+msgid "UUID Representation"
+msgstr ""
+
+#: ../../examples/uuid.rst:243
+msgid "``pythonLegacy``"
+msgstr ""
+
+#: ../../examples/uuid.rst:244 ../../examples/uuid.rst:283
+msgid ":ref:`python-legacy-representation-details`"
+msgstr ""
+
+#: ../../examples/uuid.rst:246
+msgid "``javaLegacy``"
+msgstr ""
+
+#: ../../examples/uuid.rst:247 ../../examples/uuid.rst:289
+msgid ":ref:`java-legacy-representation-details`"
+msgstr ""
+
+#: ../../examples/uuid.rst:249
+msgid "``csharpLegacy``"
+msgstr ""
+
+#: ../../examples/uuid.rst:250 ../../examples/uuid.rst:295
+msgid ":ref:`csharp-legacy-representation-details`"
+msgstr ""
+
+#: ../../examples/uuid.rst:252
+msgid "``standard``"
+msgstr ""
+
+#: ../../examples/uuid.rst:253 ../../examples/uuid.rst:301
+msgid ":ref:`standard-representation-details`"
+msgstr ""
+
+#: ../../examples/uuid.rst:255
+msgid "``unspecified``"
+msgstr ""
+
+#: ../../examples/uuid.rst:256 ../../examples/uuid.rst:307
+msgid ":ref:`unspecified-representation-details`"
+msgstr ""
+
+#: ../../examples/uuid.rst:258
+msgid "Using the ``uuid_representation`` kwarg option, e.g.::"
+msgstr ""
+
+#: ../../examples/uuid.rst:263
+msgid ""
+"By supplying a suitable :class:`~bson.codec_options.CodecOptions` "
+"instance, e.g.::"
+msgstr ""
+
+#: ../../examples/uuid.rst:272
+msgid "Supported UUID Representations"
+msgstr ""
+
+#: ../../examples/uuid.rst:278
+msgid "Default?"
+msgstr ""
+
+#: ../../examples/uuid.rst:279
+msgid "Encode :class:`uuid.UUID` to"
+msgstr ""
+
+#: ../../examples/uuid.rst:280
+msgid "Decode :class:`~bson.binary.Binary` subtype 4 to"
+msgstr ""
+
+#: ../../examples/uuid.rst:281
+msgid "Decode :class:`~bson.binary.Binary` subtype 3 to"
+msgstr ""
+
+#: ../../examples/uuid.rst:284
+msgid "Yes, in PyMongo>=2.9,<4"
+msgstr ""
+
+#: ../../examples/uuid.rst:285
+msgid ":class:`~bson.binary.Binary` subtype 3 with standard byte-order"
+msgstr ""
+
+#: ../../examples/uuid.rst:286 ../../examples/uuid.rst:292
+#: ../../examples/uuid.rst:298
+msgid ""
+":class:`uuid.UUID` in PyMongo<4; :class:`~bson.binary.Binary` subtype 4 "
+"in PyMongo>=4"
+msgstr ""
+
+#: ../../examples/uuid.rst:287 ../../examples/uuid.rst:293
+#: ../../examples/uuid.rst:299 ../../examples/uuid.rst:304
+msgid ":class:`uuid.UUID`"
+msgstr ""
+
+#: ../../examples/uuid.rst:290 ../../examples/uuid.rst:296
+#: ../../examples/uuid.rst:302
+msgid "No"
+msgstr ""
+
+#: ../../examples/uuid.rst:291
+msgid ":class:`~bson.binary.Binary` subtype 3 with Java legacy byte-order"
+msgstr ""
+
+#: ../../examples/uuid.rst:297
+msgid ":class:`~bson.binary.Binary` subtype 3 with C# legacy byte-order"
+msgstr ""
+
+#: ../../examples/uuid.rst:303 ../../examples/uuid.rst:310
+msgid ":class:`~bson.binary.Binary` subtype 4"
+msgstr ""
+
+#: ../../examples/uuid.rst:305 ../../examples/uuid.rst:311
+msgid ""
+":class:`uuid.UUID` in PyMongo<4; :class:`~bson.binary.Binary` subtype 3 "
+"in PyMongo>=4"
+msgstr ""
+
+#: ../../examples/uuid.rst:308
+msgid "Yes, in PyMongo>=4"
+msgstr ""
+
+#: ../../examples/uuid.rst:309
+msgid "Raise :exc:`ValueError`"
+msgstr ""
+
+#: ../../examples/uuid.rst:313
+msgid ""
+"We now detail the behavior and use-case for each supported UUID "
+"representation."
+msgstr ""
+
+#: ../../examples/uuid.rst:319
+msgid "``PYTHON_LEGACY``"
+msgstr ""
+
+#: ../../examples/uuid.rst:321
+msgid ""
+"This uuid representation should be used when reading UUIDs generated by "
+"existing applications that use the Python driver but **don't** explicitly"
+" set a UUID representation."
+msgstr ""
+
+#: ../../examples/uuid.rst:325
+msgid ""
+":data:`~bson.binary.UuidRepresentation.PYTHON_LEGACY` has been the "
+"default uuid representation since PyMongo 2.9."
+msgstr ""
+
+#: ../../examples/uuid.rst:328
+msgid ""
+"The :data:`~bson.binary.UuidRepresentation.PYTHON_LEGACY` representation "
+"corresponds to the legacy representation of UUIDs used by PyMongo. This "
+"representation conforms with `RFC 4122 Section 4.1.2 "
+"<https://tools.ietf.org/html/rfc4122#section-4.1.2>`_."
+msgstr ""
+
+#: ../../examples/uuid.rst:333
+msgid "The following example illustrates the use of this representation::"
+msgstr ""
+
+#: ../../examples/uuid.rst:355
+msgid ""
+"``PYTHON_LEGACY`` encodes native :class:`uuid.UUID` objects to "
+":class:`~bson.binary.Binary` subtype 3 objects, preserving the same byte-"
+"order as :attr:`~uuid.UUID.bytes`::"
+msgstr ""
+
+#: ../../examples/uuid.rst:367
+msgid "``JAVA_LEGACY``"
+msgstr ""
+
+#: ../../examples/uuid.rst:369
+msgid ""
+"This UUID representation should be used when reading UUIDs written to "
+"MongoDB by the legacy applications (i.e. applications that don't use the "
+"``STANDARD`` representation) using the Java driver."
+msgstr ""
+
+#: ../../examples/uuid.rst:373
+msgid ""
+"The :data:`~bson.binary.UuidRepresentation.JAVA_LEGACY` representation "
+"corresponds to the legacy representation of UUIDs used by the MongoDB "
+"Java Driver."
+msgstr ""
+
+#: ../../examples/uuid.rst:377
+msgid ""
+"The ``JAVA_LEGACY`` representation reverses the order of bytes 0-7, and "
+"bytes 8-15."
+msgstr ""
+
+#: ../../examples/uuid.rst:380
+msgid ""
+"As an example, consider the same UUID described in :ref:`example-legacy-"
+"uuid`. Let us assume that an application used the Java driver without an "
+"explicitly specified UUID representation to insert the example UUID "
+"``00112233-4455-6677-8899-aabbccddeeff`` into MongoDB. If we try to read "
+"this value using PyMongo with no UUID representation specified, we end up"
+" with an entirely different UUID::"
+msgstr ""
+
+#: ../../examples/uuid.rst:389
+msgid ""
+"However, if we explicitly set the representation to "
+":data:`~bson.binary.UuidRepresentation.JAVA_LEGACY`, we get the correct "
+"result::"
+msgstr ""
+
+#: ../../examples/uuid.rst:394
+msgid ""
+"PyMongo uses the specified UUID representation to reorder the BSON bytes "
+"and load them correctly. ``JAVA_LEGACY`` encodes native "
+":class:`uuid.UUID` objects to :class:`~bson.binary.Binary` subtype 3 "
+"objects, while performing the same byte-reordering as the legacy Java "
+"driver's UUID to BSON encoder."
+msgstr ""
+
+#: ../../examples/uuid.rst:402
+msgid "``CSHARP_LEGACY``"
+msgstr ""
+
+#: ../../examples/uuid.rst:404
+msgid ""
+"This UUID representation should be used when reading UUIDs written to "
+"MongoDB by the legacy applications (i.e. applications that don't use the "
+"``STANDARD`` representation) using the C# driver."
+msgstr ""
+
+#: ../../examples/uuid.rst:408
+msgid ""
+"The :data:`~bson.binary.UuidRepresentation.CSHARP_LEGACY` representation "
+"corresponds to the legacy representation of UUIDs used by the MongoDB "
+"Java Driver."
+msgstr ""
+
+#: ../../examples/uuid.rst:412
+msgid ""
+"The ``CSHARP_LEGACY`` representation reverses the order of bytes 0-3, "
+"bytes 4-5, and bytes 6-7."
+msgstr ""
+
+#: ../../examples/uuid.rst:415
+msgid ""
+"As an example, consider the same UUID described in :ref:`example-legacy-"
+"uuid`. Let us assume that an application used the C# driver without an "
+"explicitly specified UUID representation to insert the example UUID "
+"``00112233-4455-6677-8899-aabbccddeeff`` into MongoDB. If we try to read "
+"this value using PyMongo with no UUID representation specified, we end up"
+" with an entirely different UUID::"
+msgstr ""
+
+#: ../../examples/uuid.rst:424
+msgid ""
+"However, if we explicitly set the representation to "
+":data:`~bson.binary.UuidRepresentation.CSHARP_LEGACY`, we get the correct"
+" result::"
+msgstr ""
+
+#: ../../examples/uuid.rst:429
+msgid ""
+"PyMongo uses the specified UUID representation to reorder the BSON bytes "
+"and load them correctly. ``CSHARP_LEGACY`` encodes native "
+":class:`uuid.UUID` objects to :class:`~bson.binary.Binary` subtype 3 "
+"objects, while performing the same byte-reordering as the legacy C# "
+"driver's UUID to BSON encoder."
+msgstr ""
+
+#: ../../examples/uuid.rst:437
+msgid "``STANDARD``"
+msgstr ""
+
+#: ../../examples/uuid.rst:439
+msgid ""
+"This UUID representation should be used by new applications that have "
+"never stored UUIDs in MongoDB."
+msgstr ""
+
+#: ../../examples/uuid.rst:442
+msgid ""
+"The :data:`~bson.binary.UuidRepresentation.STANDARD` representation "
+"enables cross-language compatibility by ensuring the same byte-ordering "
+"when encoding UUIDs from all drivers. UUIDs written by a driver with this"
+" representation configured will be handled correctly by every other "
+"provided it is also configured with the ``STANDARD`` representation."
+msgstr ""
+
+#: ../../examples/uuid.rst:448
+msgid ""
+"``STANDARD`` encodes native :class:`uuid.UUID` objects to "
+":class:`~bson.binary.Binary` subtype 4 objects."
+msgstr ""
+
+#: ../../examples/uuid.rst:454
+msgid "``UNSPECIFIED``"
+msgstr ""
+
+#: ../../examples/uuid.rst:456
+msgid ""
+"Starting in PyMongo 4.0, "
+":data:`~bson.binary.UuidRepresentation.UNSPECIFIED` will be the default "
+"UUID representation used by PyMongo."
+msgstr ""
+
+#: ../../examples/uuid.rst:460
+msgid ""
+"The :data:`~bson.binary.UuidRepresentation.UNSPECIFIED` representation "
+"prevents the incorrect interpretation of UUID bytes by stopping short of "
+"automatically converting UUID fields in BSON to native UUID types. "
+"Loading a UUID when using this representation returns a "
+":class:`~bson.binary.Binary` object instead. If required, users can "
+"coerce the decoded :class:`~bson.binary.Binary` objects into native UUIDs"
+" using the :meth:`~bson.binary.Binary.as_uuid` method and specifying the "
+"appropriate representation format. The following example shows what this "
+"might look like for a UUID stored by the C# driver::"
+msgstr ""
+
+#: ../../examples/uuid.rst:495
+msgid ""
+"Native :class:`uuid.UUID` objects cannot directly be encoded to "
+":class:`~bson.binary.Binary` when the UUID representation is "
+"``UNSPECIFIED`` and attempting to do so will result in an exception::"
+msgstr ""
+
+#: ../../examples/uuid.rst:504
+msgid ""
+"Instead, applications using "
+":data:`~bson.binary.UuidRepresentation.UNSPECIFIED` must explicitly "
+"coerce a native UUID using the :meth:`~bson.binary.Binary.from_uuid` "
+"method::"
+msgstr ""
+

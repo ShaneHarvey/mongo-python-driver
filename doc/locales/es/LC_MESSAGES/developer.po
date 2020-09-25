@@ -1,0 +1,192 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) MongoDB, Inc. 2008-present. MongoDB, Mongo, and the leaf
+# logo are registered trademarks of MongoDB, Inc
+# This file is distributed under the same license as the PyMongo package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2020.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PyMongo 3.11.1.dev1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-09-24 18:14-0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.8.0\n"
+
+#: ../../developer/index.rst:2
+msgid "Developer Guide"
+msgstr ""
+
+#: ../../developer/index.rst:4
+msgid "Technical guide for contributors to PyMongo."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:2
+msgid "Periodic Executors"
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:6
+msgid ""
+"PyMongo implements a :class:`~periodic_executor.PeriodicExecutor` for two"
+" purposes: as the background thread for :class:`~monitor.Monitor`, and to"
+" regularly check if there are `OP_KILL_CURSORS` messages that must be "
+"sent to the server."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:11
+msgid "Killing Cursors"
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:13
+msgid ""
+"An incompletely iterated :class:`~cursor.Cursor` on the client represents"
+" an open cursor object on the server. In code like this, we lose a "
+"reference to the cursor before finishing iteration::"
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:20
+msgid ""
+"We try to send an `OP_KILL_CURSORS` to the server to tell it to clean up "
+"the server-side cursor. But we must not take any locks directly from the "
+"cursor's destructor (see `PYTHON-799`_), so we cannot safely use the "
+"PyMongo data structures required to send a message. The solution is to "
+"add the cursor's id to an array on the :class:`~mongo_client.MongoClient`"
+" without taking any locks."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:26
+msgid ""
+"Each client has a :class:`~periodic_executor.PeriodicExecutor` devoted to"
+" checking the array for cursor ids. Any it sees are the result of cursors"
+" that were freed while the server-side cursor was still open. The "
+"executor can safely take the locks it needs in order to send the "
+"`OP_KILL_CURSORS` message."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:34
+msgid "Stopping Executors"
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:36
+msgid ""
+"Just as :class:`~cursor.Cursor` must not take any locks from its "
+"destructor, neither can :class:`~mongo_client.MongoClient` and "
+":class:`~topology.Topology`. Thus, although the client calls "
+":meth:`close` on its kill-cursors thread, and the topology calls "
+":meth:`close` on all its monitor threads, the :meth:`close` method cannot"
+" actually call :meth:`wake` on the executor, since :meth:`wake` takes a "
+"lock."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:43
+msgid ""
+"Instead, executors wake periodically to check if ``self.close`` is set, "
+"and if so they exit."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:46
+msgid ""
+"A thread can log spurious errors if it wakes late in the Python "
+"interpreter's shutdown sequence, so we try to join threads before then. "
+"Each periodic executor (either a monitor or a kill-cursors thread) adds a"
+" weakref to itself to a set called ``_EXECUTORS``, in the "
+"``periodic_executor`` module."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:51
+msgid ""
+"An `exit handler`_ runs on shutdown and tells all executors to stop, then"
+" tries (with a short timeout) to join all executor threads."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:57
+msgid "Monitoring"
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:59
+msgid ""
+"For each server in the topology, :class:`~topology.Topology` uses a "
+"periodic executor to launch a monitor thread. This thread must not "
+"prevent the topology from being freed, so it weakrefs the topology. "
+"Furthermore, it uses a weakref callback to terminate itself soon after "
+"the topology is freed."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:64
+msgid "Solid lines represent strong references, dashed lines weak ones:"
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:70
+msgid ""
+"See `Stopping Executors`_ above for an explanation of the ``_EXECUTORS`` "
+"set."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:72
+msgid ""
+"It is a requirement of the `Server Discovery And Monitoring Spec`_ that a"
+" sleeping monitor can be awakened early. Aside from infrequent wakeups to"
+" do their appointed chores, and occasional interruptions, periodic "
+"executors also wake periodically to check if they should terminate."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:77
+msgid ""
+"Our first implementation of this idea was the obvious one: use the Python"
+" standard library's threading.Condition.wait with a timeout. Another "
+"thread wakes the executor early by signaling the condition variable."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:81
+msgid ""
+"A topology cannot signal the condition variable to tell the executor to "
+"terminate, because it would risk a deadlock in the garbage collector: no "
+"destructor or weakref callback can take a lock to signal the condition "
+"variable (see `PYTHON-863`_); thus the only way for a dying object to "
+"terminate a periodic executor is to set its \"stopped\" flag and let the "
+"executor see the flag next time it wakes."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:88
+msgid ""
+"We erred on the side of prompt cleanup, and set the check interval at "
+"100ms. We assumed that checking a flag and going back to sleep 10 times a"
+" second was cheap on modern machines."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:92
+msgid ""
+"Starting in Python 3.2, the builtin C implementation of lock.acquire "
+"takes a timeout parameter, so Python 3.2+ Condition variables sleep "
+"simply by calling lock.acquire; they are implemented as efficiently as "
+"expected."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:96
+msgid ""
+"But in Python 2, lock.acquire has no timeout. To wait with a timeout, a "
+"Python 2 condition variable sleeps a millisecond, tries to acquire the "
+"lock, sleeps twice as long, and tries again. This exponential backoff "
+"reaches a maximum sleep time of 50ms."
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:101
+msgid ""
+"If PyMongo calls the condition variable's \"wait\" method with a short "
+"timeout, the exponential backoff is restarted frequently. Overall, the "
+"condition variable is not waking a few times a second, but hundreds of "
+"times. (See `PYTHON-983`_.)"
+msgstr ""
+
+#: ../../developer/periodic_executor.rst:105
+msgid ""
+"Thus the current design of periodic executors is surprisingly simple: "
+"they do a simple `time.sleep` for a half-second, check if it is time to "
+"wake or terminate, and sleep again."
+msgstr ""
+
