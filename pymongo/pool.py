@@ -33,6 +33,7 @@ from bson.son import SON
 from pymongo import auth, helpers, thread_util, __version__
 from pymongo.client_session import _validate_session_write_concern
 from pymongo.common import (MAX_BSON_SIZE,
+                            MAX_CONNECTING,
                             MAX_IDLE_TIME_SEC,
                             MAX_MESSAGE_SIZE,
                             MAX_POOL_SIZE,
@@ -294,7 +295,7 @@ class PoolOptions(object):
                  '__wait_queue_timeout', '__wait_queue_multiple',
                  '__ssl_context', '__ssl_match_hostname', '__socket_keepalive',
                  '__event_listeners', '__appname', '__driver', '__metadata',
-                 '__compression_settings')
+                 '__compression_settings', '__max_connecting')
 
     def __init__(self, max_pool_size=MAX_POOL_SIZE,
                  min_pool_size=MIN_POOL_SIZE,
@@ -303,7 +304,7 @@ class PoolOptions(object):
                  wait_queue_multiple=None, ssl_context=None,
                  ssl_match_hostname=True, socket_keepalive=True,
                  event_listeners=None, appname=None, driver=None,
-                 compression_settings=None):
+                 compression_settings=None, max_connecting=MAX_CONNECTING):
 
         self.__max_pool_size = max_pool_size
         self.__min_pool_size = min_pool_size
@@ -319,6 +320,7 @@ class PoolOptions(object):
         self.__appname = appname
         self.__driver = driver
         self.__compression_settings = compression_settings
+        self.__max_connecting = max_connecting
         self.__metadata = copy.deepcopy(_METADATA)
         if appname:
             self.__metadata['application'] = {'name': appname}
@@ -357,6 +359,8 @@ class PoolOptions(object):
             opts['maxIdleTimeMS'] = self.__max_idle_time_seconds * 1000
         if self.__wait_queue_timeout != WAIT_QUEUE_TIMEOUT:
             opts['waitQueueTimeoutMS'] = self.__wait_queue_timeout * 1000
+        if self.__max_connecting != MAX_CONNECTING:
+            opts['maxConnecting'] = self.__max_connecting
         return opts
 
     @property
@@ -380,6 +384,13 @@ class PoolOptions(object):
         will maintain to each connected server. Default is 0.
         """
         return self.__min_pool_size
+
+    @property
+    def max_connecting(self):
+        """The maximum number of concurrent connection creation attempts per
+        pool. Defaults to 2.
+        """
+        return self.__max_connecting
 
     @property
     def max_idle_time_seconds(self):
@@ -1080,6 +1091,8 @@ class Pool:
 
         self._socket_semaphore = thread_util.create_semaphore(
             self.opts.max_pool_size, max_waiters)
+        self._max_connecting_semaphore = thread_util.create_semaphore(
+            self.opts.max_connecting, None)
         if self.enabled_for_cmap:
             self.opts.event_listeners.publish_pool_created(
                 self.address, self.opts.non_default_options)
@@ -1149,7 +1162,8 @@ class Pool:
             if not self._socket_semaphore.acquire(False):
                 break
             try:
-                sock_info = self.connect(all_credentials)
+                with self._max_connecting_semaphore:
+                    sock_info = self.connect(all_credentials)
                 with self.lock:
                     # Close connection and return if the pool was reset during
                     # socket creation or while acquiring the pool lock.
@@ -1277,8 +1291,16 @@ class Pool:
                     with self.lock:
                         sock_info = self.sockets.popleft()
                 except IndexError:
-                    # Can raise ConnectionFailure or CertificateError.
-                    sock_info = self.connect(all_credentials)
+                    # XXX: Spec says this should wait for either maxConnecting
+                    # OR for a socket to be checked back into the pool.
+                    with self._max_connecting_semaphore:
+                        # We may have waited a while, check again.
+                        try:
+                            with self.lock:
+                                sock_info = self.sockets.popleft()
+                        except IndexError:
+                            # Can raise ConnectionFailure or CertificateError.
+                            sock_info = self.connect(all_credentials)
                 else:
                     if self._perished(sock_info):
                         sock_info = None
