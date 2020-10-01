@@ -99,7 +99,6 @@
     },
     {
       "type": "ConnectionCheckedOut",
-      "connectionId": 1,
       "address": 42
     },
     {
