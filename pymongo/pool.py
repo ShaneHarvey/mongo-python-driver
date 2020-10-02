@@ -1091,8 +1091,9 @@ class Pool:
 
         self._socket_semaphore = thread_util.create_semaphore(
             self.opts.max_pool_size, max_waiters)
-        self._max_connecting_semaphore = thread_util.create_semaphore(
-            self.opts.max_connecting, None)
+        self._max_connecting_cond = threading.Condition(self.lock)
+        self._max_connecting = self.opts.max_connecting
+        self._connecting = 0
         if self.enabled_for_cmap:
             self.opts.event_listeners.publish_pool_created(
                 self.address, self.opts.non_default_options)
@@ -1162,8 +1163,17 @@ class Pool:
             if not self._socket_semaphore.acquire(False):
                 break
             try:
-                with self._max_connecting_semaphore:
+                with self._max_connecting_cond:
+                    while self._connecting >= self._max_connecting:
+                        self._max_connecting_cond.wait()
+                        # TODO: check for timeouts?
+                    self._connecting += 1
+                try:
                     sock_info = self.connect(all_credentials)
+                finally:
+                    with self._max_connecting_cond:
+                        self._connecting -= 1
+                        self._max_connecting_cond.notify()
                 with self.lock:
                     # Close connection and return if the pool was reset during
                     # socket creation or while acquiring the pool lock.
@@ -1293,14 +1303,28 @@ class Pool:
                 except IndexError:
                     # XXX: Spec says this should wait for either maxConnecting
                     # OR for a socket to be checked back into the pool.
-                    with self._max_connecting_semaphore:
-                        # We may have waited a while, check again.
-                        try:
-                            with self.lock:
+                    with self._max_connecting_cond:
+                        while self._connecting >= self._max_connecting:
+                            self._max_connecting_cond.wait()
+                            try:
                                 sock_info = self.sockets.popleft()
-                        except IndexError:
-                            # Can raise ConnectionFailure or CertificateError.
+                                break
+                            except IndexError:
+                                pass
+
+                        if sock_info is None:
+                            # TODO: refactor
+                            try:
+                                sock_info = self.sockets.popleft()
+                            except IndexError:
+                                self._connecting += 1
+                    if sock_info is None:
+                        try:
                             sock_info = self.connect(all_credentials)
+                        finally:
+                            with self._max_connecting_cond:
+                                self._connecting -= 1
+                                self._max_connecting_cond.notify()
                 else:
                     if self._perished(sock_info):
                         sock_info = None
@@ -1346,6 +1370,8 @@ class Pool:
                         sock_info.update_last_checkin_time()
                         sock_info.update_is_writable(self.is_writable)
                         self.sockets.appendleft(sock_info)
+                        # Notify any threads waiting to create a connection.
+                        self._max_connecting_cond.notify()
 
         self._socket_semaphore.release()
         with self.lock:
