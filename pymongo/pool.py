@@ -1162,18 +1162,15 @@ class Pool:
             # We must acquire the semaphore to respect max_pool_size.
             if not self._socket_semaphore.acquire(False):
                 break
+            incremented = False
             try:
                 with self._max_connecting_cond:
                     while self._connecting >= self._max_connecting:
                         self._max_connecting_cond.wait()
                         # TODO: check for timeouts?
                     self._connecting += 1
-                try:
-                    sock_info = self.connect(all_credentials)
-                finally:
-                    with self._max_connecting_cond:
-                        self._connecting -= 1
-                        self._max_connecting_cond.notify()
+                    incremented = True
+                sock_info = self.connect(all_credentials)
                 with self.lock:
                     # Close connection and return if the pool was reset during
                     # socket creation or while acquiring the pool lock.
@@ -1182,6 +1179,11 @@ class Pool:
                         break
                     self.sockets.appendleft(sock_info)
             finally:
+                if incremented:
+                    # Notify after adding the socket to the pool.
+                    with self._max_connecting_cond:
+                        self._connecting -= 1
+                        self._max_connecting_cond.notify()
                 self._socket_semaphore.release()
 
     def connect(self, all_credentials=None):
