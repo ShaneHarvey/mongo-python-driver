@@ -1306,20 +1306,14 @@ class Pool:
                     # XXX: Spec says this should wait for either maxConnecting
                     # OR for a socket to be checked back into the pool.
                     with self._max_connecting_cond:
-                        while self._connecting >= self._max_connecting:
+                        while (self._connecting >= self._max_connecting and
+                               not self.sockets):
                             self._max_connecting_cond.wait()
-                            try:
-                                sock_info = self.sockets.popleft()
-                                break
-                            except IndexError:
-                                pass
 
-                        if sock_info is None:
-                            # TODO: refactor
-                            try:
-                                sock_info = self.sockets.popleft()
-                            except IndexError:
-                                self._connecting += 1
+                        try:
+                            sock_info = self.sockets.popleft()
+                        except IndexError:
+                            self._connecting += 1
                     if sock_info is None:
                         try:
                             sock_info = self.connect(all_credentials)
