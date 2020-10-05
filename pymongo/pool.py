@@ -1157,17 +1157,18 @@ class Pool:
                 if (len(self.sockets) + self.active_sockets >=
                         self.opts.min_pool_size):
                     # There are enough sockets in the pool.
-                    break
+                    return
 
             # We must acquire the semaphore to respect max_pool_size.
             if not self._socket_semaphore.acquire(False):
-                break
+                return
             incremented = False
             try:
                 with self._max_connecting_cond:
-                    while self._connecting >= self._max_connecting:
-                        self._max_connecting_cond.wait()
-                        # TODO: check for timeouts?
+                    # If maxConnecting connections are already being created
+                    # by this pool then try again later instead of waiting.
+                    if self._connecting >= self._max_connecting:
+                        return
                     self._connecting += 1
                     incremented = True
                 sock_info = self.connect(all_credentials)
@@ -1176,7 +1177,7 @@ class Pool:
                     # socket creation or while acquiring the pool lock.
                     if self.generation != reference_generation:
                         sock_info.close_socket(ConnectionClosedReason.STALE)
-                        break
+                        return
                     self.sockets.appendleft(sock_info)
             finally:
                 if incremented:
