@@ -81,8 +81,7 @@
     },
     {
       "type": "ConnectionCheckedOut",
-      "address": 42,
-      "connectionId": 1
+      "address": 42
     },
     {
       "type": "ConnectionCreated",
