@@ -1287,6 +1287,10 @@ class Pool:
                 'pool')
 
         # Get a free socket or create one.
+        if self.opts.wait_queue_timeout:
+            deadline = _time() + self.opts.wait_queue_timeout
+        else:
+            deadline = None
         if not self._socket_semaphore.acquire(
                 True, self.opts.wait_queue_timeout):
             self._raise_wait_queue_timeout()
@@ -1309,7 +1313,15 @@ class Pool:
                     with self._max_connecting_cond:
                         while (self._connecting >= self._max_connecting and
                                not self.sockets):
-                            self._max_connecting_cond.wait()
+                            if self.opts.wait_queue_timeout:
+                                # TODO: What if timeout is <= zero here?
+                                # timeout = max(deadline - _time(), .001)
+                                timeout = deadline - _time()
+                            else:
+                                timeout = None
+                            if not self._max_connecting_cond.wait(timeout):
+                                # timeout
+                                self._raise_wait_queue_timeout()
 
                         try:
                             sock_info = self.sockets.popleft()
