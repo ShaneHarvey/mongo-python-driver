@@ -1,7 +1,7 @@
 {
   "version": 1,
   "style": "integration",
-  "description": "maxConnecting is enforced",
+  "description": "waiting on maxConnecting is limited by WaitQueueTimeoutMS",
   "runOn": [
     {
       "minServerVersion": "4.4.0"
@@ -23,7 +23,7 @@
   },
   "poolOptions": {
     "maxPoolSize": 10,
-    "waitQueueTimeoutMS": 5000
+    "waitQueueTimeoutMS": 50
   },
   "operations": [
     {
@@ -39,22 +39,17 @@
       "target": "thread2"
     },
     {
-      "name": "wait",
-      "thread": "thread2",
-      "ms": 100
-    },
-    {
       "name": "checkOut",
       "thread": "thread2"
     },
     {
-      "name": "start",
-      "target": "thread3"
+      "name": "waitForEvent",
+      "event": "ConnectionCreated",
+      "count": 2
     },
     {
-      "name": "wait",
-      "thread": "thread3",
-      "ms": 100
+      "name": "start",
+      "target": "thread3"
     },
     {
       "name": "checkOut",
@@ -62,27 +57,39 @@
     },
     {
       "name": "waitForEvent",
-      "event": "ConnectionReady",
-      "count": 3
-    }
-  ],
-  "events": [
-    {
-      "type": "ConnectionCreated",
-      "address": 42,
-      "connectionId": 1
+      "event": "ConnectionCheckOutFailed",
+      "count": 1
     },
     {
-      "type": "ConnectionCreated",
+      "name": "waitForThread",
+      "target": "thread3"
+    },
+    {
+      "name": "waitForEvent",
+      "event": "ConnectionReady",
+      "count": 2
+    }
+  ],
+  "error": {
+    "type": "WaitQueueTimeoutError",
+    "message": "Timed out while checking out a connection from connection pool"
+  },
+  "events": [
+    {
+      "type": "ConnectionCheckOutStarted",
       "address": 42
     },
     {
-      "type": "ConnectionReady",
-      "address": 42,
-      "connectionId": 1
+      "type": "ConnectionCheckOutStarted",
+      "address": 42
     },
     {
-      "type": "ConnectionCreated",
+      "type": "ConnectionCheckOutStarted",
+      "address": 42
+    },
+    {
+      "type": "ConnectionCheckOutFailed",
+      "reason": "timeout",
       "address": 42
     },
     {
@@ -95,7 +102,7 @@
     }
   ],
   "ignore": [
-    "ConnectionCheckOutStarted",
+    "ConnectionCreated",
     "ConnectionCheckedIn",
     "ConnectionCheckedOut",
     "ConnectionClosed",
