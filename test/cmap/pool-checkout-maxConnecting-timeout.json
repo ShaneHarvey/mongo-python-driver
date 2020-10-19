@@ -61,11 +61,14 @@
       "count": 1
     },
     {
-      "name": "waitForEvent",
-      "event": "ConnectionReady",
-      "count": 2
+      "name": "waitForThread",
+      "target": "thread3"
     }
   ],
+  "error": {
+    "type": "WaitQueueTimeoutError",
+    "message": "Timed out while checking out a connection from connection pool"
+  },
   "events": [
     {
       "type": "ConnectionCheckOutStarted",
@@ -82,14 +85,6 @@
     {
       "type": "ConnectionCheckOutFailed",
       "reason": "timeout",
-      "address": 42
-    },
-    {
-      "type": "ConnectionReady",
-      "address": 42
-    },
-    {
-      "type": "ConnectionReady",
       "address": 42
     }
   ],
