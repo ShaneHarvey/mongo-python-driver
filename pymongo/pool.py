@@ -28,7 +28,7 @@ from pymongo.ssl_support import (
     IPADDR_SAFE as _IPADDR_SAFE)
 
 from bson import DEFAULT_CODEC_OPTIONS
-from bson.py3compat import imap, itervalues, _unicode
+from bson.py3compat import imap, itervalues, _unicode, PY3
 from bson.son import SON
 from pymongo import auth, helpers, thread_util, __version__
 from pymongo.client_session import _validate_session_write_concern
@@ -285,6 +285,18 @@ def _raise_connection_failure(address, error, msg_prefix=None):
         raise NetworkTimeout(msg)
     else:
         raise AutoReconnect(msg)
+
+if PY3:
+    def _cond_wait(condition, timeout, deadline):
+        return condition.wait(timeout)
+else:
+    def _cond_wait(condition, timeout, deadline):
+        condition.wait(timeout)
+        # Python 2.7 always returns False for wait(),
+        # manually check for a timeout.
+        if timeout and _time() >= deadline:
+            return False
+        return True
 
 
 class PoolOptions(object):
@@ -1320,7 +1332,8 @@ class Pool:
                                 timeout = deadline - _time()
                             else:
                                 timeout = None
-                            if not self._max_connecting_cond.wait(timeout):
+                            if not _cond_wait(self._max_connecting_cond,
+                                              timeout, deadline):
                                 # timeout
                                 emitted_event = True
                                 self._raise_wait_queue_timeout()
