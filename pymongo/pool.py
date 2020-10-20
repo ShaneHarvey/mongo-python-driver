@@ -1317,41 +1317,38 @@ class Pool:
                 incremented = True
 
             while sock_info is None:
-                try:
-                    with self.lock:
-                        sock_info = self.sockets.popleft()
-                except IndexError:
-                    # XXX: Spec says this should wait for either maxConnecting
-                    # OR for a socket to be checked back into the pool.
-                    with self._max_connecting_cond:
-                        while (self._connecting >= self._max_connecting and
-                               not self.sockets):
-                            if self.opts.wait_queue_timeout:
-                                # TODO: What if timeout is <= zero here?
-                                # timeout = max(deadline - _time(), .001)
-                                timeout = deadline - _time()
-                            else:
-                                timeout = None
-                            if not _cond_wait(self._max_connecting_cond,
-                                              timeout, deadline):
-                                # timeout
-                                emitted_event = True
-                                self._raise_wait_queue_timeout()
+                # CMAP: we MUST wait for either maxConnecting OR for a socket
+                # to be checked back into the pool.
+                with self._max_connecting_cond:
+                    while (self._connecting >= self._max_connecting and
+                           not self.sockets):
+                        if self.opts.wait_queue_timeout:
+                            # TODO: What if timeout is <= zero here?
+                            # timeout = max(deadline - _time(), .001)
+                            timeout = deadline - _time()
+                        else:
+                            timeout = None
+                        if not _cond_wait(self._max_connecting_cond,
+                                          timeout, deadline):
+                            # timeout
+                            emitted_event = True
+                            self._raise_wait_queue_timeout()
 
-                        try:
-                            sock_info = self.sockets.popleft()
-                        except IndexError:
-                            self._connecting += 1
-                    if sock_info is None:
-                        try:
-                            sock_info = self.connect(all_credentials)
-                        finally:
-                            with self._max_connecting_cond:
-                                self._connecting -= 1
-                                self._max_connecting_cond.notify()
-                else:
+                    try:
+                        sock_info = self.sockets.popleft()
+                    except IndexError:
+                        self._connecting += 1
+                if sock_info:  # We got a socket from the pool
                     if self._perished(sock_info):
                         sock_info = None
+                        continue
+                else:  # We need to create a new connection
+                    try:
+                        sock_info = self.connect(all_credentials)
+                    finally:
+                        with self._max_connecting_cond:
+                            self._connecting -= 1
+                            self._max_connecting_cond.notify()
             sock_info.check_auth(all_credentials)
         except Exception:
             if sock_info:
