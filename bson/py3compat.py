@@ -19,9 +19,7 @@ import sys
 PY3 = sys.version_info[0] == 3
 
 if PY3:
-    import codecs
     import collections.abc as abc
-    import _thread as thread
     from abc import ABC, abstractmethod
     from io import BytesIO as StringIO
 
@@ -38,7 +36,7 @@ if PY3:
         # 2.7 you can create an alias for `bytes` using
         # the b prefix (e.g. b'foo').
         # See http://python3porting.com/problems.html#nicer-solutions
-        return codecs.latin_1_encode(s)[0]
+        return s.encode('ISO-8859-1')
 
     def bytes_from_hex(h):
         return bytes.fromhex(h)
@@ -63,7 +61,6 @@ if PY3:
     integer_types = int
 else:
     import collections as abc
-    import thread
     from abc import ABCMeta, abstractproperty
 
     from itertools import imap

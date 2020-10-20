@@ -21,7 +21,6 @@ import re
 import sys
 import threading
 
-from codecs import utf_8_decode
 from collections import defaultdict
 
 sys.path[0:0] = [""]
@@ -1296,7 +1295,7 @@ class TestCollection(IntegrationTest):
                 b'\xe2\x98\x83\xe2\x98\x83\xe2\x98\x83\xe2\x98\x83'
                 b'\xe2\x98\x83\xe2\x98\x83\xe2\x98\x83\xe2\x98\x83')
 
-        text = utf_8_decode(data, None, True)
+        text = data.decode('utf-8')
         db.test.insert_one({"text": text})
 
         # Should raise DuplicateKeyError, not InvalidBSON
