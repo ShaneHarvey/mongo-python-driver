@@ -21,7 +21,9 @@ try:
                                   PyMongoAuthAwsError)
     _HAVE_MONGODB_AWS = True
 except ImportError:
-    class AwsSaslContext(object):
+    # For an explanation of the type ignore comment, see:
+    # https://github.com/python/mypy/issues/1153
+    class AwsSaslContext(object):  # type: ignore
         def __init__(self, credentials):
             pass
     _HAVE_MONGODB_AWS = False
