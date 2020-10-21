@@ -1105,7 +1105,7 @@ class Pool:
             self.opts.max_pool_size, max_waiters)
         self._max_connecting_cond = threading.Condition(self.lock)
         self._max_connecting = self.opts.max_connecting
-        self._connecting = 0
+        self._pending = 0
         if self.enabled_for_cmap:
             self.opts.event_listeners.publish_pool_created(
                 self.address, self.opts.non_default_options)
@@ -1179,9 +1179,9 @@ class Pool:
                 with self._max_connecting_cond:
                     # If maxConnecting connections are already being created
                     # by this pool then try again later instead of waiting.
-                    if self._connecting >= self._max_connecting:
+                    if self._pending >= self._max_connecting:
                         return
-                    self._connecting += 1
+                    self._pending += 1
                     incremented = True
                 sock_info = self.connect(all_credentials)
                 with self.lock:
@@ -1195,7 +1195,7 @@ class Pool:
                 if incremented:
                     # Notify after adding the socket to the pool.
                     with self._max_connecting_cond:
-                        self._connecting -= 1
+                        self._pending -= 1
                         self._max_connecting_cond.notify()
                 self._socket_semaphore.release()
 
@@ -1320,7 +1320,7 @@ class Pool:
                 # CMAP: we MUST wait for either maxConnecting OR for a socket
                 # to be checked back into the pool.
                 with self._max_connecting_cond:
-                    while (self._connecting >= self._max_connecting and
+                    while (self._pending >= self._max_connecting and
                            not self.sockets):
                         if self.opts.wait_queue_timeout:
                             # TODO: What if timeout is <= zero here?
@@ -1337,7 +1337,7 @@ class Pool:
                     try:
                         sock_info = self.sockets.popleft()
                     except IndexError:
-                        self._connecting += 1
+                        self._pending += 1
                 if sock_info:  # We got a socket from the pool
                     if self._perished(sock_info):
                         sock_info = None
@@ -1347,7 +1347,7 @@ class Pool:
                         sock_info = self.connect(all_credentials)
                     finally:
                         with self._max_connecting_cond:
-                            self._connecting -= 1
+                            self._pending -= 1
                             self._max_connecting_cond.notify()
             sock_info.check_auth(all_credentials)
         except Exception:
