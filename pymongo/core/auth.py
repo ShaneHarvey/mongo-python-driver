@@ -14,7 +14,6 @@
 
 """Authentication helpers."""
 
-import asyncio
 import functools
 import hashlib
 import hmac
@@ -376,23 +375,21 @@ def _auth_key(nonce, username, password):
     return _unicode(md5hash.hexdigest())
 
 
-async def _canonicalize_hostname(hostname):
+def _canonicalize_hostname(hostname):
     """Canonicalize hostname following MIT-krb5 behavior."""
-    loop = asyncio.get_running_loop()
     # https://github.com/krb5/krb5/blob/d406afa363554097ac48646a29249c04f498c88e/src/util/k5test.py#L505-L520
-    af, socktype, proto, canonname, sockaddr = await loop.getaddrinfo(
-        hostname, None, family=0, type=0, proto=socket.IPPROTO_TCP,
-        flags=socket.AI_CANONNAME)[0]
+    af, socktype, proto, canonname, sockaddr = socket.getaddrinfo(
+        hostname, None, 0, 0, socket.IPPROTO_TCP, socket.AI_CANONNAME)[0]
 
     try:
-        name = await loop.getnameinfo(sockaddr, flags=socket.NI_NAMEREQD)
+        name = socket.getnameinfo(sockaddr, socket.NI_NAMEREQD)
     except socket.gaierror:
         return canonname.lower()
 
     return name[0].lower()
 
 
-async def _authenticate_gssapi(credentials, sock_info):
+def _authenticate_gssapi(credentials, sock_info):
     """Authenticate using GSSAPI.
     """
     if not HAVE_KERBEROS:
@@ -407,7 +404,7 @@ async def _authenticate_gssapi(credentials, sock_info):
         # the security context. See RFC 4752, Section 3.1, first paragraph.
         host = sock_info.address[0]
         if props.canonicalize_host_name:
-            host = await _canonicalize_hostname(host)
+            host = _canonicalize_hostname(host)
         service = props.service_name + '@' + host
         if props.service_realm is not None:
             service = service + '@' + props.service_realm
