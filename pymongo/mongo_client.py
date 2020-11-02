@@ -75,6 +75,7 @@ from pymongo.uri_parser import (_handle_option_deprecations,
                                 _handle_security_options,
                                 _normalize_options)
 from pymongo.write_concern import DEFAULT_WRITE_CONCERN
+from pymongo.synchro import Synchronizer
 
 
 class MongoClient(common.BaseObject):
@@ -745,15 +746,15 @@ class MongoClient(common.BaseObject):
         # this closure. When the client is freed, stop the executor soon.
         self_ref = weakref.ref(self, executor.close)
         self._kill_cursors_executor = executor
-
-        if connect:
-            self._get_topology()
-
+        self.__synchronizer = None
         self._encrypter = None
         if self.__options.auto_encryption_opts:
             from pymongo.encryption import _Encrypter
             self._encrypter = _Encrypter.create(
                 self, self.__options.auto_encryption_opts)
+
+        if connect:
+            self._get_topology()
 
     def _cache_credentials(self, source, credentials, connect=False):
         """Save a set of authentication credentials.
@@ -1199,6 +1200,9 @@ class MongoClient(common.BaseObject):
         if self._encrypter:
             # TODO: PYTHON-1921 Encrypted MongoClients cannot be re-opened.
             self._encrypter.close()
+        if self.__synchronizer:
+            self.__synchronizer.stop()
+            self.__synchronizer = None
 
     def set_cursor_manager(self, manager_class):
         """DEPRECATED - Set this client's cursor manager.
@@ -1238,6 +1242,9 @@ class MongoClient(common.BaseObject):
         self._topology.open()
         with self.__lock:
             self._kill_cursors_executor.open()
+            if not self.__synchronizer:
+                self.__synchronizer = Synchronizer()
+                self.__synchronizer.register_client(self)
         return self._topology
 
     @contextlib.contextmanager
@@ -1265,6 +1272,9 @@ class MongoClient(common.BaseObject):
           - `address` (optional): Address when sending a message
             to a specific server, used for getMore.
         """
+        s = self.__synchronizer
+        if s:
+            s.sleep()
         try:
             topology = self._get_topology()
             address = address or (session and session._pinned_address)
