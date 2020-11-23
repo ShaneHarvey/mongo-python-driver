@@ -98,6 +98,9 @@ class CMAPListener(ConnectionPoolListener):
     def pool_created(self, event):
         self.add_event(event)
 
+    def pool_ready(self, event):
+        self.add_event(event)
+
     def pool_cleared(self, event):
         self.add_event(event)
 

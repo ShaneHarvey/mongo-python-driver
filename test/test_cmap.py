@@ -35,6 +35,7 @@ from pymongo.monitoring import (ConnectionCheckedInEvent,
                                 ConnectionCreatedEvent,
                                 ConnectionReadyEvent,
                                 PoolCreatedEvent,
+                                PoolReadyEvent,
                                 PoolClearedEvent,
                                 PoolClosedEvent)
 from pymongo.read_preferences import ReadPreference
@@ -64,6 +65,7 @@ OBJECT_TYPES = {
     'ConnectionReady': ConnectionReadyEvent,
     'ConnectionCheckOutStarted': ConnectionCheckOutStartedEvent,
     'ConnectionPoolCreated': PoolCreatedEvent,
+    'ConnectionPoolReady': PoolReadyEvent,
     'ConnectionPoolCleared': PoolClearedEvent,
     'ConnectionPoolClosed': PoolClosedEvent,
     # Error types.
@@ -120,6 +122,10 @@ class TestCMAP(IntegrationTest):
         label = op['connection']
         sock_info = self.labels[label]
         self.pool.return_socket(sock_info)
+
+    def ready(self, op):
+        """Run the 'ready' operation."""
+        self.pool.ready()
 
     def clear(self, op):
         """Run the 'clear' operation."""

@@ -1058,6 +1058,8 @@ class _PoolClosedError(PyMongoError):
     pass
 
 
+PAUSED, READY, CLOSED = range(3)
+
 # Do *not* explicitly inherit from object or Jython won't call __del__
 # http://bugs.jython.org/issue1057
 class Pool:
@@ -1068,6 +1070,7 @@ class Pool:
           - `options`: a PoolOptions instance
           - `handshake`: whether to call ismaster for each new SocketInfo
         """
+        self.state = PAUSED
         # Check a socket's health with socket_closed() every once in a while.
         # Can override for testing: 0 to always check, None to never check.
         self._check_interval_seconds = 1
@@ -1079,7 +1082,6 @@ class Pool:
         self.active_sockets = 0
         # Monotonically increasing connection ID required for CMAP Events.
         self.next_connection_id = 1
-        self.closed = False
         # Track whether the sockets in this pool are writeable or not.
         self.is_writable = None
 
@@ -1112,16 +1114,27 @@ class Pool:
             self.opts.event_listeners.publish_pool_created(
                 self.address, self.opts.non_default_options)
 
+    def ready(self):
+        old_state, self.state = self.state, READY
+        if old_state != READY:
+            if self.enabled_for_cmap:
+                self.opts.event_listeners.publish_pool_ready(self.address)
+
+    @property
+    def closed(self):
+        return self.state == CLOSED
+
     def _reset(self, close):
         with self.lock:
             if self.closed:
                 return
+            self.state = PAUSED
             self.generation += 1
             self.pid = os.getpid()
             sockets, self.sockets = self.sockets, collections.deque()
             self.active_sockets = 0
             if close:
-                self.closed = True
+                self.state = CLOSED
 
         listeners = self.opts.event_listeners
         # CMAP spec says that close() MUST close sockets before publishing the
@@ -1159,6 +1172,9 @@ class Pool:
         `generation` at the point in time this operation was requested on the
         pool.
         """
+        if self.state != READY:
+            return
+
         if self.opts.max_idle_time_seconds is not None:
             with self.lock:
                 while (self.sockets and
