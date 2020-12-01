@@ -309,7 +309,8 @@ class PoolOptions(object):
                  '__wait_queue_timeout', '__wait_queue_multiple',
                  '__ssl_context', '__ssl_match_hostname', '__socket_keepalive',
                  '__event_listeners', '__appname', '__driver', '__metadata',
-                 '__compression_settings', '__max_connecting')
+                 '__compression_settings', '__max_connecting',
+                 '__pause_enabled')
 
     def __init__(self, max_pool_size=MAX_POOL_SIZE,
                  min_pool_size=MIN_POOL_SIZE,
@@ -318,7 +319,8 @@ class PoolOptions(object):
                  wait_queue_multiple=None, ssl_context=None,
                  ssl_match_hostname=True, socket_keepalive=True,
                  event_listeners=None, appname=None, driver=None,
-                 compression_settings=None, max_connecting=MAX_CONNECTING):
+                 compression_settings=None, max_connecting=MAX_CONNECTING,
+                 pause_enabled=True):
 
         self.__max_pool_size = max_pool_size
         self.__min_pool_size = min_pool_size
@@ -335,6 +337,7 @@ class PoolOptions(object):
         self.__driver = driver
         self.__compression_settings = compression_settings
         self.__max_connecting = max_connecting
+        self.__pause_enabled = pause_enabled
         self.__metadata = copy.deepcopy(_METADATA)
         if appname:
             self.__metadata['application'] = {'name': appname}
@@ -405,6 +408,10 @@ class PoolOptions(object):
         pool. Defaults to 2.
         """
         return self.__max_connecting
+
+    @property
+    def pause_enabled(self):
+        return self.__pause_enabled
 
     @property
     def max_idle_time_seconds(self):
@@ -1070,7 +1077,9 @@ class Pool:
           - `options`: a PoolOptions instance
           - `handshake`: whether to call ismaster for each new SocketInfo
         """
-        self.state = PAUSED
+        self.state = READY
+        if options.pause_enabled:
+            self.state = PAUSED
         # Check a socket's health with socket_closed() every once in a while.
         # Can override for testing: 0 to always check, None to never check.
         self._check_interval_seconds = 1
@@ -1128,7 +1137,8 @@ class Pool:
         with self.lock:
             if self.closed:
                 return
-            self.state = PAUSED
+            if self.opts.pause_enabled:
+                self.state = PAUSED
             self.generation += 1
             self.pid = os.getpid()
             sockets, self.sockets = self.sockets, collections.deque()
@@ -1324,6 +1334,12 @@ class Pool:
         if not self._socket_semaphore.acquire(
                 True, self.opts.wait_queue_timeout):
             self._raise_wait_queue_timeout()
+
+        # TODO: racy?
+        if self.opts.pause_enabled and self.state == PAUSED:
+            # TODO: ensure this error is retryable
+            _raise_connection_failure(
+                self.address, AutoReconnect('connection pool paused'))
 
         # We've now acquired the semaphore and must release it on error.
         sock_info = None
