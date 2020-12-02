@@ -101,6 +101,7 @@ class TestCMAP(IntegrationTest):
         thread.join()
         if thread.exc:
             raise thread.exc
+        self.assertFalse(thread.ops)
 
     def wait_for_event(self, op):
         """Run the 'waitForEvent' operation."""
