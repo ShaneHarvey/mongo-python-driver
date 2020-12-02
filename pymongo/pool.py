@@ -1335,17 +1335,16 @@ class Pool:
                 True, self.opts.wait_queue_timeout):
             self._raise_wait_queue_timeout()
 
-        # TODO: racy?
-        if self.opts.pause_enabled and self.state == PAUSED:
-            # TODO: ensure this error is retryable
-            _raise_connection_failure(
-                self.address, AutoReconnect('connection pool paused'))
-
         # We've now acquired the semaphore and must release it on error.
         sock_info = None
         incremented = False
         emitted_event = False
         try:
+            # TODO: racy?
+            if self.opts.pause_enabled and self.state == PAUSED:
+                # TODO: ensure this error is retryable
+                _raise_connection_failure(
+                    self.address, AutoReconnect('connection pool paused'))
             with self.lock:
                 self.active_sockets += 1
                 incremented = True
