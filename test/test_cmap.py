@@ -343,13 +343,14 @@ class TestCMAP(IntegrationTest):
             client.admin.command('isMaster')
 
         self.assertIsInstance(listener.events[0], PoolCreatedEvent)
-        self.assertIsInstance(listener.events[1],
-                              ConnectionCheckOutStartedEvent)
+        self.assertIsInstance(listener.events[1], PoolReadyEvent)
         self.assertIsInstance(listener.events[2],
+                              ConnectionCheckOutStartedEvent)
+        self.assertIsInstance(listener.events[3],
                               ConnectionCheckOutFailedEvent)
-        self.assertIsInstance(listener.events[3], PoolClearedEvent)
+        self.assertIsInstance(listener.events[4], PoolClearedEvent)
 
-        failed_event = listener.events[2]
+        failed_event = listener.events[3]
         self.assertEqual(
             failed_event.reason, ConnectionCheckOutFailedReason.CONN_ERROR)
 
@@ -364,17 +365,16 @@ class TestCMAP(IntegrationTest):
             client.admin.command('isMaster')
 
         self.assertIsInstance(listener.events[0], PoolCreatedEvent)
-        self.assertIsInstance(listener.events[1],
+        self.assertIsInstance(listener.events[1], PoolReadyEvent)
+        self.assertIsInstance(listener.events[2],
                               ConnectionCheckOutStartedEvent)
-        self.assertIsInstance(listener.events[2], ConnectionCreatedEvent)
+        self.assertIsInstance(listener.events[3], ConnectionCreatedEvent)
         # Error happens here.
-        self.assertIsInstance(listener.events[3], ConnectionClosedEvent)
-        self.assertIsInstance(listener.events[4],
+        self.assertIsInstance(listener.events[4], ConnectionClosedEvent)
+        self.assertIsInstance(listener.events[5],
                               ConnectionCheckOutFailedEvent)
-
-        failed_event = listener.events[4]
-        self.assertEqual(
-            failed_event.reason, ConnectionCheckOutFailedReason.CONN_ERROR)
+        self.assertEqual(listener.events[5].reason,
+                         ConnectionCheckOutFailedReason.CONN_ERROR)
 
     #
     # Extra non-spec tests
