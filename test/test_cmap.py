@@ -53,6 +53,7 @@ from test.utils import (camel_to_snake,
                         TestCreator,
                         wait_until)
 from test.utils_spec_runner import SpecRunnerThread
+from test.pymongo_mocks import DummyMonitor
 
 
 OBJECT_TYPES = {
@@ -216,9 +217,12 @@ class TestCMAP(IntegrationTest):
 
         opts = test['poolOptions'].copy()
         opts['event_listeners'] = [self.listener]
+        if scenario_def['style'] == 'unit':
+            opts['_monitor_class'] = DummyMonitor
         client = single_client(**opts)
         self.addCleanup(client.close)
-        self.pool = get_pool(client)
+        # self.pool = get_pools(client)[0]
+        self.pool = list(client._get_topology()._servers.values())[0].pool
 
         # Map of target names to Thread objects.
         self.targets = dict()
