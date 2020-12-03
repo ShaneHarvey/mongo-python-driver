@@ -4,15 +4,14 @@
   "description": "clearing pool clears the WaitQueue",
   "poolOptions": {
     "maxPoolSize": 1,
-    "waitQueueTimeoutMS": 1000
+    "waitQueueTimeoutMS": 30000
   },
   "operations": [
     {
       "name": "ready"
     },
     {
-      "name": "checkOut",
-      "label": "conn1"
+      "name": "checkOut"
     },
     {
       "name": "start",
@@ -47,13 +46,10 @@
       "name": "clear"
     },
     {
-      "name": "checkIn",
-      "connection": "conn1"
-    },
-    {
       "name": "waitForEvent",
       "event": "ConnectionCheckOutFailed",
-      "count": 3
+      "count": 3,
+      "timeout": 1000
     }
   ],
   "events": [
@@ -95,16 +91,14 @@
       "type": "ConnectionCheckOutFailed",
       "reason": "connectionError",
       "address": 42
-    },
-    {
-      "type": "ConnectionCheckedIn",
-      "address": 42
     }
   ],
   "ignore": [
     "ConnectionPoolReady",
     "ConnectionPoolCreated",
     "ConnectionCreated",
-    "ConnectionReady"
+    "ConnectionReady",
+    "ConnectionCheckedIn",
+    "ConnectionClosed"
   ]
 }
