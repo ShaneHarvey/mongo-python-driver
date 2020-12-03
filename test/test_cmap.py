@@ -41,7 +41,8 @@ from pymongo.monitoring import (ConnectionCheckedInEvent,
 from pymongo.read_preferences import ReadPreference
 from pymongo.pool import _PoolClosedError
 
-from test import (IntegrationTest,
+from test import (client_knobs,
+                  IntegrationTest,
                   unittest)
 from test.utils import (camel_to_snake,
                         client_context,
@@ -107,8 +108,9 @@ class TestCMAP(IntegrationTest):
         """Run the 'waitForEvent' operation."""
         event = OBJECT_TYPES[op['event']]
         count = op['count']
+        timeout = op.get('timeout', 10000) / 1000.0
         wait_until(lambda: self.listener.event_count(event) >= count,
-                   'find %s %s event(s)' % (count, event))
+                   'find %s %s event(s)' % (count, event), timeout=timeout)
 
     def check_out(self, op):
         """Run the 'checkOut' operation."""
@@ -219,7 +221,9 @@ class TestCMAP(IntegrationTest):
         opts = test['poolOptions'].copy()
         opts['event_listeners'] = [self.listener]
         opts['_monitor_class'] = DummyMonitor
-        client = single_client(**opts)
+        with client_knobs(kill_cursor_frequency=.05,
+                          min_heartbeat_interval=.05):
+            client = single_client(**opts)
         self.addCleanup(client.close)
         # self.pool = get_pools(client)[0]
         self.pool = list(client._get_topology()._servers.values())[0].pool

@@ -46,6 +46,7 @@ from pymongo.errors import (AutoReconnect,
                             CertificateError,
                             ConnectionFailure,
                             ConfigurationError,
+                            ExceededMaxWaiters,
                             InvalidOperation,
                             DocumentTooLarge,
                             NetworkTimeout,
@@ -1109,13 +1110,20 @@ class Pool:
 
         if (self.opts.wait_queue_multiple is None or
                 self.opts.max_pool_size is None):
-            max_waiters = None
+            max_waiters = float('inf')
         else:
             max_waiters = (
                 self.opts.max_pool_size * self.opts.wait_queue_multiple)
-
-        self._socket_semaphore = thread_util.create_semaphore(
-            self.opts.max_pool_size, max_waiters)
+        # The first portion of the wait queue.
+        # Enforces: maxPoolSize and waitQueueMultiple
+        # Also used for: clearing the wait queue
+        self.size_cond = threading.Condition(self.lock)
+        self.requests = 0
+        self.waiters = 0
+        self.max_waiters = max_waiters
+        # The second portion of the wait queue.
+        # Enforces: maxConnecting
+        # Also used for: clearing the wait queue
         self._max_connecting_cond = threading.Condition(self.lock)
         self._max_connecting = self.opts.max_connecting
         self._pending = 0
@@ -1134,7 +1142,7 @@ class Pool:
         return self.state == CLOSED
 
     def _reset(self, close):
-        with self.lock:
+        with self.size_cond:
             if self.closed:
                 return
             if self.opts.pause_enabled:
@@ -1145,6 +1153,7 @@ class Pool:
             self.active_sockets = 0
             if close:
                 self.state = CLOSED
+            self.size_cond.notify_all()
 
         listeners = self.opts.event_listeners
         # CMAP spec says that close() MUST close sockets before publishing the
@@ -1193,15 +1202,14 @@ class Pool:
                     sock_info.close_socket(ConnectionClosedReason.IDLE)
 
         while True:
-            with self.lock:
+            with self.size_cond:
+                # There are enough sockets in the pool.
                 if (len(self.sockets) + self.active_sockets >=
                         self.opts.min_pool_size):
-                    # There are enough sockets in the pool.
                     return
-
-            # We must acquire the semaphore to respect max_pool_size.
-            if not self._socket_semaphore.acquire(False):
-                return
+                if self.requests >= self.opts.min_pool_size:
+                    return
+                self.requests += 1
             incremented = False
             try:
                 with self._max_connecting_cond:
@@ -1225,7 +1233,10 @@ class Pool:
                     with self._max_connecting_cond:
                         self._pending -= 1
                         self._max_connecting_cond.notify()
-                self._socket_semaphore.release()
+
+                with self.size_cond:
+                    self.requests -= 1
+                    self.size_cond.notify()
 
     def connect(self, all_credentials=None):
         """Connect to Mongo and return a new SocketInfo.
@@ -1310,6 +1321,15 @@ class Pool:
             if not checkout:
                 self.return_socket(sock_info)
 
+    def _raise_if_not_ready(self):
+        if self.opts.pause_enabled and self.state == PAUSED:
+            if self.enabled_for_cmap:
+                self.opts.event_listeners.publish_connection_check_out_failed(
+                    self.address, ConnectionCheckOutFailedReason.CONN_ERROR)
+            # TODO: ensure this error is retryable
+            _raise_connection_failure(
+                self.address, AutoReconnect('connection pool paused'))
+
     def _get_socket(self, all_credentials):
         """Get or create a SocketInfo. Can raise ConnectionFailure."""
         # We use the pid here to avoid issues with fork / multiprocessing.
@@ -1331,9 +1351,25 @@ class Pool:
             deadline = _time() + self.opts.wait_queue_timeout
         else:
             deadline = None
-        if not self._socket_semaphore.acquire(
-                True, self.opts.wait_queue_timeout):
-            self._raise_wait_queue_timeout()
+
+        with self.size_cond:
+            if self.waiters >= self.max_waiters:
+                raise ExceededMaxWaiters(
+                    'exceeded max waiters: %s threads already waiting' % (
+                        self.waiters))
+            self.waiters += 1
+            try:
+                while not (self.requests < self.opts.max_pool_size):
+                    self._raise_if_not_ready()
+                    if not _cond_wait(self.size_cond, deadline):
+                        # Timed out, notify the next thread to ensure a
+                        # timeout doesn't consume the condition.
+                        if self.requests < self.opts.max_pool_size:
+                            self.size_cond.notify()
+                        self._raise_wait_queue_timeout()
+            finally:
+                self.waiters -= 1
+            self.requests += 1
 
         # We've now acquired the semaphore and must release it on error.
         sock_info = None
@@ -1341,10 +1377,9 @@ class Pool:
         emitted_event = False
         try:
             # TODO: racy?
-            if self.opts.pause_enabled and self.state == PAUSED:
-                # TODO: ensure this error is retryable
-                _raise_connection_failure(
-                    self.address, AutoReconnect('connection pool paused'))
+            emitted_event = True
+            self._raise_if_not_ready()
+            emitted_event = False
             with self.lock:
                 self.active_sockets += 1
                 incremented = True
@@ -1384,11 +1419,11 @@ class Pool:
             if sock_info:
                 # We checked out a socket but authentication failed.
                 sock_info.close_socket(ConnectionClosedReason.ERROR)
-            self._socket_semaphore.release()
-
-            if incremented:
-                with self.lock:
+            with self.size_cond:
+                self.requests -= 1
+                if incremented:
                     self.active_sockets -= 1
+                self.size_cond.notify()
 
             if self.enabled_for_cmap and not emitted_event:
                 self.opts.event_listeners.publish_connection_check_out_failed(
@@ -1424,9 +1459,10 @@ class Pool:
                         # Notify any threads waiting to create a connection.
                         self._max_connecting_cond.notify()
 
-        self._socket_semaphore.release()
-        with self.lock:
+        with self.size_cond:
+            self.requests -= 1
             self.active_sockets -= 1
+            self.size_cond.notify()
 
     def _perished(self, sock_info):
         """Return True and close the connection if it is "perished".
