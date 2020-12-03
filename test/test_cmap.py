@@ -218,8 +218,7 @@ class TestCMAP(IntegrationTest):
 
         opts = test['poolOptions'].copy()
         opts['event_listeners'] = [self.listener]
-        if scenario_def['style'] == 'unit':
-            opts['_monitor_class'] = DummyMonitor
+        opts['_monitor_class'] = DummyMonitor
         client = single_client(**opts)
         self.addCleanup(client.close)
         # self.pool = get_pools(client)[0]

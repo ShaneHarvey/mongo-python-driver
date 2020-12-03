@@ -39,6 +39,7 @@ from pymongo.errors import (ConnectionFailure,
                             NetworkTimeout,
                             NotMasterError,
                             OperationFailure,
+                            PyMongoError,
                             ServerSelectionTimeoutError)
 from pymongo.monitor import SrvMonitor
 from pymongo.monotonic import time as _time
@@ -445,7 +446,13 @@ class Topology(object):
                 servers.append((server, server._pool.generation))
 
         for server, generation in servers:
-            server._pool.remove_stale_sockets(generation, all_credentials)
+            pool = server._pool
+            try:
+                pool.remove_stale_sockets(generation, all_credentials)
+            except PyMongoError as exc:
+                ctx = _ErrorContext(exc, 0, generation, False)
+                self.handle_error(pool.address, ctx)
+                raise
 
     def close(self):
         """Clear pools and terminate monitors. Topology reopens on demand."""
