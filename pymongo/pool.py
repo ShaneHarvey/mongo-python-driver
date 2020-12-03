@@ -1119,6 +1119,9 @@ class Pool:
         # Also used for: clearing the wait queue
         self.size_cond = threading.Condition(self.lock)
         self.requests = 0
+        self.max_pool_size = self.opts.max_pool_size
+        if self.max_pool_size is None:
+            self.max_pool_size = float('inf')
         self.waiters = 0
         self.max_waiters = max_waiters
         # The second portion of the wait queue.
@@ -1359,12 +1362,12 @@ class Pool:
                         self.waiters))
             self.waiters += 1
             try:
-                while not (self.requests < self.opts.max_pool_size):
+                while not (self.requests < self.max_pool_size):
                     self._raise_if_not_ready()
                     if not _cond_wait(self.size_cond, deadline):
                         # Timed out, notify the next thread to ensure a
                         # timeout doesn't consume the condition.
-                        if self.requests < self.opts.max_pool_size:
+                        if self.requests < self.max_pool_size:
                             self.size_cond.notify()
                         self._raise_wait_queue_timeout()
             finally:
