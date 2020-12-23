@@ -4,6 +4,8 @@ Changelog
 Changes in Version 4.0
 ----------------------
 
+- Support for MongoDB Versioned API, see :class:`~pymongo.server_api.ServerApi`.
+
 Issues Resolved
 ...............
 
