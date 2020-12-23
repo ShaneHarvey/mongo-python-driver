@@ -73,7 +73,7 @@ class TestServerApi(IntegrationTest):
         for event in events[1:]:
             self.assertNoServerApi(event)
 
-    @client_context.require_version_min(4, 7)
+    # @client_context.require_version_min(4, 7)
     def test_command_options(self):
         listener = OvertCommandListener()
         client = rs_or_single_client(server_api=ServerApi('1'),
@@ -90,7 +90,26 @@ class TestServerApi(IntegrationTest):
             else:
                 self.assertServerApi(event)
 
-    @client_context.require_version_min(4, 7)
+    def test_command_options_aggregate(self):
+        self.db.test.insert_many([{} for _ in range(100)])
+        client = rs_or_single_client(server_api=ServerApi('1'))
+        self.addCleanup(client.close)
+        coll = client.pymongo_test.test
+        list(coll.aggregate([]))
+
+    def test_command_options_find(self):
+        client = rs_or_single_client(server_api=ServerApi('1'))
+        self.addCleanup(client.close)
+        coll = client.pymongo_test.test
+        list(coll.find({}))
+
+    def test_command_options_find_and_modify(self):
+        client = rs_or_single_client(server_api=ServerApi('1'))
+        self.addCleanup(client.close)
+        coll = client.pymongo_test.test
+        coll.find_one_and_delete({})
+
+    # @client_context.require_version_min(4, 7)
     @client_context.require_transactions
     def test_command_options_txn(self):
         listener = OvertCommandListener()
