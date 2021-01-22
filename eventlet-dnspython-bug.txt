@@ -1,0 +1,103 @@
+$ pip list
+Package    Version  Location
+---------- -------- ------------------------------------
+dnspython  2.0.0
+eventlet   0.26.1
+greenlet   1.0.0
+monotonic  1.5
+pip        20.2.1
+pymongo    4.0.dev0 /Users/shane/git/mongo-python-driver
+setuptools 49.2.1
+six        1.15.0
+wheel      0.34.2
+$ PYMONGO_MUST_CONNECT=1 python green_framework_test.py eventlet -s test.test_client_context
+/Users/shane/git/mongo-python-driver/.venv/38/lib/python3.8/site-packages/setuptools/distutils_patch.py:25: UserWarning: Distutils was imported before Setuptools. This usage is discouraged and may exhibit undesirable behaviors or errors. Please use Setuptools' objects directly or at least import Setuptools first.
+  warnings.warn(
+running test
+running egg_info
+writing pymongo.egg-info/PKG-INFO
+writing dependency_links to pymongo.egg-info/dependency_links.txt
+writing requirements to pymongo.egg-info/requires.txt
+writing top-level names to pymongo.egg-info/top_level.txt
+reading manifest file 'pymongo.egg-info/SOURCES.txt'
+reading manifest template 'MANIFEST.in'
+writing manifest file 'pymongo.egg-info/SOURCES.txt'
+running build_ext
+pool._configured_socket: locals:
+{'address': ('localhost', 27017),
+ 'host': 'localhost',
+ 'options': <pymongo.pool.PoolOptions object at 0x7fd2d033e3b0>,
+ 'pprint': <module 'pprint' from '/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/pprint.py'>,
+ 'sock': <eventlet.greenio.base.GreenSocket object at 0x7fd2d03274f0>,
+ 'sock_fileno': 5,
+ 'ssl_context': <eventlet.green.ssl.GreenSSLContext object at 0x7fd2d0315240>}
+GreenSSLSocket.__new__: locals:
+{'__class__': <class 'eventlet.green.ssl.GreenSSLSocket'>,
+ 'args': (),
+ 'ca_certs': None,
+ 'cert_reqs': <VerifyMode.CERT_NONE: 0>,
+ 'certfile': None,
+ 'cls': <class 'eventlet.green.ssl.GreenSSLSocket'>,
+ 'context': <eventlet.green.ssl.GreenSSLContext object at 0x7fd2d0315240>,
+ 'do_handshake_on_connect': True,
+ 'keyfile': None,
+ 'kw': {'_context': <eventlet.green.ssl.GreenSSLContext object at 0x7fd2d0315240>,
+        'server_hostname': 'localhost'},
+ 'pprint': <module 'pprint' from '/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/pprint.py'>,
+ 'server_side': False,
+ 'sock': <eventlet.greenio.base.GreenSocket object at 0x7fd2d03274f0>,
+ 'ssl_version': <_SSLMethod.PROTOCOL_TLS: 2>}
+SSLSocket._create: locals:
+{'__class__': <class 'ssl.SSLSocket'>,
+ 'cls': <class 'ssl.SSLSocket'>,
+ 'connected': True,
+ 'context': <eventlet.green.ssl.GreenSSLContext object at 0x7fd2d0315240>,
+ 'do_handshake_on_connect': False,
+ 'kwargs': {'family': <AddressFamily.AF_INET: 2>,
+            'fileno': 5,
+            'proto': 6,
+            'type': <SocketKind.SOCK_STREAM: 1>},
+ 'pprint': <module 'pprint' from '/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/pprint.py'>,
+ 'self': <ssl.SSLSocket object at 0x7fd2d03270a0>,
+ 'server_hostname': 'localhost',
+ 'server_side': False,
+ 'session': None,
+ 'sock': <socket.socket [closed] fd=-1, family=AddressFamily.AF_INET, type=SocketKind.SOCK_STREAM, proto=6>,
+ 'suppress_ragged_eofs': None}
+Traceback (most recent call last):
+  File "/Users/shane/git/mongo-python-driver/pymongo/monitor.py", line 214, in _check_server
+    return self._check_once()
+  File "/Users/shane/git/mongo-python-driver/pymongo/monitor.py", line 252, in _check_once
+    with self._pool.get_socket({}) as sock_info:
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/contextlib.py", line 113, in __enter__
+    return next(self.gen)
+  File "/Users/shane/git/mongo-python-driver/pymongo/pool.py", line 1300, in get_socket
+    sock_info = self._get_socket(all_credentials)
+  File "/Users/shane/git/mongo-python-driver/pymongo/pool.py", line 1404, in _get_socket
+    sock_info = self.connect(all_credentials)
+  File "/Users/shane/git/mongo-python-driver/pymongo/pool.py", line 1249, in connect
+    sock = _configured_socket(self.address, self.opts)
+  File "/Users/shane/git/mongo-python-driver/pymongo/pool.py", line 1007, in _configured_socket
+    sock = ssl_context.wrap_socket(sock, server_hostname=host)
+  File "/Users/shane/git/mongo-python-driver/.venv/38/lib/python3.8/site-packages/eventlet/green/ssl.py", line 450, in wrap_socket
+    return GreenSSLSocket(sock, *a, _context=self, **kw)
+  File "/Users/shane/git/mongo-python-driver/.venv/38/lib/python3.8/site-packages/eventlet/green/ssl.py", line 71, in __new__
+    ret = _original_sslsocket._create(
+  File "/Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/ssl.py", line 1033, in _create
+    self._sslobj = self._context._wrap_socket(
+TypeError: _wrap_socket() argument 'sock' must be _socket.socket, not SSLSocket
+> /Library/Frameworks/Python.framework/Versions/3.8/lib/python3.8/ssl.py(1033)_create()
+-> self._sslobj = self._context._wrap_socket(
+(Pdb) l
+1040 	                        # non-blocking
+1041 	                        raise ValueError("do_handshake_on_connect should not be specified for non-blocking sockets")
+1042 	                    self.do_handshake()
+1043 	            except (OSError, ValueError):
+1044 	                self.close()
+1045 ->	                raise
+1046 	        return self
+1047
+1048 	    @property
+1049 	    @_sslcopydoc
+1050 	    def context(self):
+(Pdb)

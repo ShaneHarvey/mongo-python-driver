@@ -220,6 +220,10 @@ class Monitor(MonitorBase):
         except ReferenceError:
             raise
         except Exception as error:
+            # NOTE: EVENTLET_NO_GREENDNS=YES works around this error.
+            if isinstance(error, TypeError):
+                import traceback; traceback.print_exc()
+                import pdb; pdb.post_mortem()
             _sanitize(error)
             sd = self._server_description
             address = sd.address

@@ -1000,6 +1000,9 @@ def _configured_socket(address, options):
             # https://bugs.python.org/issue32185
             # We have to pass hostname / ip address to wrap_socket
             # to use SSLContext.check_hostname.
+            sock_fileno = sock.fileno()
+            print(f'pool._configured_socket: locals:')
+            import pprint;pprint.pprint(locals())
             if _HAVE_SNI and (not is_ip_address(host) or _IPADDR_SAFE):
                 sock = ssl_context.wrap_socket(sock, server_hostname=host)
             else:
