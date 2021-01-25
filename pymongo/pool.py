@@ -253,6 +253,7 @@ def _cond_wait(condition, deadline):
     timeout = deadline - _time() if deadline else None
     return condition.wait(timeout)
 
+from pymongo import common
 
 class PoolOptions(object):
 
@@ -272,7 +273,7 @@ class PoolOptions(object):
                  wait_queue_multiple=None, ssl_context=None,
                  ssl_match_hostname=True, socket_keepalive=True,
                  event_listeners=None, appname=None, driver=None,
-                 compression_settings=None, max_connecting=MAX_CONNECTING,
+                 compression_settings=None, max_connecting=None,
                  pause_enabled=True, server_api=None):
         self.__max_pool_size = max_pool_size
         self.__min_pool_size = min_pool_size
@@ -289,6 +290,8 @@ class PoolOptions(object):
         self.__driver = driver
         self.__compression_settings = compression_settings
         self.__max_connecting = max_connecting
+        if max_connecting is None:
+            self.__max_connecting = common.MAX_CONNECTING
         self.__pause_enabled = pause_enabled
         self.__server_api = server_api
         self.__metadata = copy.deepcopy(_METADATA)
