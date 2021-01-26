@@ -21,7 +21,7 @@ from pymongo.common import clean_node
 from pymongo.read_preferences import ReadPreference
 from test import client_context, IntegrationTest, unittest
 from test.utils_selection_tests import create_topology
-from test.utils import TestCreator, rs_client, OvertCommandListener
+from test.utils import TestCreator, rs_client, OvertCommandListener, wait_until
 
 
 # Location of JSON test specifications.
@@ -131,6 +131,7 @@ class TestProse(IntegrationTest):
                            appName='loadBalancingTest',
                            event_listeners=[listener])
         self.addCleanup(client.close)
+        wait_until(lambda: len(client.nodes) == 2, 'discover both nodes')
         # Delay find commands on
         delay_finds = {
             'configureFailPoint': 'failCommand',
