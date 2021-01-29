@@ -720,7 +720,7 @@ class SocketInfo(object):
         """Raise NotMasterError on unacknowledged write if this socket is not
         writable.
         """
-        if unacknowledged and not self.is_writable:
+        if False and not self.is_writable:
             # Write won't succeed, bail as if we'd received a not master error.
             raise NotMasterError("not master", {
                 "ok": 0, "errmsg": "not master", "code": 10107})
@@ -740,8 +740,10 @@ class SocketInfo(object):
         self._raise_if_not_writable(not with_last_error)
 
         self.send_message(msg, max_doc_size)
+        print(f'with_last_error: {with_last_error}')
         if with_last_error:
             reply = self.receive_message(request_id)
+            print(f'with_last_error: {reply}')
             return helpers._check_gle_response(reply.command_response(),
                                                self.max_wire_version)
 
