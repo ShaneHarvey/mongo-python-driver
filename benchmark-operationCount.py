@@ -9,7 +9,9 @@ import bson
 import pymongo
 from pymongo import MongoClient
 from pymongo import common
-from pymongo.server_selectors import writable_server_selector
+from pymongo.monitoring import ServerListener
+from pymongo.read_preferences import ReadPreference
+from pymongo.server_selectors import writable_server_selector, secondary_server_selector
 
 N_WORKERS = 110
 
@@ -17,11 +19,24 @@ client = MongoClient(connect=False)
 coll = client.test.test
 
 
+class ServerLogger(ServerListener):
+    def opened(self, event): pass
+
+    def description_changed(self, event):
+        if not event.new_description.is_server_type_known:
+            print(f'Event [{event.server_address}]: {event.new_description}')
+
+    def closed(self, event): pass
+
+
 def reset_client():
     global client, coll
     client.close()
-    client = MongoClient('mongodb://user:password@localhost:27017/?authSource=admin&tls=true&tlsInsecure=true')
-    coll = client.test.test
+    client = MongoClient(
+        'mongodb://user:password@localhost:27017/?authSource=admin&tls=true&tlsInsecure=true&directConnection=false',
+        # event_listeners=[ServerLogger()],
+    )
+    coll = client.test.test.with_options(read_preference=ReadPreference.SECONDARY)
 
 
 def delay(sec):
@@ -57,8 +72,15 @@ def get_pool(client):
     return server.pool
 
 
-def n_connections(client):
-    return len(get_pool(client).sockets)
+def get_secondary_pools(client):
+    """Get the secondary pools."""
+    topology = client._get_topology()
+    servers = topology.select_servers(secondary_server_selector)
+    return [server.pool for server in servers]
+
+
+def n_connections(pool):
+    return len(pool.sockets)
 
 
 if __name__ == "__main__":
@@ -70,30 +92,31 @@ if __name__ == "__main__":
     coll.insert_one({})
     for n_requests in (200, 10000):
         print(f'Executing {n_requests} findOne operations with {N_WORKERS} worker threads')
-        print("%13s: %20s: %11s:" % ("maxConnecting", "find_one time", "connections"))
-        for max_connecting in (2, 3, 5, 10, 100):
+        print("%13s: %20s: %11s: %11s:" % ("maxConnecting", "find_one time", "connections A", "connections B"))
+        for max_connecting in (2, 100):
             common.MAX_CONNECTING = max_connecting
             t = time(partial(benchmark, n_requests))
-            print("%13s %20.2fs %12s" % (max_connecting, t, n_connections(client)))
+            try:
+                a, b = get_secondary_pools(client)
+            except ValueError:
+                print(f'Cluster: {client._topology.description}')
+                raise
+            print("%13s %20.2fs %12s %12s" % (max_connecting, t, n_connections(a), n_connections(b)))
 
 # Output:
+# python3.9 benchmark-operationCount.py
 # PyMongo version: 4.0.dev0
 # MongoDB version: 4.4.3
-# MongoDB cluster: <TopologyDescription id: 600f4f3a9a0f341f7f7eed36,
-# topology_type: Single, servers: [<ServerDescription ('localhost', 27017)
-# server_type: Standalone, rtt: 0.00042395099999999186>]>
+# MongoDB cluster: <TopologyDescription id: 60272af61fb938f594ebcf50, topology_type: ReplicaSetWithPrimary, servers: [<ServerDescription ('localhost', 27017) server_type: RSSecondary, rtt: 0.0004510910000000007>, <ServerDescription ('localhost', 27018) server_type: RSSecondary, rtt: 0.0004311889999999985>, <ServerDescription ('localhost', 27019) server_type: RSPrimary, rtt: 0.0003646339999999887>]>
 # bson.has_c(): True
 # Executing 200 findOne operations with 110 worker threads
-# maxConnecting:        find_one time: connections:
-#             2                 0.10s            8
-#             3                 0.12s           10
-#             5                 0.13s           11
-#            10                 0.16s           16
-#           100                 1.01s          100
+# maxConnecting:        find_one time: connections A: connections A:
+#             2                 0.15s            6            5
+#           100                 1.56s          100           55
 # Executing 10000 findOne operations with 110 worker threads
-# maxConnecting:        find_one time: connections:
-#             2                 2.79s           60
-#             3                 2.85s           73
-#             5                 2.84s           96
-#            10                 2.78s          100
-#           100                 2.76s          100
+# maxConnecting:        find_one time: connections A: connections A:
+#             2                 3.36s           46           42
+# Traceback (most recent call last):
+#   File "/Users/shane/git/mongo-python-driver/benchmark-operationCount.py", line 85, in <module>
+#     a, b = get_secondary_pools(client)
+# ValueError: not enough values to unpack (expected 2, got 1)
