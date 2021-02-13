@@ -33,7 +33,7 @@ def reset_client():
     global client, coll
     client.close()
     client = MongoClient(
-        'mongodb://user:password@localhost:27017/?authSource=admin&tls=true&tlsInsecure=true&directConnection=false',
+        'mongodb://user:password@localhost:27017/?authSource=admin&tls=true&tlsInsecure=true&directConnection=false&localThresholdMS=1000',
         # event_listeners=[ServerLogger()],
     )
     coll = client.test.test.with_options(read_preference=ReadPreference.SECONDARY)
@@ -76,7 +76,8 @@ def get_secondary_pools(client):
     """Get the secondary pools."""
     topology = client._get_topology()
     servers = topology.select_servers(secondary_server_selector)
-    return [server.pool for server in servers]
+    return sorted([server.pool for server in servers],
+                  key=lambda pool: pool.address)
 
 
 def n_connections(pool):
@@ -96,27 +97,25 @@ if __name__ == "__main__":
         for max_connecting in (2, 100):
             common.MAX_CONNECTING = max_connecting
             t = time(partial(benchmark, n_requests))
-            try:
-                a, b = get_secondary_pools(client)
-            except ValueError:
-                print(f'Cluster: {client._topology.description}')
-                raise
+            a, b = get_secondary_pools(client)
             print("%13s %20.2fs %12s %12s" % (max_connecting, t, n_connections(a), n_connections(b)))
 
 # Output:
 # python3.9 benchmark-operationCount.py
 # PyMongo version: 4.0.dev0
 # MongoDB version: 4.4.3
-# MongoDB cluster: <TopologyDescription id: 60272af61fb938f594ebcf50, topology_type: ReplicaSetWithPrimary, servers: [<ServerDescription ('localhost', 27017) server_type: RSSecondary, rtt: 0.0004510910000000007>, <ServerDescription ('localhost', 27018) server_type: RSSecondary, rtt: 0.0004311889999999985>, <ServerDescription ('localhost', 27019) server_type: RSPrimary, rtt: 0.0003646339999999887>]>
+# MongoDB cluster: <TopologyDescription id: 602c3b7739c5b64451dfe98a,
+# topology_type: ReplicaSetWithPrimary, servers: [<ServerDescription (
+# 'localhost', 27017) server_type: RSSecondary, rtt: 0.0005159730000000029>,
+# <ServerDescription ('localhost', 27018) server_type: RSPrimary,
+# rtt: 0.00038200400000000523>, <ServerDescription ('localhost', 27019)
+# server_type: RSSecondary, rtt: 0.00035782500000000605>]>
 # bson.has_c(): True
 # Executing 200 findOne operations with 110 worker threads
-# maxConnecting:        find_one time: connections A: connections A:
-#             2                 0.15s            6            5
-#           100                 1.56s          100           55
+# maxConnecting:        find_one time: connections A: connections B:
+#             2                 0.16s            4            4
+#           100                 1.45s          100           55
 # Executing 10000 findOne operations with 110 worker threads
-# maxConnecting:        find_one time: connections A: connections A:
-#             2                 3.36s           46           42
-# Traceback (most recent call last):
-#   File "/Users/shane/git/mongo-python-driver/benchmark-operationCount.py", line 85, in <module>
-#     a, b = get_secondary_pools(client)
-# ValueError: not enough values to unpack (expected 2, got 1)
+# maxConnecting:        find_one time: connections A: connections B:
+#             2                 3.40s           43           44
+#           100                 3.43s           55           94
