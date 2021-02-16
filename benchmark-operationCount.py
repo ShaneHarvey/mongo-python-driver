@@ -135,14 +135,22 @@ def get_stats(client):
 def n_connections(pool):
     return len(pool.sockets)
 
+from contextlib import contextmanager
+from bson import SON
+@contextmanager
+def fail_point(command_args):
+    cmd_on = SON([('configureFailPoint', 'failCommand')])
+    cmd_on.update(command_args)
+    c = MongoClient(
+        'mongodb://user:password@localhost:27019/?authSource=admin&tls=true&tlsInsecure=true&directConnection=true')
+    c.admin.command(cmd_on)
+    try:
+        yield
+    finally:
+        c.admin.command(
+            'configureFailPoint', cmd_on['configureFailPoint'], mode='off')
 
-if __name__ == "__main__":
-    reset_client()
-    print(f'PyMongo version: {pymongo.__version__}')
-    print(f'MongoDB version: {client.server_info()["version"]}')
-    print(f'MongoDB cluster: {client._topology.description}')
-    print(f'bson.has_c(): {bson.has_c()}')
-    coll.insert_one({})
+def bench():
     for n_requests in (200, 10000):
         print(f'Executing {n_requests} findOne operations with {N_WORKERS} worker threads')
         print("%13s: %20s: %11s: %11s: %7s: %7s:" % ("maxConnecting", "find_one time", "connections A", "connections B", "ops A", "ops B"))
@@ -151,6 +159,28 @@ if __name__ == "__main__":
             t = time(partial(benchmark, n_requests))
             a, b = get_stats(client)
             print("%13s %20.2fs %14s %14s %8s %8s" % (max_connecting, t, a['conns'], b['conns'], a['ops'], b['ops']))
+
+
+if __name__ == "__main__":
+    reset_client()
+    print(f'PyMongo version: {pymongo.__version__}')
+    print(f'MongoDB version: {client.server_info()["version"]}')
+    print(f'MongoDB cluster: {client._topology.description}')
+    print(f'bson.has_c(): {bson.has_c()}')
+    coll.insert_one({})
+    bench()
+    print('Running benchmark with delayed server')
+    delay_find = {
+        'configureFailPoint': 'failCommand',
+        'mode': {'times': 1000000},
+        'data': {
+            'failCommands': ['find'],
+            'blockConnection': True,
+            'blockTimeMS': 500,
+        },
+    }
+    with fail_point(delay_find):
+        bench()
 
 # Output:
 # PyMongo version: 4.0.dev0
