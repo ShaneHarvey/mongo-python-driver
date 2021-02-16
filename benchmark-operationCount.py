@@ -9,14 +9,11 @@ import bson
 import pymongo
 from pymongo import MongoClient
 from pymongo import common
-from pymongo.monitoring import ServerListener
+from pymongo.monitoring import ServerListener, ConnectionPoolListener
 from pymongo.read_preferences import ReadPreference
 from pymongo.server_selectors import writable_server_selector, secondary_server_selector
 
 N_WORKERS = 110
-
-client = MongoClient(connect=False)
-coll = client.test.test
 
 
 class ServerLogger(ServerListener):
@@ -29,12 +26,60 @@ class ServerLogger(ServerListener):
     def closed(self, event): pass
 
 
+class PoolListener(ConnectionPoolListener):
+    def __init__(self):
+        self.stats = {}
+
+    def pool_created(self, event): pass
+    def pool_ready(self, event): pass
+
+    def pool_cleared(self, event): pass
+
+    def pool_closed(self, event): pass
+
+    def connection_created(self, event):
+        """Abstract method to handle a :class:`ConnectionCreatedEvent`.
+
+        Emitted when a Connection Pool creates a Connection object.
+
+        :Parameters:
+          - `event`: An instance of :class:`ConnectionCreatedEvent`.
+        """
+        self.stats.setdefault(event.address, {'conns': 0, 'ops': 0})['conns'] += 1
+
+    def connection_ready(self, event): pass
+
+    def connection_closed(self, event): pass
+
+    def connection_check_out_started(self, event): pass
+
+    def connection_check_out_failed(self, event): pass
+
+    def connection_checked_out(self, event):
+        """Abstract method to handle a :class:`ConnectionCheckedOutEvent`.
+
+        Emitted when the driver successfully checks out a Connection.
+
+        :Parameters:
+          - `event`: An instance of :class:`ConnectionCheckedOutEvent`.
+        """
+        self.stats.setdefault(event.address, {'conns': 0, 'ops': 0})['ops'] += 1
+
+    def connection_checked_in(self, event): pass
+
+
+client = MongoClient(connect=False)
+coll = client.test.test
+listener = PoolListener()
+
+
 def reset_client():
-    global client, coll
+    global client, coll, listener
     client.close()
+    listener = PoolListener()
     client = MongoClient(
         'mongodb://user:password@localhost:27017/?authSource=admin&tls=true&tlsInsecure=true&directConnection=false&localThresholdMS=1000',
-        # event_listeners=[ServerLogger()],
+        event_listeners=[listener],
     )
     coll = client.test.test.with_options(read_preference=ReadPreference.SECONDARY)
 
@@ -80,6 +125,13 @@ def get_secondary_pools(client):
                   key=lambda pool: pool.address)
 
 
+def get_stats(client):
+    """Get the secondary pools."""
+    a, b = get_secondary_pools(client)
+    stats = listener.stats
+    return stats[a.address], stats[b.address]
+
+
 def n_connections(pool):
     return len(pool.sockets)
 
@@ -93,29 +145,23 @@ if __name__ == "__main__":
     coll.insert_one({})
     for n_requests in (200, 10000):
         print(f'Executing {n_requests} findOne operations with {N_WORKERS} worker threads')
-        print("%13s: %20s: %11s: %11s:" % ("maxConnecting", "find_one time", "connections A", "connections B"))
+        print("%13s: %20s: %11s: %11s: %7s: %7s:" % ("maxConnecting", "find_one time", "connections A", "connections B", "ops A", "ops B"))
         for max_connecting in (2, 100):
             common.MAX_CONNECTING = max_connecting
             t = time(partial(benchmark, n_requests))
-            a, b = get_secondary_pools(client)
-            print("%13s %20.2fs %12s %12s" % (max_connecting, t, n_connections(a), n_connections(b)))
+            a, b = get_stats(client)
+            print("%13s %20.2fs %14s %14s %8s %8s" % (max_connecting, t, a['conns'], b['conns'], a['ops'], b['ops']))
 
 # Output:
-# python3.9 benchmark-operationCount.py
 # PyMongo version: 4.0.dev0
 # MongoDB version: 4.4.3
-# MongoDB cluster: <TopologyDescription id: 602c3b7739c5b64451dfe98a,
-# topology_type: ReplicaSetWithPrimary, servers: [<ServerDescription (
-# 'localhost', 27017) server_type: RSSecondary, rtt: 0.0005159730000000029>,
-# <ServerDescription ('localhost', 27018) server_type: RSPrimary,
-# rtt: 0.00038200400000000523>, <ServerDescription ('localhost', 27019)
-# server_type: RSSecondary, rtt: 0.00035782500000000605>]>
+# MongoDB cluster: <TopologyDescription id: 602c537011c320122be9fd62, topology_type: ReplicaSetWithPrimary, servers: [<ServerDescription ('localhost', 27017) server_type: RSSecondary, rtt: 0.0004559100000000038>, <ServerDescription ('localhost', 27018) server_type: RSPrimary, rtt: 0.0004028969999999993>, <ServerDescription ('localhost', 27019) server_type: RSSecondary, rtt: 0.0003537460000000159>]>
 # bson.has_c(): True
 # Executing 200 findOne operations with 110 worker threads
-# maxConnecting:        find_one time: connections A: connections B:
-#             2                 0.16s            4            4
-#           100                 1.45s          100           55
+# maxConnecting:        find_one time: connections A: connections B:   ops A:   ops B:
+#             2                 0.17s              6              5      109       91
+#           100                 1.44s            100             51      110       90
 # Executing 10000 findOne operations with 110 worker threads
-# maxConnecting:        find_one time: connections A: connections B:
-#             2                 3.40s           43           44
-#           100                 3.43s           55           94
+# maxConnecting:        find_one time: connections A: connections B:   ops A:   ops B:
+#             2                 3.49s             45             41     5395     4605
+#           100                 3.87s            100             55     6074     3926
