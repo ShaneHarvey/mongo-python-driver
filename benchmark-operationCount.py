@@ -141,8 +141,10 @@ from bson import SON
 def fail_point(command_args):
     cmd_on = SON([('configureFailPoint', 'failCommand')])
     cmd_on.update(command_args)
-    c = MongoClient(
-        'mongodb://user:password@localhost:27019/?authSource=admin&tls=true&tlsInsecure=true&directConnection=true')
+    _, pool = get_secondary_pools(client)
+    addr = pool.address
+    uri = 'mongodb://user:password@%s:%s/?authSource=admin&tls=true&tlsInsecure=true&directConnection=true' % addr
+    c = MongoClient(uri)
     c.admin.command(cmd_on)
     try:
         yield
@@ -153,12 +155,10 @@ def fail_point(command_args):
 def bench():
     for n_requests in (200, 10000):
         print(f'Executing {n_requests} findOne operations with {N_WORKERS} worker threads')
-        print("%13s: %20s: %11s: %11s: %7s: %7s:" % ("maxConnecting", "find_one time", "connections A", "connections B", "ops A", "ops B"))
-        for max_connecting in (2, 100):
-            common.MAX_CONNECTING = max_connecting
-            t = time(partial(benchmark, n_requests))
-            a, b = get_stats(client)
-            print("%13s %20.2fs %14s %14s %8s %8s" % (max_connecting, t, a['conns'], b['conns'], a['ops'], b['ops']))
+        print("%20s: %11s: %11s: %7s: %7s:" % ("find_one time", "connections A", "connections B", "ops A", "ops B"))
+        t = time(partial(benchmark, n_requests))
+        a, b = get_stats(client)
+        print("%20.2fs %14s %14s %8s %8s" % (t, a['conns'], b['conns'], a['ops'], b['ops']))
 
 
 if __name__ == "__main__":
@@ -183,15 +183,39 @@ if __name__ == "__main__":
         bench()
 
 # Output:
-# PyMongo version: 4.0.dev0
+# PyMongo version: 3.11.3
 # MongoDB version: 4.4.3
-# MongoDB cluster: <TopologyDescription id: 602c537011c320122be9fd62, topology_type: ReplicaSetWithPrimary, servers: [<ServerDescription ('localhost', 27017) server_type: RSSecondary, rtt: 0.0004559100000000038>, <ServerDescription ('localhost', 27018) server_type: RSPrimary, rtt: 0.0004028969999999993>, <ServerDescription ('localhost', 27019) server_type: RSSecondary, rtt: 0.0003537460000000159>]>
+# MongoDB cluster: <TopologyDescription id: 602d5414b37fe9222be63052, topology_type: ReplicaSetWithPrimary, servers: [<ServerDescription ('localhost', 27017) server_type: RSSecondary, rtt: 0.0005602909999999905>, <ServerDescription ('localhost', 27018) server_type: RSSecondary, rtt: 0.000500710999999987>, <ServerDescription ('localhost', 27019) server_type: RSPrimary, rtt: 0.00037360899999999697>]>
 # bson.has_c(): True
 # Executing 200 findOne operations with 110 worker threads
-# maxConnecting:        find_one time: connections A: connections B:   ops A:   ops B:
-#             2                 0.17s              6              5      109       91
-#           100                 1.44s            100             51      110       90
+#        find_one time: connections A: connections B:   ops A:   ops B:
+#                 1.47s            100             44      155       45
 # Executing 10000 findOne operations with 110 worker threads
-# maxConnecting:        find_one time: connections A: connections B:   ops A:   ops B:
-#             2                 3.49s             45             41     5395     4605
-#           100                 3.87s            100             55     6074     3926
+#        find_one time: connections A: connections B:   ops A:   ops B:
+#                 3.63s            100            100     5089     4911
+# Running benchmark with delayed server
+# Executing 200 findOne operations with 110 worker threads
+#        find_one time: connections A: connections B:   ops A:   ops B:
+#                 2.00s            100             44      156       44
+# Executing 10000 findOne operations with 110 worker threads
+#        find_one time: connections A: connections B:   ops A:   ops B:
+#                26.55s             56            100     4990     5010
+
+
+# PyMongo version: 4.0.dev0
+# MongoDB version: 4.4.3
+# MongoDB cluster: <TopologyDescription id: 602d5528890449cd34bb3a30, topology_type: ReplicaSetWithPrimary, servers: [<ServerDescription ('localhost', 27017) server_type: RSSecondary, rtt: 0.0006069959999999985>, <ServerDescription ('localhost', 27018) server_type: RSSecondary, rtt: 0.0004018660000000007>, <ServerDescription ('localhost', 27019) server_type: RSPrimary, rtt: 0.000422492999999996>]>
+# bson.has_c(): True
+# Executing 200 findOne operations with 110 worker threads
+#        find_one time: connections A: connections B:   ops A:   ops B:
+#                 0.16s              5              4      145       55
+# Executing 10000 findOne operations with 110 worker threads
+#        find_one time: connections A: connections B:   ops A:   ops B:
+#                 3.53s             44             44     4991     5009
+# Running benchmark with delayed server
+# Executing 200 findOne operations with 110 worker threads
+#        find_one time: connections A: connections B:   ops A:   ops B:
+#                 1.16s              6             54      145       55
+# Executing 10000 findOne operations with 110 worker threads
+#        find_one time: connections A: connections B:   ops A:   ops B:
+#                 3.94s             55             55     9748      252
