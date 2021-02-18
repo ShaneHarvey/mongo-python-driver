@@ -48,6 +48,7 @@ from pymongo.topology_description import (updated_topology_description,
                                           TopologyDescription,
                                           SRV_POLLING_TOPOLOGIES, TOPOLOGY_TYPE)
 
+import logging
 
 def process_events_queue(queue_ref):
     q = queue_ref()
@@ -276,6 +277,8 @@ class Topology(object):
         sd_old = td_old._server_descriptions[server_description.address]
         if _is_stale_server_description(sd_old, server_description):
             # This is a stale isMaster response. Ignore it.
+            logging.info('STALE ServerDescription topologyVersion: current: %s, sd: %s',
+                         sd_old.topology_version, server_description.topology_version)
             return
 
         # CMAP: Ensure the pool is "ready" when the server is selectable.
@@ -552,6 +555,7 @@ class Topology(object):
 
         if err_ctx.sock_generation != server._pool.generation:
             # This is an outdated error from a previous pool version.
+            logging.info('STALE error generation: current: %s, error: %s', server._pool.generation, err_ctx.sock_generation)
             return True
 
         # topologyVersion check, ignore error when cur_tv >= error_tv:
@@ -562,7 +566,9 @@ class Topology(object):
             if isinstance(error.details, dict):
                 error_tv = error.details.get('topologyVersion')
 
-        return _is_stale_error_topology_version(cur_tv, error_tv)
+        stale = _is_stale_error_topology_version(cur_tv, error_tv)
+        logging.info('STALE error topologyVersion: current: %s, error: %s', cur_tv, error_tv)
+        return stale
 
     def _handle_error(self, address, err_ctx):
         if self._is_stale_error(address, err_ctx):

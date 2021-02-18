@@ -224,3 +224,7 @@ class BulkWriteResult(_WriteResult):
         if self.__bulk_api_result:
             return dict((upsert["index"], upsert["_id"])
                         for upsert in self.bulk_api_result["upserted"])
+
+    def __repr__(self):
+        return "BulkWriteResult(%s, %s)" % (
+            self.__bulk_api_result, self.acknowledged)
