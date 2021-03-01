@@ -1455,6 +1455,36 @@ class TestCursor(IntegrationTest):
         self.assertNotIn('$readPreference', started[1].command)
 
 
+from bson.raw_bson import RawBSONDocument
+
+
+def find_raw_all(coll, *args, **kwargs):
+    raw_opts = coll.codec_options.with_options(document_class=RawBSONDocument)
+    raw_coll = coll.with_options(codec_options=raw_opts)
+    with raw_coll.find(*args, **kwargs) as cursor:
+        return b''.join(raw_doc.raw for raw_doc in cursor)
+
+MAX_BATCH_SIZE = 48 * 1000 * 1000  # 48 Mb (4.4 era maxMessageSizeBytes)
+
+def find_raw_batches(coll, *args, **kwargs):
+    raw_opts = coll.codec_options.with_options(document_class=RawBSONDocument)
+    raw_coll = coll.with_options(codec_options=raw_opts)
+    with raw_coll.find(*args, **kwargs) as cursor:
+        batch = []
+        batch_size = 0
+        for raw_doc in cursor:
+            doc_size = len(raw_doc.raw)
+            if batch_size + doc_size >= MAX_BATCH_SIZE:
+                yield b''.join(batch)
+                batch = []
+                batch_size = 0
+            batch.append(raw_doc.raw)
+            batch_size += doc_size
+        # Final batch.
+        if batch:
+            yield b''.join(batch)
+
+
 class TestRawBatchCursor(IntegrationTest):
     def test_find_raw(self):
         c = self.db.test
@@ -1462,6 +1492,23 @@ class TestRawBatchCursor(IntegrationTest):
         docs = [{'_id': i, 'x': 3.0 * i} for i in range(10)]
         c.insert_many(docs)
         batches = list(c.find_raw_batches().sort('_id'))
+        self.assertEqual(1, len(batches))
+        self.assertEqual(docs, decode_all(batches[0]))
+
+    def test_find_raw_on_view(self):
+        c = self.db.test
+        c.drop()
+        docs = [{'_id': i, 'x': 3.0 * i} for i in range(10)]
+        c.insert_many(docs)
+        view = self.db.create_collection('view', viewOn='test')
+        self.addCleanup(view.drop)
+        with self.assertRaises(OperationFailure):
+            list(view.find_raw_batches().sort('_id'))
+
+        batch = find_raw_all(view, sort=[('_id', 1)])
+        self.assertEqual(docs, decode_all(batch))
+
+        batches = list(find_raw_batches(view, sort=[('_id', 1)]))
         self.assertEqual(1, len(batches))
         self.assertEqual(docs, decode_all(batches[0]))
 
