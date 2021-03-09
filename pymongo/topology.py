@@ -44,6 +44,7 @@ from pymongo.server_selectors import (any_server_selector,
                                       readable_server_selector,
                                       writable_server_selector,
                                       Selection)
+from pymongo.server_type import SERVER_TYPE
 from pymongo.topology_description import (updated_topology_description,
                                           _updated_topology_description_srv_polling,
                                           TopologyDescription,
@@ -597,8 +598,11 @@ class Topology(object):
                 err_code = error.details.get('code', -1)
             if err_code in helpers._NOT_MASTER_CODES:
                 is_shutting_down = err_code in helpers._SHUTDOWN_CODES
-                # Mark server Unknown, clear the pool, and request check.
-                self._process_change(ServerDescription(address, error=error))
+                # Update topology, clear the pool, and request check.
+                server_description = ServerDescription(address, error=error)
+                self._process_change(server_description)
+                if server_description.server_type == SERVER_TYPE.Quiesce:
+                    return
                 if is_shutting_down or (err_ctx.max_wire_version <= 7):
                     # Clear the pool.
                     server.reset()

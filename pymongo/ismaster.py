@@ -20,9 +20,18 @@ from pymongo import common
 from pymongo.server_type import SERVER_TYPE
 
 
+def _is_quiesce_mode(doc):
+    """Determine if this response is a Quiesce Mode error."""
+    return (not doc.get('ok') and
+            doc.get('code') == 91 and  # ShutdownInProgress
+            'remainingQuiesceTimeMillis' in doc)
+
+
 def _get_server_type(doc):
     """Determine the server type from an ismaster response."""
     if not doc.get('ok'):
+        if _is_quiesce_mode(doc):
+            return SERVER_TYPE.Quiesce
         return SERVER_TYPE.Unknown
 
     if doc.get('isreplicaset'):
@@ -57,6 +66,7 @@ class IsMaster(object):
             SERVER_TYPE.Standalone,
             SERVER_TYPE.Mongos)
 
+        # TODO: Should this be True or False for SERVER_TYPE.Quiesce?
         self._is_readable = (
             self.server_type == SERVER_TYPE.RSSecondary
             or self._is_writable)

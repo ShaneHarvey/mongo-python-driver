@@ -18,7 +18,7 @@ import time
 
 from bson import EPOCH_NAIVE
 from pymongo.server_type import SERVER_TYPE
-from pymongo.ismaster import IsMaster
+from pymongo.ismaster import IsMaster, _is_quiesce_mode
 
 
 class ServerDescription(object):
@@ -47,6 +47,13 @@ class ServerDescription(object):
             round_trip_time=None,
             error=None):
         self._address = address
+        quiesce_mode = False
+        if (error and hasattr(error, 'details') and
+                isinstance(error.details, dict)):
+            error_resp = error.details
+            if _is_quiesce_mode(error_resp):
+                quiesce_mode = True
+                ismaster = IsMaster(error_resp)
         if not ismaster:
             ismaster = IsMaster({})
 
@@ -59,7 +66,11 @@ class ServerDescription(object):
         self._max_message_size = ismaster.max_message_size
         self._max_write_batch_size = ismaster.max_write_batch_size
         self._min_wire_version = ismaster.min_wire_version
-        self._max_wire_version = ismaster.max_wire_version
+        if quiesce_mode:
+            # Quiesce mode was introduced in MongoDB 5.0.
+            self._max_wire_version = 12
+        else:
+            self._max_wire_version = ismaster.max_wire_version
         self._set_version = ismaster.set_version
         self._election_id = ismaster.election_id
         self._cluster_time = ismaster.cluster_time

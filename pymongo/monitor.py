@@ -187,16 +187,18 @@ class Monitor(MonitorBase):
                 return
 
             # Update the Topology and clear the server pool on error.
-            self._topology.on_change(self._server_description,
-                                     reset_pool=self._server_description.error)
+            unknown = not self._server_description.is_server_type_known
+            error = bool(self._server_description.error)
+            self._topology.on_change(
+                self._server_description, reset_pool=unknown and error)
 
-            if (self._server_description.is_server_type_known and
-                     self._server_description.topology_version):
+            if (not unknown and not error and
+                    self._server_description.topology_version):
                 self._start_rtt_monitor()
                 # Immediately check for the next streaming response.
                 self._executor.skip_sleep()
 
-            if self._server_description.error and prev_sd.is_server_type_known:
+            if unknown and error and prev_sd.is_server_type_known:
                 # Immediately retry on network errors.
                 self._executor.skip_sleep()
         except ReferenceError:
@@ -232,7 +234,7 @@ class Monitor(MonitorBase):
             if isinstance(error, _OperationCancelled):
                 raise
             self._rtt_monitor.reset()
-            # Server type defaults to Unknown.
+            # The new state is either Unknown or Quiesce.
             return ServerDescription(address, error=error)
 
     def _check_once(self):

@@ -306,6 +306,7 @@ _SERVER_TYPE_TO_TOPOLOGY_TYPE = {
     SERVER_TYPE.RSSecondary: TOPOLOGY_TYPE.ReplicaSetNoPrimary,
     SERVER_TYPE.RSArbiter: TOPOLOGY_TYPE.ReplicaSetNoPrimary,
     SERVER_TYPE.RSOther: TOPOLOGY_TYPE.ReplicaSetNoPrimary,
+    SERVER_TYPE.Quiesce: TOPOLOGY_TYPE.Unknown,
 }
 
 
@@ -365,7 +366,8 @@ def updated_topology_description(topology_description, server_description):
             topology_type = _SERVER_TYPE_TO_TOPOLOGY_TYPE[server_type]
 
     if topology_type == TOPOLOGY_TYPE.Sharded:
-        if server_type not in (SERVER_TYPE.Mongos, SERVER_TYPE.Unknown):
+        if server_type not in (SERVER_TYPE.Mongos, SERVER_TYPE.Quiesce,
+                               SERVER_TYPE.Unknown):
             sds.pop(address)
 
     elif topology_type == TOPOLOGY_TYPE.ReplicaSetNoPrimary:
@@ -412,7 +414,8 @@ def updated_topology_description(topology_description, server_description):
                 sds, set_name, server_description)
 
         else:
-            # Server type is Unknown or RSGhost: did we just lose the primary?
+            # Server type is Unknown, Quiesce, or RSGhost: did we just lose
+            # the primary?
             topology_type = _check_has_primary(sds)
 
     # Return updated copy.
