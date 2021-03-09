@@ -20,6 +20,7 @@ sys.path[0:0] = [""]
 
 from bson.objectid import ObjectId
 from bson.int64 import Int64
+from pymongo.errors import NotMasterError
 from pymongo.server_type import SERVER_TYPE
 from pymongo.ismaster import IsMaster
 from pymongo.server_description import ServerDescription
@@ -189,6 +190,23 @@ class TestServerDescription(unittest.TestCase):
 
         self.assertEqual(SERVER_TYPE.RSPrimary, s.server_type)
         self.assertEqual(None, s.topology_version)
+
+    def test_quiesce_mode_error(self):
+        topology_version = {'processId': ObjectId(), 'counter': Int64('0')}
+        errmsg = 'The server is in quiesce mode and will shut down'
+        error = NotMasterError(
+            errmsg,
+            {'ok': 0, 'errmsg': errmsg, 'code': 91,
+             'remainingQuiesceTimeMillis': 15000,
+             'topologyVersion': topology_version})
+        s = ServerDescription(address, error=error)
+        self.assertEqual(SERVER_TYPE.Unknown, s.server_type)
+        self.assertEqual(topology_version, s.topology_version)
+        self.assertEqual(error, s.error)
+        self.assertFalse(s.is_server_type_known)
+        self.assertFalse(s.is_readable)
+        self.assertFalse(s.is_writable)
+        self.assertTrue(s.is_quiesce_mode)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,13 @@ from pymongo.server_type import SERVER_TYPE
 from pymongo.ismaster import IsMaster
 
 
+def _is_quiesce_mode(doc):
+    """Determine if this response is a Quiesce Mode error."""
+    return (not doc.get('ok') and
+            doc.get('code') == 91 and  # ShutdownInProgress
+            'remainingQuiesceTimeMillis' in doc)
+
+
 class ServerDescription(object):
     """Immutable representation of one server.
 
@@ -184,6 +191,16 @@ class ServerDescription(object):
     def error(self):
         """The last error attempting to connect to the server, or None."""
         return self._error
+
+    @property
+    def is_quiesce_mode(self):
+        """True if this server is in Quiesce Mode."""
+        error = self.error
+        if (error and hasattr(error, 'details') and
+                isinstance(error.details, dict)):
+            error_resp = error.details
+            return _is_quiesce_mode(error_resp)
+        return False
 
     @property
     def is_writable(self):

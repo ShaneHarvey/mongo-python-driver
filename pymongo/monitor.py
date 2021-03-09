@@ -186,18 +186,21 @@ class Monitor(MonitorBase):
                     self._executor.skip_sleep()
                 return
 
-            # Update the Topology and clear the server pool on error.
+            # Update the Topology and clear the server pool on non-quiesce
+            # mode errors.
+            non_quiesce_error = (self._server_description.error and
+                                 not self._server_description.is_quiesce_mode)
             self._topology.on_change(self._server_description,
-                                     reset_pool=self._server_description.error)
+                                     reset_pool=non_quiesce_error)
 
             if (self._server_description.is_server_type_known and
-                     self._server_description.topology_version):
+                    self._server_description.topology_version):
                 self._start_rtt_monitor()
                 # Immediately check for the next streaming response.
                 self._executor.skip_sleep()
 
-            if self._server_description.error and prev_sd.is_server_type_known:
-                # Immediately retry on network errors.
+            if non_quiesce_error and prev_sd.is_server_type_known:
+                # Immediately retry (once) on non-quiesce errors.
                 self._executor.skip_sleep()
         except ReferenceError:
             # Topology was garbage-collected.
