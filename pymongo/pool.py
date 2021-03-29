@@ -164,6 +164,8 @@ if sys.platform == 'win32':
                        (1, idle_ms, interval_ms))
 else:
     def _set_tcp_option(sock, tcp_option, max_value):
+        print('_set_tcp_option tcp_option=%s, max_value=%s' % (
+            tcp_option, max_value))
         if hasattr(socket, tcp_option):
             sockopt = getattr(socket, tcp_option)
             try:
@@ -171,10 +173,17 @@ else:
                 # TCP_KEEPIDLE and friends. Don't attempt to set the
                 # values there.
                 default = sock.getsockopt(socket.IPPROTO_TCP, sockopt)
+                print('  _set_tcp_option tcp_option=%s, default=%s' % (
+                    tcp_option, default))
                 if default > max_value:
+                    print('    sock.setsockopt tcp_option=%s, max_value=%s' % (
+                        tcp_option, max_value))
                     sock.setsockopt(socket.IPPROTO_TCP, sockopt, max_value)
-            except socket.error:
+            except socket.error as exc:
+                print('  socket.error: %r' % (exc,))
                 pass
+        else:
+            print('  tcp_option: %s not supported' % (tcp_option,))
 
     def _set_keepalive_times(sock):
         _set_tcp_option(sock, 'TCP_KEEPIDLE', _MAX_TCP_KEEPIDLE)
