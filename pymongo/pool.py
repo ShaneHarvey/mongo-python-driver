@@ -962,6 +962,8 @@ def _create_connection(address, options):
                             options.socket_keepalive)
             if options.socket_keepalive:
                 _set_keepalive_times(sock)
+            if hasattr(socket, 'TCP_USER_TIMEOUT'):
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_USER_TIMEOUT, 210*1000)
             sock.connect(sa)
             return sock
         except socket.error as e:
