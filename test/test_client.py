@@ -532,7 +532,170 @@ class TestClientExecutor(LoggedTest):
             wait_until(lambda: 1 <= len(server._pool.sockets),
                        "replace stale socket")
             client.close()
+        """
+https://evergreen.mongodb.com/task/mongo_python_driver_tests_python_version_amazon1_test_ssl__platform~awslinux_auth~noauth_ssl~nossl_python_version~3.6_coverage~coverage_test_3.6_replica_set_patch_cc029a1e6208863eaab453777363d3935b927f32_6074e49f57e85a62cda4f7d9_21_04_13_00_25_25
 
+[2021/04/13 01:14:14.722] TEST failed, debug ouput:
+  2021-04-13 01:14:04,692 INFO event_loggers Topology with id 6074f05c40523378832898e3 opened
+  2021-04-13 01:14:04,692 INFO event_loggers Topology description updated for topology id 6074f05c40523378832898e3
+  2021-04-13 01:14:04,692 INFO event_loggers Topology 6074f05c40523378832898e3 changed type from Unknown to ReplicaSetNoPrimary
+  2021-04-13 01:14:04,692 WARNING event_loggers No writable servers available.
+  2021-04-13 01:14:04,692 WARNING event_loggers No readable servers available.
+  2021-04-13 01:14:04,692 INFO event_loggers Server ('localhost', 27017) added to topology 6074f05c40523378832898e3
+  2021-04-13 01:14:04,692 INFO event_loggers [pool ('localhost', 27017)] pool created
+  2021-04-13 01:14:04,692 INFO event_loggers Heartbeat sent to server ('localhost', 27017)
+  2021-04-13 01:14:04,694 INFO event_loggers Heartbeat to server ('localhost', 27017) succeeded with reply {'hosts': ['localhost:27017', 'localhost:27018'], 'arbiters': ['localhost:27019'], 'setName': 'repl0', 'setVersion': 1, 'ismaster': True, 'secondary': False, 'primary': 'localhost:27017', 'tags': {'dc': 'ny', 'ordinal': 'one'}, 'me': 'localhost:27017', 'electionId': ObjectId('7fffffff0000000000000001'), 'lastWrite': {'opTime': {'ts': Timestamp(1618276444, 1), 't': 1}, 'lastWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 4), 'majorityOpTime': {'ts': Timestamp(1618276444, 1), 't': 1}, 'majorityWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 4)}, 'maxBsonObjectSize': 16777216, 'maxMessageSizeBytes': 48000000, 'maxWriteBatchSize': 100000, 'localTime': datetime.datetime(2021, 4, 13, 1, 14, 4, 693000), 'logicalSessionTimeoutMinutes': 30, 'minWireVersion': 0, 'maxWireVersion': 6, 'readOnly': False, 'ok': 1.0, 'operationTime': Timestamp(1618276444, 1), '$clusterTime': {'clusterTime': Timestamp(1618276444, 1), 'signature': {'hash': b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 'keyId': 0}}}
+  2021-04-13 01:14:04,694 INFO event_loggers [pool ('localhost', 27017)] pool ready
+  2021-04-13 01:14:04,694 INFO event_loggers [pool ('localhost', 27019)] pool created
+  2021-04-13 01:14:04,694 INFO event_loggers Heartbeat sent to server ('localhost', 27019)
+  2021-04-13 01:14:04,695 INFO event_loggers [pool ('localhost', 27018)] pool created
+  2021-04-13 01:14:04,695 INFO event_loggers Heartbeat sent to server ('localhost', 27018)
+  2021-04-13 01:14:04,696 INFO event_loggers Heartbeat to server ('localhost', 27019) succeeded with reply {'hosts': ['localhost:27017', 'localhost:27018'], 'arbiters': ['localhost:27019'], 'setName': 'repl0', 'setVersion': 1, 'ismaster': False, 'secondary': False, 'primary': 'localhost:27017', 'arbiterOnly': True, 'me': 'localhost:27019', 'lastWrite': {'opTime': {'ts': Timestamp(1618276442, 5), 't': 1}, 'lastWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 2), 'majorityOpTime': {'ts': Timestamp(1618276442, 5), 't': 1}, 'majorityWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 2)}, 'maxBsonObjectSize': 16777216, 'maxMessageSizeBytes': 48000000, 'maxWriteBatchSize': 100000, 'localTime': datetime.datetime(2021, 4, 13, 1, 14, 4, 696000), 'minWireVersion': 0, 'maxWireVersion': 6, 'readOnly': False, 'ok': 1.0}
+  2021-04-13 01:14:04,696 INFO event_loggers [pool ('localhost', 27019)] pool ready
+  2021-04-13 01:14:04,697 INFO event_loggers [pool ('localhost', 27019)] connection check out started
+  2021-04-13 01:14:04,697 INFO event_loggers [pool ('localhost', 27019)][conn #1] connection created
+  2021-04-13 01:14:04,698 INFO event_loggers Heartbeat to server ('localhost', 27018) succeeded with reply {'hosts': ['localhost:27017', 'localhost:27018'], 'arbiters': ['localhost:27019'], 'setName': 'repl0', 'setVersion': 1, 'ismaster': False, 'secondary': True, 'primary': 'localhost:27017', 'tags': {'dc': 'pa', 'ordinal': 'two'}, 'me': 'localhost:27018', 'lastWrite': {'opTime': {'ts': Timestamp(1618276444, 1), 't': 1}, 'lastWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 4), 'majorityOpTime': {'ts': Timestamp(1618276444, 1), 't': 1}, 'majorityWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 4)}, 'maxBsonObjectSize': 16777216, 'maxMessageSizeBytes': 48000000, 'maxWriteBatchSize': 100000, 'localTime': datetime.datetime(2021, 4, 13, 1, 14, 4, 697000), 'logicalSessionTimeoutMinutes': 30, 'minWireVersion': 0, 'maxWireVersion': 6, 'readOnly': False, 'ok': 1.0, 'operationTime': Timestamp(1618276444, 1), '$clusterTime': {'clusterTime': Timestamp(1618276444, 1), 'signature': {'hash': b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 'keyId': 0}}}
+  2021-04-13 01:14:04,698 INFO event_loggers [pool ('localhost', 27018)] pool ready
+  2021-04-13 01:14:04,699 INFO event_loggers [pool ('localhost', 27019)][conn #1] connection setup succeeded
+  2021-04-13 01:14:04,699 INFO event_loggers [pool ('localhost', 27019)][conn #1] connection checked out of pool
+  2021-04-13 01:14:04,699 INFO event_loggers [pool ('localhost', 27019)][conn #1] connection checked into pool
+  2021-04-13 01:14:04,699 INFO test_client assertEqual
+  2021-04-13 01:14:05,194 INFO event_loggers [pool ('localhost', 27017)][conn #1] connection created
+  2021-04-13 01:14:05,195 INFO event_loggers [pool ('localhost', 27017)][conn #1] connection setup succeeded
+  2021-04-13 01:14:05,195 INFO event_loggers [pool ('localhost', 27018)][conn #1] connection created
+  2021-04-13 01:14:05,196 INFO event_loggers [pool ('localhost', 27018)][conn #1] connection setup succeeded
+  2021-04-13 01:14:05,197 INFO event_loggers Heartbeat sent to server ('localhost', 27017)
+  2021-04-13 01:14:05,197 INFO event_loggers Heartbeat to server ('localhost', 27017) succeeded with reply {'hosts': ['localhost:27017', 'localhost:27018'], 'arbiters': ['localhost:27019'], 'setName': 'repl0', 'setVersion': 1, 'ismaster': True, 'secondary': False, 'primary': 'localhost:27017', 'tags': {'dc': 'ny', 'ordinal': 'one'}, 'me': 'localhost:27017', 'electionId': ObjectId('7fffffff0000000000000001'), 'lastWrite': {'opTime': {'ts': Timestamp(1618276444, 1), 't': 1}, 'lastWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 4), 'majorityOpTime': {'ts': Timestamp(1618276444, 1), 't': 1}, 'majorityWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 4)}, 'maxBsonObjectSize': 16777216, 'maxMessageSizeBytes': 48000000, 'maxWriteBatchSize': 100000, 'localTime': datetime.datetime(2021, 4, 13, 1, 14, 5, 197000), 'logicalSessionTimeoutMinutes': 30, 'minWireVersion': 0, 'maxWireVersion': 6, 'readOnly': False, 'ok': 1.0, 'operationTime': Timestamp(1618276444, 1), '$clusterTime': {'clusterTime': Timestamp(1618276444, 1), 'signature': {'hash': b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 'keyId': 0}}}
+  2021-04-13 01:14:05,693 INFO event_loggers Server ('localhost', 27017) changed type from Unknown to RSPrimary
+  2021-04-13 01:14:05,694 INFO event_loggers Topology description updated for topology id 6074f05c40523378832898e3
+  2021-04-13 01:14:05,694 INFO event_loggers Topology 6074f05c40523378832898e3 changed type from ReplicaSetNoPrimary to ReplicaSetWithPrimary
+  2021-04-13 01:14:05,694 INFO event_loggers Server ('localhost', 27019) changed type from Unknown to RSArbiter
+  2021-04-13 01:14:05,694 INFO event_loggers Topology description updated for topology id 6074f05c40523378832898e3
+  2021-04-13 01:14:05,694 INFO event_loggers Server ('localhost', 27018) changed type from Unknown to RSSecondary
+  2021-04-13 01:14:05,694 INFO event_loggers Topology description updated for topology id 6074f05c40523378832898e3
+  2021-04-13 01:14:05,697 INFO event_loggers [pool ('localhost', 27017)][conn #1] connection closed, reason: idle
+  2021-04-13 01:14:05,697 INFO event_loggers [pool ('localhost', 27017)][conn #2] connection created
+  2021-04-13 01:14:05,698 INFO event_loggers [pool ('localhost', 27017)][conn #2] connection setup succeeded
+  2021-04-13 01:14:05,698 INFO event_loggers [pool ('localhost', 27018)][conn #1] connection closed, reason: idle
+  2021-04-13 01:14:05,698 INFO event_loggers [pool ('localhost', 27018)][conn #2] connection created
+  2021-04-13 01:14:05,699 INFO event_loggers [pool ('localhost', 27018)][conn #2] connection setup succeeded
+  2021-04-13 01:14:06,200 INFO event_loggers [pool ('localhost', 27017)][conn #2] connection closed, reason: idle
+  2021-04-13 01:14:06,200 INFO event_loggers [pool ('localhost', 27017)][conn #3] connection created
+  2021-04-13 01:14:06,201 INFO event_loggers [pool ('localhost', 27017)][conn #3] connection setup succeeded
+  2021-04-13 01:14:06,201 INFO event_loggers [pool ('localhost', 27018)][conn #2] connection closed, reason: idle
+  2021-04-13 01:14:06,201 INFO event_loggers [pool ('localhost', 27018)][conn #3] connection created
+  2021-04-13 01:14:06,202 INFO event_loggers [pool ('localhost', 27018)][conn #3] connection setup succeeded
+  2021-04-13 01:14:06,703 INFO event_loggers [pool ('localhost', 27017)][conn #3] connection closed, reason: idle
+  2021-04-13 01:14:06,703 INFO event_loggers [pool ('localhost', 27017)][conn #4] connection created
+  2021-04-13 01:14:06,704 INFO event_loggers [pool ('localhost', 27017)][conn #4] connection setup succeeded
+  2021-04-13 01:14:06,704 INFO event_loggers [pool ('localhost', 27018)][conn #3] connection closed, reason: idle
+  2021-04-13 01:14:06,704 INFO event_loggers [pool ('localhost', 27018)][conn #4] connection created
+  2021-04-13 01:14:06,705 INFO event_loggers [pool ('localhost', 27018)][conn #4] connection setup succeeded
+  2021-04-13 01:14:07,206 INFO event_loggers [pool ('localhost', 27017)][conn #4] connection closed, reason: idle
+  2021-04-13 01:14:07,206 INFO event_loggers [pool ('localhost', 27017)][conn #5] connection created
+  2021-04-13 01:14:07,207 INFO event_loggers [pool ('localhost', 27017)][conn #5] connection setup succeeded
+  2021-04-13 01:14:07,207 INFO event_loggers [pool ('localhost', 27018)][conn #4] connection closed, reason: idle
+  2021-04-13 01:14:07,207 INFO event_loggers [pool ('localhost', 27018)][conn #5] connection created
+  2021-04-13 01:14:07,208 INFO event_loggers [pool ('localhost', 27018)][conn #5] connection setup succeeded
+  2021-04-13 01:14:07,709 INFO event_loggers [pool ('localhost', 27017)][conn #5] connection closed, reason: idle
+  2021-04-13 01:14:07,709 INFO event_loggers [pool ('localhost', 27017)][conn #6] connection created
+  2021-04-13 01:14:07,710 INFO event_loggers [pool ('localhost', 27017)][conn #6] connection setup succeeded
+  2021-04-13 01:14:07,710 INFO event_loggers [pool ('localhost', 27018)][conn #5] connection closed, reason: idle
+  2021-04-13 01:14:07,710 INFO event_loggers [pool ('localhost', 27018)][conn #6] connection created
+  2021-04-13 01:14:07,711 INFO event_loggers [pool ('localhost', 27018)][conn #6] connection setup succeeded
+  2021-04-13 01:14:08,212 INFO event_loggers [pool ('localhost', 27017)][conn #6] connection closed, reason: idle
+  2021-04-13 01:14:08,212 INFO event_loggers [pool ('localhost', 27017)][conn #7] connection created
+  2021-04-13 01:14:08,213 INFO event_loggers [pool ('localhost', 27017)][conn #7] connection setup succeeded
+  2021-04-13 01:14:08,213 INFO event_loggers [pool ('localhost', 27018)][conn #6] connection closed, reason: idle
+  2021-04-13 01:14:08,213 INFO event_loggers [pool ('localhost', 27018)][conn #7] connection created
+  2021-04-13 01:14:08,214 INFO event_loggers [pool ('localhost', 27018)][conn #7] connection setup succeeded
+  2021-04-13 01:14:08,715 INFO event_loggers [pool ('localhost', 27017)][conn #7] connection closed, reason: idle
+  2021-04-13 01:14:08,715 INFO event_loggers [pool ('localhost', 27017)][conn #8] connection created
+  2021-04-13 01:14:08,716 INFO event_loggers [pool ('localhost', 27017)][conn #8] connection setup succeeded
+  2021-04-13 01:14:08,716 INFO event_loggers [pool ('localhost', 27018)][conn #7] connection closed, reason: idle
+  2021-04-13 01:14:08,716 INFO event_loggers [pool ('localhost', 27018)][conn #8] connection created
+  2021-04-13 01:14:08,717 INFO event_loggers [pool ('localhost', 27018)][conn #8] connection setup succeeded
+  2021-04-13 01:14:09,218 INFO event_loggers [pool ('localhost', 27017)][conn #8] connection closed, reason: idle
+  2021-04-13 01:14:09,218 INFO event_loggers [pool ('localhost', 27017)][conn #9] connection created
+  2021-04-13 01:14:09,219 INFO event_loggers [pool ('localhost', 27017)][conn #9] connection setup succeeded
+  2021-04-13 01:14:09,219 INFO event_loggers [pool ('localhost', 27018)][conn #8] connection closed, reason: idle
+  2021-04-13 01:14:09,220 INFO event_loggers [pool ('localhost', 27018)][conn #9] connection created
+  2021-04-13 01:14:09,220 INFO event_loggers [pool ('localhost', 27018)][conn #9] connection setup succeeded
+  2021-04-13 01:14:09,721 INFO event_loggers [pool ('localhost', 27017)][conn #9] connection closed, reason: idle
+  2021-04-13 01:14:09,721 INFO event_loggers [pool ('localhost', 27017)][conn #10] connection created
+  2021-04-13 01:14:09,722 INFO event_loggers [pool ('localhost', 27017)][conn #10] connection setup succeeded
+  2021-04-13 01:14:09,723 INFO event_loggers [pool ('localhost', 27018)][conn #9] connection closed, reason: idle
+  2021-04-13 01:14:09,723 INFO event_loggers [pool ('localhost', 27018)][conn #10] connection created
+  2021-04-13 01:14:09,723 INFO event_loggers [pool ('localhost', 27018)][conn #10] connection setup succeeded
+  2021-04-13 01:14:10,224 INFO event_loggers [pool ('localhost', 27017)][conn #10] connection closed, reason: idle
+  2021-04-13 01:14:10,225 INFO event_loggers [pool ('localhost', 27017)][conn #11] connection created
+  2021-04-13 01:14:10,225 INFO event_loggers [pool ('localhost', 27017)][conn #11] connection setup succeeded
+  2021-04-13 01:14:10,226 INFO event_loggers [pool ('localhost', 27018)][conn #10] connection closed, reason: idle
+  2021-04-13 01:14:10,226 INFO event_loggers [pool ('localhost', 27018)][conn #11] connection created
+  2021-04-13 01:14:10,226 INFO event_loggers [pool ('localhost', 27018)][conn #11] connection setup succeeded
+  2021-04-13 01:14:10,727 INFO event_loggers [pool ('localhost', 27017)][conn #11] connection closed, reason: idle
+  2021-04-13 01:14:10,728 INFO event_loggers [pool ('localhost', 27017)][conn #12] connection created
+  2021-04-13 01:14:10,729 INFO event_loggers [pool ('localhost', 27017)][conn #12] connection setup succeeded
+  2021-04-13 01:14:10,729 INFO event_loggers [pool ('localhost', 27018)][conn #11] connection closed, reason: idle
+  2021-04-13 01:14:10,729 INFO event_loggers [pool ('localhost', 27018)][conn #12] connection created
+  2021-04-13 01:14:10,729 INFO event_loggers [pool ('localhost', 27018)][conn #12] connection setup succeeded
+  2021-04-13 01:14:11,230 INFO event_loggers [pool ('localhost', 27017)][conn #12] connection closed, reason: idle
+  2021-04-13 01:14:11,231 INFO event_loggers [pool ('localhost', 27017)][conn #13] connection created
+  2021-04-13 01:14:11,232 INFO event_loggers [pool ('localhost', 27017)][conn #13] connection setup succeeded
+  2021-04-13 01:14:11,232 INFO event_loggers [pool ('localhost', 27018)][conn #12] connection closed, reason: idle
+  2021-04-13 01:14:11,232 INFO event_loggers [pool ('localhost', 27018)][conn #13] connection created
+  2021-04-13 01:14:11,233 INFO event_loggers [pool ('localhost', 27018)][conn #13] connection setup succeeded
+  2021-04-13 01:14:11,734 INFO event_loggers [pool ('localhost', 27017)][conn #13] connection closed, reason: idle
+  2021-04-13 01:14:11,734 INFO event_loggers [pool ('localhost', 27017)][conn #14] connection created
+  2021-04-13 01:14:11,735 INFO event_loggers [pool ('localhost', 27017)][conn #14] connection setup succeeded
+  2021-04-13 01:14:11,735 INFO event_loggers [pool ('localhost', 27018)][conn #13] connection closed, reason: idle
+  2021-04-13 01:14:11,735 INFO event_loggers [pool ('localhost', 27018)][conn #14] connection created
+  2021-04-13 01:14:11,736 INFO event_loggers [pool ('localhost', 27018)][conn #14] connection setup succeeded
+  2021-04-13 01:14:12,237 INFO event_loggers [pool ('localhost', 27017)][conn #14] connection closed, reason: idle
+  2021-04-13 01:14:12,237 INFO event_loggers [pool ('localhost', 27017)][conn #15] connection created
+  2021-04-13 01:14:12,238 INFO event_loggers [pool ('localhost', 27017)][conn #15] connection setup succeeded
+  2021-04-13 01:14:12,239 INFO event_loggers [pool ('localhost', 27018)][conn #14] connection closed, reason: idle
+  2021-04-13 01:14:12,239 INFO event_loggers [pool ('localhost', 27018)][conn #15] connection created
+  2021-04-13 01:14:12,239 INFO event_loggers [pool ('localhost', 27018)][conn #15] connection setup succeeded
+  2021-04-13 01:14:12,740 INFO event_loggers [pool ('localhost', 27017)][conn #15] connection closed, reason: idle
+  2021-04-13 01:14:12,740 INFO event_loggers [pool ('localhost', 27017)][conn #16] connection created
+  2021-04-13 01:14:12,741 INFO event_loggers [pool ('localhost', 27017)][conn #16] connection setup succeeded
+  2021-04-13 01:14:12,742 INFO event_loggers [pool ('localhost', 27018)][conn #15] connection closed, reason: idle
+  2021-04-13 01:14:12,742 INFO event_loggers [pool ('localhost', 27018)][conn #16] connection created
+  2021-04-13 01:14:12,742 INFO event_loggers [pool ('localhost', 27018)][conn #16] connection setup succeeded
+  2021-04-13 01:14:13,243 INFO event_loggers [pool ('localhost', 27017)][conn #16] connection closed, reason: idle
+  2021-04-13 01:14:13,243 INFO event_loggers [pool ('localhost', 27017)][conn #17] connection created
+  2021-04-13 01:14:13,244 INFO event_loggers [pool ('localhost', 27017)][conn #17] connection setup succeeded
+  2021-04-13 01:14:13,245 INFO event_loggers [pool ('localhost', 27018)][conn #16] connection closed, reason: idle
+  2021-04-13 01:14:13,245 INFO event_loggers [pool ('localhost', 27018)][conn #17] connection created
+  2021-04-13 01:14:13,245 INFO event_loggers [pool ('localhost', 27018)][conn #17] connection setup succeeded
+  2021-04-13 01:14:13,746 INFO event_loggers [pool ('localhost', 27017)][conn #17] connection closed, reason: idle
+  2021-04-13 01:14:13,746 INFO event_loggers [pool ('localhost', 27017)][conn #18] connection created
+  2021-04-13 01:14:13,747 INFO event_loggers [pool ('localhost', 27017)][conn #18] connection setup succeeded
+  2021-04-13 01:14:13,748 INFO event_loggers [pool ('localhost', 27018)][conn #17] connection closed, reason: idle
+  2021-04-13 01:14:13,748 INFO event_loggers [pool ('localhost', 27018)][conn #18] connection created
+  2021-04-13 01:14:13,748 INFO event_loggers [pool ('localhost', 27018)][conn #18] connection setup succeeded
+  2021-04-13 01:14:14,249 INFO event_loggers [pool ('localhost', 27017)][conn #18] connection closed, reason: idle
+  2021-04-13 01:14:14,249 INFO event_loggers [pool ('localhost', 27017)][conn #19] connection created
+  2021-04-13 01:14:14,250 INFO event_loggers [pool ('localhost', 27017)][conn #19] connection setup succeeded
+  2021-04-13 01:14:14,251 INFO event_loggers [pool ('localhost', 27018)][conn #18] connection closed, reason: idle
+  2021-04-13 01:14:14,251 INFO event_loggers [pool ('localhost', 27018)][conn #19] connection created
+  2021-04-13 01:14:14,251 INFO event_loggers [pool ('localhost', 27018)][conn #19] connection setup succeeded
+  2021-04-13 01:14:14,709 INFO event_loggers Heartbeat sent to server ('localhost', 27019)
+  2021-04-13 01:14:14,710 INFO event_loggers Heartbeat sent to server ('localhost', 27018)
+  2021-04-13 01:14:14,710 INFO event_loggers Heartbeat to server ('localhost', 27019) succeeded with reply {'hosts': ['localhost:27017', 'localhost:27018'], 'arbiters': ['localhost:27019'], 'setName': 'repl0', 'setVersion': 1, 'ismaster': False, 'secondary': False, 'primary': 'localhost:27017', 'arbiterOnly': True, 'me': 'localhost:27019', 'lastWrite': {'opTime': {'ts': Timestamp(1618276452, 1), 't': 1}, 'lastWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 12), 'majorityOpTime': {'ts': Timestamp(1618276452, 1), 't': 1}, 'majorityWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 12)}, 'maxBsonObjectSize': 16777216, 'maxMessageSizeBytes': 48000000, 'maxWriteBatchSize': 100000, 'localTime': datetime.datetime(2021, 4, 13, 1, 14, 14, 710000), 'minWireVersion': 0, 'maxWireVersion': 6, 'readOnly': False, 'ok': 1.0}
+  2021-04-13 01:14:14,711 INFO event_loggers Heartbeat to server ('localhost', 27018) succeeded with reply {'hosts': ['localhost:27017', 'localhost:27018'], 'arbiters': ['localhost:27019'], 'setName': 'repl0', 'setVersion': 1, 'ismaster': False, 'secondary': True, 'primary': 'localhost:27017', 'tags': {'dc': 'pa', 'ordinal': 'two'}, 'me': 'localhost:27018', 'lastWrite': {'opTime': {'ts': Timestamp(1618276454, 1), 't': 1}, 'lastWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 14), 'majorityOpTime': {'ts': Timestamp(1618276454, 1), 't': 1}, 'majorityWriteDate': datetime.datetime(2021, 4, 13, 1, 14, 14)}, 'maxBsonObjectSize': 16777216, 'maxMessageSizeBytes': 48000000, 'maxWriteBatchSize': 100000, 'localTime': datetime.datetime(2021, 4, 13, 1, 14, 14, 710000), 'logicalSessionTimeoutMinutes': 30, 'minWireVersion': 0, 'maxWireVersion': 6, 'readOnly': False, 'ok': 1.0, 'operationTime': Timestamp(1618276454, 1), '$clusterTime': {'clusterTime': Timestamp(1618276454, 1), 'signature': {'hash': b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 'keyId': 0}}}
+[2021/04/13 01:14:14.723]   test_max_idle_time_reaper_does_not_exceed_maxPoolSize (test_client.TestClientExecutor) ... FAIL (10.033s)
+...
+[2021/04/13 01:16:14.740] FAIL [10.033s]: test_max_idle_time_reaper_does_not_exceed_maxPoolSize (test_client.TestClientExecutor)
+[2021/04/13 01:16:14.740] ----------------------------------------------------------------------
+[2021/04/13 01:16:14.740] Traceback (most recent call last):
+[2021/04/13 01:16:14.740]   File "/data/mci/013efac06f58f9d1ad2300c18a343347/src/test/test_client.py", line 548, in test_max_idle_time_reaper_does_not_exceed_maxPoolSize
+[2021/04/13 01:16:14.740]     "remove stale socket")
+[2021/04/13 01:16:14.740]   File "/data/mci/013efac06f58f9d1ad2300c18a343347/src/test/utils.py", line 741, in wait_until
+[2021/04/13 01:16:14.740]     raise AssertionError("Didn't ever %s" % success_description)
+[2021/04/13 01:16:14.740] AssertionError: Didn't ever remove stale socket
+        """
     def test_max_idle_time_reaper_does_not_exceed_maxPoolSize(self):
         with client_knobs(kill_cursor_frequency=0.1):
             # Assert reaper respects maxPoolSize when adding new sockets.
