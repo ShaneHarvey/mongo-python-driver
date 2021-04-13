@@ -18,6 +18,7 @@ import contextlib
 import copy
 import datetime
 import gc
+import logging
 import os
 import signal
 import socket
@@ -447,7 +448,62 @@ class ClientUnitTest(unittest.TestCase):
                         connect=False, ssl_cert_reqs=True)
 
 
-class TestClient(IntegrationTest):
+from io import StringIO
+from pymongo import event_loggers
+
+
+class LoggedTest(IntegrationTest):
+    """Base class for IntegrationTests that log events on failure."""
+
+    @classmethod
+    def setUpClass(cls):
+        IntegrationTest.setUpClass()
+        cls.__stream = StringIO()
+        # Enable logs in this format:
+        # 2020-06-08 23:49:35,982 DEBUG ocsp_support <message>
+        format = '%(asctime)s %(levelname)s %(module)s %(message)s'
+        logging.basicConfig(format=format, level=logging.DEBUG,
+                            stream=cls.__stream)
+        # We plan to call register(), which internally modifies _LISTENERS.
+        cls.__saved_listeners = copy.deepcopy(monitoring._LISTENERS)
+        cls.__loggers = [
+            event_loggers.TopologyLogger(),
+            event_loggers.ServerLogger(),
+            event_loggers.HeartbeatLogger(),
+            event_loggers.CommandLogger(),
+            event_loggers.ConnectionPoolLogger()]
+        cls.__output = []
+        for logger in cls.__loggers:
+            monitoring.register(logger)
+
+    @classmethod
+    def tearDownClass(cls):
+        monitoring._LISTENERS = cls.__saved_listeners
+        IntegrationTest.tearDownClass()
+
+    def setUp(self):
+        self.__stream.seek(0)
+        self.__stream.truncate(0)
+        super(LoggedTest, self).setUp()
+
+    def tearDown(self):
+        # https://stackoverflow.com/a/39606065/8637283
+        if hasattr(self, '_outcome'):  # Python 3.4+
+            result = self.defaultTestResult()  # These two methods have no side effects
+            self._feedErrorsToResult(result, self._outcome.errors)
+        else:  # Python 3.2 - 3.3 or 3.0 - 3.1 and 2.7
+            result = getattr(self, '_outcomeForDoCleanups', self._resultForDoCleanups)
+        if not result.wasSuccessful():
+            print('TEST failed, debug ouput:')
+            print(self.__stream.getvalue())
+
+    def __getattribute__(self, item):
+        if item.startswith('assert'):
+            logging.info('%s', item)
+        return object.__getattribute__(self, item)
+
+
+class TestClientExecutor(LoggedTest):
 
     def test_max_idle_time_reaper_default(self):
         with client_knobs(kill_cursor_frequency=0.1):
@@ -557,6 +613,9 @@ class TestClient(IntegrationTest):
             with server._pool.get_socket({}) as new_sock_info:
                 self.assertEqual(sock_info, new_sock_info)
             self.assertEqual(1, len(server._pool.sockets))
+
+
+class TestClient(IntegrationTest):
 
     def test_constants(self):
         """This test uses MongoClient explicitly to make sure that host and
