@@ -504,7 +504,7 @@ class SocketInfo(object):
       - `id`: the id of this socket in it's pool
     """
     def __init__(self, sock, pool, address, id):
-        self.pool_ref = weakref.ref(pool)
+        # self.pool_ref = weakref.ref(pool)
         self.sock = sock
         self.address = address
         self.id = id
@@ -547,11 +547,11 @@ class SocketInfo(object):
 
     def unpin(self):
         self.pinned = False
-        pool = self.pool_ref()
-        if pool:
-            pool.return_socket(self)
-        else:
-            self.close_socket(ConnectionClosedReason.STALE)
+        # pool = self.pool_ref()
+        # if pool:
+        #     pool.return_socket(self)
+        # else:
+        self.close_socket(ConnectionClosedReason.STALE)
 
     def hello_cmd(self):
         if self.opts.server_api:
@@ -861,6 +861,7 @@ class SocketInfo(object):
         """Close this connection."""
         if self.closed:
             return
+        print(f'_close_socket: {self}')
         self.closed = True
         if self.cancel_context:
             self.cancel_context.cancel()
@@ -868,7 +869,8 @@ class SocketInfo(object):
         # shutdown.
         try:
             self.sock.close()
-        except Exception:
+        except Exception as exc:
+            print(f'_close_socket: {exc}')
             pass
 
     def socket_closed(self):
@@ -932,7 +934,7 @@ class SocketInfo(object):
         return hash(self.sock)
 
     def __repr__(self):
-        return "SocketInfo(%s)%s at %s" % (
+        return "SocketInfo(%s)%s at 0x%x" % (
             repr(self.sock),
             self.closed and " CLOSED" or "",
             id(self)
@@ -1375,8 +1377,18 @@ class Pool:
             listeners.publish_connection_checked_out(
                 self.address, sock_info.id)
         try:
+            if self.handshake:
+                if checkout:
+                    print(f'get_socket checkout: {sock_info}')
+                else:
+                    print(f'get_socket: {sock_info}')
             yield sock_info
-        except:
+        except BaseException as exc:
+            if self.handshake:
+                if checkout:
+                    print(f'get_socket checkout error: {sock_info}: {exc}')
+                else:
+                    print(f'get_socket error: {sock_info}')
             pinned = sock_info.pinned
             if handler:
                 exc_type, exc_val, _ = sys.exc_info()
@@ -1385,6 +1397,9 @@ class Pool:
             # Exception in caller. Decrement semaphore.
             if not pinned:
                 self.return_socket(sock_info)
+            else:
+                if checkout:
+                    print(f'Socket lost: {sock_info}')
             raise
         else:
             if not checkout and not sock_info.pinned:
@@ -1508,6 +1523,8 @@ class Pool:
         :Parameters:
           - `sock_info`: The socket to check into the pool.
         """
+        if self.handshake:
+            print(f'return socket: {sock_info}')
         sock_info.pinned = False
         listeners = self.opts.event_listeners
         if self.enabled_for_cmap:
@@ -1525,10 +1542,13 @@ class Pool:
                         ConnectionClosedReason.ERROR)
             else:
                 with self.lock:
+                    assert sock_info not in self.sockets
                     # Hold the lock to ensure this section does not race with
                     # Pool.reset().
                     if self.stale_generation(sock_info.generation,
                                              sock_info.service_id):
+                        if self.handshake:
+                            print(f'sock_info.close_socket: {sock_info}')
                         sock_info.close_socket(ConnectionClosedReason.STALE)
                     else:
                         sock_info.update_last_checkin_time()
@@ -1536,6 +1556,8 @@ class Pool:
                         self.sockets.appendleft(sock_info)
                         # Notify any threads waiting to create a connection.
                         self._max_connecting_cond.notify()
+                        if self.handshake:
+                            print(f'sockets.appendleft: {sock_info}')
 
         with self.size_cond:
             self.requests -= 1

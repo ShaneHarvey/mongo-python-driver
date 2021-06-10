@@ -127,6 +127,7 @@ class Server(object):
             if use_cmd:
                 first = docs[0]
                 operation.client._process_response(first, operation.session)
+                # breakpoint()
                 _check_command_response(first, sock_info.max_wire_version)
         except Exception as exc:
             if publish:

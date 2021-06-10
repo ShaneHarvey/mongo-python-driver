@@ -256,6 +256,7 @@ class SpecRunner(IntegrationTest):
             name = 'open_download_stream_by_name'
         elif name == 'download':
             name = 'open_download_stream'
+        print(f'run op {name}')
 
         database = collection.database
         collection = database.get_collection(collection.name)

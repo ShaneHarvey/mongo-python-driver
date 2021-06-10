@@ -310,12 +310,12 @@ class _Transaction(object):
             return self.sock_mgr.sock
         return None
 
-    def pin(self, server, sock_info):
+    def pin(self, server, sock_info, client):
         self.sharded = True
         self.pinned_address = server.description.address
         if server.description.server_type == SERVER_TYPE.LoadBalancer:
             sock_info.pinned = True
-            self.sock_mgr = _SocketManager(sock_info, False)
+            self.sock_mgr = _SocketManager(sock_info, False, client)
 
     def unpin(self):
         self.pinned_address = None
@@ -811,7 +811,7 @@ class ClientSession(object):
 
     def _pin(self, server, sock_info):
         """Pin this session to the given Server or to the given connection."""
-        self._transaction.pin(server, sock_info)
+        self._transaction.pin(server, sock_info, self.client)
 
     def _unpin(self):
         """Unpin this session from any pinned Server."""

@@ -111,13 +111,17 @@ class CursorType(object):
 class _SocketManager:
     """Used with exhaust cursors to ensure the socket is returned.
     """
-    def __init__(self, sock, more_to_come):
+    def __init__(self, sock, more_to_come, client):
+        self.client = client
         self.sock = sock
+        self.sock.pinned = True
         self.more_to_come = more_to_come
         self.__closed = False
         self.lock = threading.Lock()
+        print(f'Created _SocketManager: {sock}')
 
     def __del__(self):
+        print(f'_SocketManager.__del__: {self.sock}')
         self.close()
 
     def update_exhaust(self, more_to_come):
@@ -127,9 +131,11 @@ class _SocketManager:
         """Return this instance's socket to the connection pool.
         """
         if not self.__closed:
+            print(f'_SocketManager.close: {self.sock}')
             self.__closed = True
-            self.sock.unpin()
+            self.client._unpin_sock(self.sock)
             self.sock = None
+            self.client = None
 
 
 class Cursor(object):
@@ -346,6 +352,7 @@ class Cursor(object):
         except AttributeError:
             # __init__ did not run to completion (or at all).
             return
+        print(f'Cursor.__die')
 
         self.__killed = True
         if self.__id and not already_killed:
@@ -1064,7 +1071,8 @@ class Cursor(object):
         if isinstance(response, PinnedResponse):
             if not self.__sock_mgr:
                 self.__sock_mgr = _SocketManager(response.socket_info,
-                                                 response.more_to_come)
+                                                 response.more_to_come,
+                                                 client)
 
         cmd_name = operation.name
         docs = response.docs

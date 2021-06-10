@@ -1369,11 +1369,18 @@ class MongoClient(common.BaseObject):
 
         Re-raises any exception thrown by func().
         """
+        import gc
         retryable = (retryable and
                      self.retry_reads
                      and not (session and session.in_transaction))
         last_error = None
         retrying = False
+
+        def _sanitize(_error):
+            _error.__traceback__ = None
+            _error.__context__ = None
+            _error.__cause__ = None
+            # gc.collect()
 
         while True:
             try:
@@ -1388,7 +1395,14 @@ class MongoClient(common.BaseObject):
                         # A retry is not possible because this server does
                         # not support retryable reads, raise the last error.
                         raise last_error
-                    return func(session, server, sock_info, slave_ok)
+                    # if last_error is None:
+                    #     raise AutoReconnect('asd')
+                    ret = func(session, server, sock_info, slave_ok)
+                    # sock_info = None
+                    # last_error = None
+                # gc.collect()
+                print(f'server.pool after success: {server.pool.sockets}')
+                return ret
             except ServerSelectionTimeoutError:
                 if retrying:
                     # The application may think the write was never attempted
@@ -1402,6 +1416,9 @@ class MongoClient(common.BaseObject):
             except ConnectionFailure as exc:
                 if not retryable or retrying:
                     raise
+                _sanitize(exc)
+                # breakpoint()
+                print(f'server.pool after error: {server.pool.sockets}')
                 retrying = True
                 last_error = exc
             except OperationFailure as exc:
@@ -1409,6 +1426,7 @@ class MongoClient(common.BaseObject):
                     raise
                 if exc.code not in helpers._RETRYABLE_ERROR_CODES:
                     raise
+                _sanitize(exc)
                 retrying = True
                 last_error = exc
 
@@ -1416,6 +1434,13 @@ class MongoClient(common.BaseObject):
         """Internal retryable write helper."""
         with self._tmp_session(session) as s:
             return self._retry_with_session(retryable, func, s, None)
+
+    def _unpin_sock(self, sock_info):
+        server = self._topology.get_server_by_address(sock_info.address)
+        if server and server.pool:
+            server.pool.return_socket(sock_info)
+        else:
+            sock_info.close_socket(ConnectionClosedReason.STALE)
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):

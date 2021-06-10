@@ -194,7 +194,7 @@ class ChangeStream(object):
         try:
             self._cursor.close()
         except PyMongoError:
-            pass
+            raise
         self._cursor = self._create_cursor()
 
     def close(self):

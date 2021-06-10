@@ -1007,6 +1007,7 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
 
     def run_operations(self, spec):
         for op in spec:
+            print(f'run op: {op["name"]}')
             target = op['object']
             if target != 'testRunner':
                 self.run_entity_operation(op)
@@ -1084,6 +1085,10 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
 
         # process outcome
         self.verify_outcome(spec.get('outcome', []))
+
+        # cleanup
+        import gc
+        gc.collect()
 
 
 class UnifiedSpecTestMeta(type):

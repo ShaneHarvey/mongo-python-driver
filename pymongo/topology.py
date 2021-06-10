@@ -50,6 +50,11 @@ from pymongo.topology_description import (updated_topology_description,
                                           TopologyDescription,
                                           SRV_POLLING_TOPOLOGIES, TOPOLOGY_TYPE)
 
+def _sanitize(error):
+    """PYTHON-2433 Clear error traceback info."""
+    error.__traceback__ = None
+    error.__context__ = None
+    error.__cause__ = None
 
 def process_events_queue(queue_ref):
     q = queue_ref()
@@ -798,6 +803,7 @@ class _ErrorContext(object):
     """An error with context for SDAM error handling."""
     def __init__(self, error, max_wire_version, sock_generation,
                  completed_handshake, service_id):
+        _sanitize(error)
         self.error = error
         self.max_wire_version = max_wire_version
         self.sock_generation = sock_generation

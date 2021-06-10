@@ -64,12 +64,16 @@ class CommandCursor(object):
             raise TypeError("max_await_time_ms must be an integer or None")
 
     def __del__(self):
+        if self.__sock_mgr:
+            print(f'CommandCursor.__del__: {self.__sock_mgr.sock}')
         if self.__id and not self.__killed:
             self.__die()
 
     def __die(self, synchronous=False):
         """Closes this cursor.
         """
+        if self.__sock_mgr:
+            print(f'CommandCursor.__die: {self.__sock_mgr.sock}')
         already_killed = self.__killed
         self.__killed = True
         if self.__id and not already_killed:
@@ -138,7 +142,9 @@ class CommandCursor(object):
         if not client._should_pin_cursor(self.__session):
             return
         if not self.__sock_mgr:
-            sock_mgr = _SocketManager(sock_info, False)
+            # sock_info.pinned = True
+            print(f'pinning CommandCursor: {sock_info}')
+            sock_mgr = _SocketManager(sock_info, False, client)
             # Ensure the connection gets returned when the entire result is
             # returned in the first batch.
             if self.__id == 0:
@@ -173,7 +179,8 @@ class CommandCursor(object):
         if isinstance(response, PinnedResponse):
             if not self.__sock_mgr:
                 self.__sock_mgr = _SocketManager(response.socket_info,
-                                                 response.more_to_come)
+                                                 response.more_to_come,
+                                                 client)
         if response.from_command:
             cursor = response.docs[0]['cursor']
             documents = cursor['nextBatch']
