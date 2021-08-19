@@ -112,6 +112,10 @@ elif TEST_SERVERLESS:
     db_user = res['username'] or db_user
     db_pwd = res['password'] or db_pwd
     TLS_OPTIONS = {'tls': True}
+    print('TEST_SERVERLESS')
+    cmd = f'echo Q | openssl s_client -showcerts -servername {host} -connect  {host}:{port} 2>/dev/null | openssl x509 -inform pem -noout -text'
+    print(cmd)
+    os.system(cmd)
 
 
 def is_server_resolvable():
