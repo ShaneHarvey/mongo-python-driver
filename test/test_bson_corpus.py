@@ -188,11 +188,11 @@ def create_test(case_spec):
                     binascii.unhexlify(decode_error_case['bson'].encode('utf8')))
 
         for parse_error_case in case_spec.get('parseErrors', []):
+            description = parse_error_case['description']
             if bson_type == '0x13':
                 self.assertRaises(
                     DecimalException, Decimal128, parse_error_case['string'])
             elif bson_type == '0x00':
-                description = parse_error_case['description']
                 if description in _NON_PARSE_ERRORS:
                     decode_extjson(parse_error_case['string'])
                 else:
