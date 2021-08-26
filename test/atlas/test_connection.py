@@ -83,10 +83,15 @@ class TestAtlasConnect(unittest.TestCase):
         from pymongo.uri_parser import parse_uri
         res = parse_uri(URIS['ATLAS_SERVERLESS'])
         host, port = res['nodelist'].pop(0)
-        print('TEST_SERVERLESS')
-        cmd = f'echo Q | openssl s_client -showcerts -servername {host} -connect  {host}:{port} 2>/dev/null | openssl x509 -inform pem -noout -text'
-        print(cmd)
-        os.system(cmd)
+
+        def run(cmd):
+            print(f'TEST_SERVERLESS: {cmd}')
+            os.system(cmd)
+
+        run(f'echo Q | openssl s_client -showcerts -servername {host} -connect {host}:{port} 2>/dev/null | openssl x509 -inform pem -noout -text')
+        run(f'nslookup {host}')
+        run(f'traceroute {host}')
+
         connect(URIS['ATLAS_SERVERLESS'])
 
     def connect_srv(self, uri):
