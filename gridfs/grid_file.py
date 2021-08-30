@@ -112,7 +112,7 @@ def _disallow_transactions(session):
             'GridFS does not support multi-document transactions')
 
 
-class GridIn(object):
+class GridIn(io.IOBase):
     """Class to write data to GridFS.
     """
     def __init__(
