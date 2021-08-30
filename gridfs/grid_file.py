@@ -183,6 +183,7 @@ class GridIn(io.IOBase):
         coll = _clear_entity_type_registry(
             root_collection, read_preference=ReadPreference.PRIMARY)
 
+        super().__init__()
         if not disable_md5:
             kwargs["md5"] = hashlib.md5()
         # Defaults
@@ -337,7 +338,7 @@ class GridIn(io.IOBase):
         return False
 
     def write(self, data):
-        """Write data to the file. There is no return value.
+        """Write data to the file and return the number of bytes written.
 
         `data` can be either a string of bytes or a file-like object
         (implementing :meth:`read`). If the file has an
@@ -374,7 +375,7 @@ class GridIn(io.IOBase):
                     raise TypeError("must specify an encoding for file in "
                                     "order to write str")
             read = io.BytesIO(data).read
-
+        nwritten = 0
         if self._buffer.tell() > 0:
             # Make sure to flush only when _buffer is complete
             space = self.chunk_size - self._buffer.tell()
@@ -385,14 +386,18 @@ class GridIn(io.IOBase):
                     self.abort()
                     raise
                 self._buffer.write(to_write)
+                nwritten += len(to_write)
                 if len(to_write) < space:
-                    return  # EOF or incomplete
+                    return nwritten  # EOF or incomplete
             self.__flush_buffer()
         to_write = read(self.chunk_size)
         while to_write and len(to_write) == self.chunk_size:
             self.__flush_data(to_write)
+            nwritten += len(to_write)
             to_write = read(self.chunk_size)
         self._buffer.write(to_write)
+        nwritten += len(to_write)
+        return nwritten
 
     def writelines(self, sequence):
         """Write a sequence of strings to the file.
