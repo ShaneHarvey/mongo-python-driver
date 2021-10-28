@@ -212,6 +212,14 @@ class TopologyDescription(object):
         return [s for s in self._server_descriptions.values() if s.is_readable]
 
     @property
+    def writable_servers(self):
+        """List of writable Servers.
+
+        .. versionadded:: 3.13
+        """
+        return [s for s in self._server_descriptions.values() if s.is_writable]
+
+    @property
     def common_wire_version(self):
         """Minimum of all servers' max wire versions, or None."""
         servers = self.known_servers

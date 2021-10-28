@@ -745,9 +745,9 @@ class MongoClient(common.BaseObject):
             server_selector=options.server_selector,
             heartbeat_frequency=options.heartbeat_frequency,
             fqdn=fqdn,
-            srv_service_name=srv_service_name,
             direct_connection=options.direct_connection,
             load_balanced=options.load_balanced,
+            srv_service_name=srv_service_name,
             srv_max_hosts=srv_max_hosts
         )
 
@@ -922,33 +922,6 @@ class MongoClient(common.BaseObject):
         .. versionadded:: 4.0
         """
         return self._topology.description
-
-    @property
-    def address(self):
-        """(host, port) of the current standalone, primary, or mongos, or None.
-
-        Accessing :attr:`address` raises :exc:`~.errors.InvalidOperation` if
-        the client is load-balancing among mongoses, since there is no single
-        address. Use :attr:`nodes` instead.
-
-        If the client is not connected, this will block until a connection is
-        established or raise ServerSelectionTimeoutError if no server is
-        available.
-
-        .. versionadded:: 3.0
-        """
-        topology_type = self._topology._description.topology_type
-        if (topology_type == TOPOLOGY_TYPE.Sharded and
-                len(self.topology_description.server_descriptions()) > 1):
-            raise InvalidOperation(
-                'Cannot use "address" property when load balancing among'
-                ' mongoses, use "nodes" instead.')
-        if topology_type not in (TOPOLOGY_TYPE.ReplicaSetWithPrimary,
-                                 TOPOLOGY_TYPE.Single,
-                                 TOPOLOGY_TYPE.LoadBalanced,
-                                 TOPOLOGY_TYPE.Sharded):
-            return None
-        return self._server_property('address')
 
     @property
     def primary(self):
@@ -1399,14 +1372,14 @@ class MongoClient(common.BaseObject):
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return self.address == other.address
+            return self._topology == other._topology
         return NotImplemented
 
     def __ne__(self, other):
         return not self == other
 
     def __hash__(self):
-        return hash(self.address)
+        return hash(self._topology)
 
     def _repr_helper(self):
         def option_repr(option, value):

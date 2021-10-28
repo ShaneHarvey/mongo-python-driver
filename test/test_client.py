@@ -646,14 +646,7 @@ class TestClient(IntegrationTest):
         c = rs_or_single_client(connect=False)
         self.assertIsInstance(c.topology_description, TopologyDescription)
         self.assertEqual(c.topology_description, c._topology._description)
-        self.assertIsNone(c.address)  # PYTHON-2981
         c.admin.command('ping')  # connect
-        if client_context.is_rs:
-            # The primary's host and port are from the replica set config.
-            self.assertIsNotNone(c.address)
-        else:
-            self.assertEqual(c.address, (host, port))
-
         bad_host = "somedomainthatdoesntexist.org"
         c = MongoClient(bad_host, port, connectTimeoutMS=1,
                         serverSelectionTimeoutMS=10)
@@ -1625,19 +1618,19 @@ class TestClient(IntegrationTest):
         client = MongoClient(
             'mongodb+srv://user:password@test22.test.build.10gen.cc',
             srvServiceName='customname', connect=False)
-        self.assertEqual(client._topology_settings._srv_service_name,
+        self.assertEqual(client._topology_settings.srv_service_name,
                          'customname')
         client = MongoClient(
             'mongodb+srv://user:password@test22.test.build.10gen.cc'
             '/?srvServiceName=shouldbeoverriden',
             srvServiceName='customname', connect=False)
-        self.assertEqual(client._topology_settings._srv_service_name,
+        self.assertEqual(client._topology_settings.srv_service_name,
                          'customname')
         client = MongoClient(
              'mongodb+srv://user:password@test22.test.build.10gen.cc'
              '/?srvServiceName=customname',
              connect=False)
-        self.assertEqual(client._topology_settings._srv_service_name,
+        self.assertEqual(client._topology_settings.srv_service_name,
                          'customname')
 
     def test_srv_max_hosts_kwarg(self):
