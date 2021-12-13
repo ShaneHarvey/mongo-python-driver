@@ -569,6 +569,7 @@ class SocketInfo(object):
                 cmd['compression'] = self.compression_settings.compressors
             if self.opts.load_balanced:
                 cmd['loadBalanced'] = True
+            cmd['keepalive'] = True
         elif topology_version is not None:
             cmd['topologyVersion'] = topology_version
             cmd['maxAwaitTimeMS'] = int(heartbeat_frequency*1000)
