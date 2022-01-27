@@ -768,6 +768,10 @@ class SocketInfo(object):
         # Catch socket.error, KeyboardInterrupt, etc. and close ourselves.
         except BaseException as error:
             self._raise_connection_failure(error)
+        finally:
+            # Reset the timeout. TODO: is this needed?
+            if not self.closed:
+                self.sock.settimeout(self.opts.socket_timeout)
 
     def send_message(self, message, max_doc_size):
         """Send a raw BSON message or raise ConnectionFailure.

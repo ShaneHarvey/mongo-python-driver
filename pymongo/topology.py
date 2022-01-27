@@ -156,6 +156,7 @@ class Topology(object):
         self._srv_monitor = None
         if self._settings.fqdn is not None and not self._settings.load_balanced:
             self._srv_monitor = SrvMonitor(self, self._settings)
+        self._local = ThreadLocal(None)
 
     def open(self):
         """Start monitoring, or restart after a fork.
@@ -191,6 +192,13 @@ class Topology(object):
         with self._lock:
             self._ensure_opened()
 
+    def get_server_selection_timeout(self):
+        # CSOT: use remaining timeout when set.
+        timeout = self._local.remaining()
+        if timeout is None:
+            return self._settings.server_selection_timeout
+        return timeout
+
     def select_servers(self, selector, server_selection_timeout=None, address=None):
         """Return a list of Servers matching selector, or time out.
 
@@ -208,7 +216,7 @@ class Topology(object):
         `server_selection_timeout` if no matching servers are found.
         """
         if server_selection_timeout is None:
-            server_timeout = self._settings.server_selection_timeout
+            server_timeout = self.get_server_selection_timeout()
         else:
             server_timeout = server_selection_timeout
 
@@ -535,11 +543,11 @@ class Topology(object):
             if self._description.topology_type == TOPOLOGY_TYPE.Single:
                 if not self._description.has_known_servers:
                     self._select_servers_loop(
-                        any_server_selector, self._settings.server_selection_timeout, None
+                        any_server_selector, self.get_server_selection_timeout(), None
                     )
             elif not self._description.readable_servers:
                 self._select_servers_loop(
-                    readable_server_selector, self._settings.server_selection_timeout, None
+                    readable_server_selector, self.get_server_selection_timeout(), None
                 )
 
             session_timeout = self._description.logical_session_timeout_minutes
@@ -867,3 +875,21 @@ def _is_stale_server_description(current_sd, new_sd):
     if current_tv["processId"] != new_tv["processId"]:
         return False
     return current_tv["counter"] > new_tv["counter"]
+
+
+class ThreadLocal:
+    def __init__(self, timeout):
+        self.local = threading.local()
+        self.local.timeout = None
+        self.local.deadline = None
+        self.set_timeout(timeout)
+
+    def set_timeout(self, timeout):
+        self.local.timeout = timeout
+        self.local.deadline = time.monotonic() + timeout if timeout else None
+
+    def remaining(self):
+        if not self.local.timeout:
+            return None
+        timeout = self.local.deadline - time.monotonic()
+        return max(timeout, 0.001)  # TODO: fix

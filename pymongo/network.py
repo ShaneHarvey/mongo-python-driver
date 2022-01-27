@@ -104,6 +104,17 @@ def command(
     if collation is not None:
         spec["collation"] = collation
 
+    if client:
+        # CSOT: use remaining timeout when set.
+        timeout = client._local.remaining()
+        if timeout:
+            # TODO: RTT tracking
+            # rtt = 0.1
+            # if timeout - rtt < 0:
+            #     raise
+            spec["maxTimeMS"] = int(timeout * 1000)
+            sock_info.sock.settimeout(timeout)
+
     publish = listeners is not None and listeners.enabled_for_commands
     if publish:
         start = datetime.datetime.now()

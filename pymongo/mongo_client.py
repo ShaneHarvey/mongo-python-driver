@@ -829,6 +829,8 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
             from pymongo.encryption import _Encrypter
 
             self._encrypter = _Encrypter(self, self.__options.auto_encryption_opts)
+        # Store timeout info.
+        self._local = self._topology._local
 
     def _duplicate(self, **kwargs):
         args = self.__init_kwargs.copy()

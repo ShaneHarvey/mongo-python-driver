@@ -14,6 +14,7 @@
 
 """Collection level utilities for Mongo."""
 
+import time
 from collections import abc
 from typing import (
     TYPE_CHECKING,
@@ -549,12 +550,16 @@ class Collection(common.BaseObject, Generic[_DocumentType]):
         if not isinstance(doc, RawBSONDocument):
             return doc.get("_id")
 
+    def _set_timeout(self, timeout):
+        self.__database.client._local.set_timeout(timeout)
+
     def insert_one(
         self,
         document: _DocumentIn,
         bypass_document_validation: bool = False,
         session: Optional["ClientSession"] = None,
         comment: Optional[Any] = None,
+        timeout: Optional[float] = None,
     ) -> InsertOneResult:
         """Insert a single document.
 
@@ -597,6 +602,7 @@ class Collection(common.BaseObject, Generic[_DocumentType]):
 
         .. versionadded:: 3.0
         """
+        self._set_timeout(timeout)
         common.validate_is_document_type("document", document)
         if not (isinstance(document, RawBSONDocument) or "_id" in document):
             document["_id"] = ObjectId()
