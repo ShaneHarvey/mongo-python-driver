@@ -551,7 +551,8 @@ class Collection(common.BaseObject, Generic[_DocumentType]):
             return doc.get("_id")
 
     def _set_timeout(self, timeout):
-        self.__database.client._local.set_timeout(timeout)
+        if timeout is not None:
+            self.__database.client._local.set_timeout(timeout)
 
     def insert_one(
         self,

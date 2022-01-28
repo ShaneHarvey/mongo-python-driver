@@ -879,17 +879,55 @@ def _is_stale_server_description(current_sd, new_sd):
 
 class ThreadLocal:
     def __init__(self, timeout):
+        self.default_timeout = timeout
         self.local = threading.local()
-        self.local.timeout = None
-        self.local.deadline = None
-        self.set_timeout(timeout)
+
+    def get_timeout(self):
+        # Lazily init this thread's timeout/deadline.
+        try:
+            return self.local.timeout
+        except AttributeError:
+            pass
+        self.set_timeout(self.default_timeout)
+        return self.local.timeout
 
     def set_timeout(self, timeout):
         self.local.timeout = timeout
         self.local.deadline = time.monotonic() + timeout if timeout else None
 
     def remaining(self):
-        if not self.local.timeout:
+        if not self.get_timeout():
             return None
         timeout = self.local.deadline - time.monotonic()
         return max(timeout, 0.001)  # TODO: fix
+
+    def with_timeout(self, timeout):
+        """Set a timeout context for client.timeout()."""
+        return _TimeoutContext(self, timeout)
+
+    def enter(self, timeout):
+        self.set_timeout(timeout)
+
+    def exit(self):
+        self.set_timeout(None)
+
+
+class _TimeoutContext(object):
+    """Internal timeout context manager.
+
+    Use client.timeout() instead::
+
+      with client.timeout(0.5):
+          client.test.test.insert_one({})
+    """
+    def __init__(self, tlocal, timeout):
+        self._tlocal = tlocal
+        self._timeout = timeout
+
+    def __enter__(self):
+        self._tlocal.enter(self._timeout)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._tlocal.exit()
+        self._topology = None
