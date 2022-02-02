@@ -780,6 +780,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
             options.read_preference,
             options.write_concern,
             options.read_concern,
+            options.timeout,
         )
 
         self._topology_settings = TopologySettings(
@@ -1728,21 +1729,26 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         if session is not None:
             session._process_response(reply)
 
-    def timeout(self, timeout: Optional[float]) -> ContextManager:
+    def settimeout(self, timeout: Optional[float]) -> ContextManager:
         """Apply the given timeout for a block of operations.
 
-        Use client.timeout() in a with-statement::
+        Use client.settimeout() in a with-statement::
 
-          with client.timeout(0.5):
+          with client.settimeout(0.5):
               client.test.test.insert_one({})
 
         TODO: Support nesting::
 
-          with client.timeout(0.5):
+          with client.settimeout(0.5):
               client.test.test.insert_one({})
-              with client.timeout(0.1):
+              with client.settimeout(0.1):
                   client.test.test.insert_one({})
         """
+        if not isinstance(timeout, (int, float, type(None))):
+            raise TypeError("timeout must be None, an int, or a float")
+        if timeout and timeout < 0:
+            raise TypeError("timeout cannot be negative")
+        timeout = float(timeout) if timeout else None
         return self._local.with_timeout(timeout)
 
     def server_info(self, session: Optional[client_session.ClientSession] = None) -> Dict[str, Any]:
@@ -1941,6 +1947,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         read_preference: Optional[_ServerMode] = None,
         write_concern: Optional[WriteConcern] = None,
         read_concern: Optional["ReadConcern"] = None,
+        timeout: Optional[float] = None,
     ) -> database.Database[_DocumentType]:
         """Get a :class:`~pymongo.database.Database` with the given name and
         options.
@@ -1991,7 +1998,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
             name = self.__default_database_name
 
         return database.Database(
-            self, name, codec_options, read_preference, write_concern, read_concern
+            self, name, codec_options, read_preference, write_concern, read_concern, timeout
         )
 
     def _database_default_options(self, name):

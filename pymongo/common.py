@@ -658,6 +658,7 @@ URI_OPTIONS_VALIDATOR_MAP: Dict[str, Callable[[Any, Any], Any]] = {
     "zlibcompressionlevel": validate_zlib_compression_level,
     "srvservicename": validate_string,
     "srvmaxhosts": validate_non_negative_integer,
+    "timeoutms": validate_timeout_or_none_or_zero,
 }
 
 # Dictionary where keys are the names of URI options specific to pymongo,
@@ -809,8 +810,8 @@ class BaseObject(object):
         read_preference: _ServerMode,
         write_concern: WriteConcern,
         read_concern: ReadConcern,
+        timeout: Optional[float],
     ) -> None:
-
         if not isinstance(codec_options, CodecOptions):
             raise TypeError("codec_options must be an instance of bson.codec_options.CodecOptions")
         self.__codec_options = codec_options
@@ -832,6 +833,12 @@ class BaseObject(object):
         if not isinstance(read_concern, ReadConcern):
             raise TypeError("read_concern must be an instance of pymongo.read_concern.ReadConcern")
         self.__read_concern = read_concern
+
+        if not isinstance(timeout, (int, float, type(None))):
+            raise TypeError("timeout must be None, an int, or a float")
+        if timeout and timeout < 0:
+            raise TypeError("timeout cannot be negative")
+        self.__timeout = float(timeout) if timeout else None
 
     @property
     def codec_options(self) -> CodecOptions:
@@ -882,6 +889,13 @@ class BaseObject(object):
         """
         return self.__read_concern
 
+    @property
+    def timeout(self):
+        """Read only access to the timeout of this instance.
+
+        .. versionadded:: 4.1
+        """
+        return self.__timeout
 
 class _CaseInsensitiveDictionary(abc.MutableMapping):
     def __init__(self, *args, **kwargs):

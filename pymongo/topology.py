@@ -902,7 +902,7 @@ class ThreadLocal:
         return max(timeout, 0.001)  # TODO: fix
 
     def with_timeout(self, timeout):
-        """Set a timeout context for client.timeout()."""
+        """Set a timeout context for client.settimeout()."""
         return _TimeoutContext(self, timeout)
 
     def enter(self, timeout):
@@ -915,9 +915,9 @@ class ThreadLocal:
 class _TimeoutContext(object):
     """Internal timeout context manager.
 
-    Use client.timeout() instead::
+    Use client.settimeout() instead::
 
-      with client.timeout(0.5):
+      with client.settimeout(0.5):
           client.test.test.insert_one({})
     """
     def __init__(self, tlocal, timeout):

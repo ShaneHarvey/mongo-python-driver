@@ -954,6 +954,7 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
 
     def run_entity_operation(self, spec):
         target = self.entity_map[spec["object"]]
+        client = target
         opname = spec["name"]
         opargs = spec.get("arguments")
         expect_error = spec.get("expectError")
@@ -971,20 +972,26 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
                 spec, arguments, camel_to_snake(opname), self.entity_map, self.run_operations
             )
         else:
-            arguments = tuple()
+            arguments = {}
 
         if isinstance(target, MongoClient):
             method_name = "_clientOperation_%s" % (opname,)
+            client = target
         elif isinstance(target, Database):
             method_name = "_databaseOperation_%s" % (opname,)
+            client = target.client
         elif isinstance(target, Collection):
             method_name = "_collectionOperation_%s" % (opname,)
+            client = target.database.client
         elif isinstance(target, ChangeStream):
             method_name = "_changeStreamOperation_%s" % (opname,)
+            client = target._client
         elif isinstance(target, NonLazyCursor):
             method_name = "_cursor_%s" % (opname,)
+            # client = ?  # TODO?
         elif isinstance(target, ClientSession):
             method_name = "_sessionOperation_%s" % (opname,)
+            client = target._client
         elif isinstance(target, GridFSBucket):
             raise NotImplementedError
         else:
@@ -1001,7 +1008,12 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
             cmd = functools.partial(method, target)
 
         try:
-            result = cmd(**dict(arguments))
+            if 'timeout' in arguments:
+                timeout = arguments.pop('timeout')
+                with client.settimeout(timeout):
+                    result = cmd(**dict(arguments))
+            else:
+                result = cmd(**dict(arguments))
         except Exception as exc:
             # Ignore all operation errors but to avoid masking bugs don't
             # ignore things like TypeError and ValueError.
