@@ -1008,8 +1008,12 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
             cmd = functools.partial(method, target)
 
         try:
-            if 'timeout' in arguments:
-                timeout = arguments.pop('timeout')
+            inherit_timeout = getattr(target, 'timeout', None)
+            if 'timeout' in arguments or inherit_timeout:
+                # TODO support timeout parameter on all methods.
+                timeout = arguments.pop('timeout', None)
+                if timeout is None:
+                    timeout = inherit_timeout
                 with client.settimeout(timeout):
                     result = cmd(**dict(arguments))
             else:
