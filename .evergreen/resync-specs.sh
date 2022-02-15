@@ -104,6 +104,9 @@ do
     crud|CRUD)
       cpjson crud/tests/ crud
       ;;
+    csot|CSOT|client-side-operations-timeout)
+      cpjson client-side-operations-timeout/tests csot
+      ;;
     load-balancers|load_balancer)
       cpjson load-balancers/tests load_balancer
       ;;
