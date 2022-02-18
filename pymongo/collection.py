@@ -14,7 +14,6 @@
 
 """Collection level utilities for Mongo."""
 
-import time
 from collections import abc
 from typing import (
     TYPE_CHECKING,

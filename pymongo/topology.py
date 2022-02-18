@@ -920,6 +920,7 @@ class _TimeoutContext(object):
       with client.settimeout(0.5):
           client.test.test.insert_one({})
     """
+
     def __init__(self, tlocal, timeout):
         self._tlocal = tlocal
         self._timeout = timeout

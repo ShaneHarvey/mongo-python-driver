@@ -897,6 +897,7 @@ class BaseObject(object):
         """
         return self.__timeout
 
+
 class _CaseInsensitiveDictionary(abc.MutableMapping):
     def __init__(self, *args, **kwargs):
         self.__casedkeys = {}

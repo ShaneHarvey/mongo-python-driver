@@ -195,7 +195,7 @@ class ClientOptions(object):
         self.__server_selector = options.get("server_selector", any_server_selector)
         self.__auto_encryption_opts = options.get("auto_encryption_opts")
         self.__load_balanced = options.get("loadbalanced")
-        self.__timeout = options.get('timeoutms')
+        self.__timeout = options.get("timeoutms")
 
     @property
     def _options(self):

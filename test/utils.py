@@ -980,8 +980,8 @@ def parse_spec_options(opts):
     if "readConcern" in opts:
         opts["read_concern"] = ReadConcern(**dict(opts.pop("readConcern")))
 
-    if 'timeoutMS' in opts:
-        opts['timeout'] = int(opts.pop('timeoutMS')) / 1000.0
+    if "timeoutMS" in opts:
+        opts["timeout"] = int(opts.pop("timeoutMS")) / 1000.0
 
     if "maxTimeMS" in opts:
         opts["max_time_ms"] = opts.pop("maxTimeMS")
