@@ -339,6 +339,15 @@ def validate_timeout_or_none_or_zero(option: Any, value: Any) -> Optional[float]
     return validate_positive_float(option, value) / 1000.0
 
 
+def validate_timeoutms(option: Any, value: Any) -> Optional[float]:
+    """Validates a timeout specified in milliseconds returning
+    a value in floating point seconds.
+    """
+    if value is None:
+        return None
+    return validate_positive_float_or_zero(option, value) / 1000.0
+
+
 def validate_max_staleness(option: str, value: Any) -> int:
     """Validates maxStalenessSeconds according to the Max Staleness Spec."""
     if value == -1 or value == "-1":
@@ -658,7 +667,7 @@ URI_OPTIONS_VALIDATOR_MAP: Dict[str, Callable[[Any, Any], Any]] = {
     "zlibcompressionlevel": validate_zlib_compression_level,
     "srvservicename": validate_string,
     "srvmaxhosts": validate_non_negative_integer,
-    "timeoutms": validate_timeout_or_none_or_zero,
+    "timeoutms": validate_timeoutms,
 }
 
 # Dictionary where keys are the names of URI options specific to pymongo,

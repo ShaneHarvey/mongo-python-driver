@@ -152,6 +152,7 @@ do
       ;;
     uri|uri-options|uri_options)
       cpjson uri-options/tests uri_options
+      cp "$SPECS"/source/uri-options/tests/*.pem  $PYMONGO/test/uri_options
       ;;
     stable-api|versioned-api)
       cpjson versioned-api/tests versioned-api
