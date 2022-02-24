@@ -56,9 +56,12 @@ from pymongo.errors import (
     BulkWriteError,
     ConfigurationError,
     ConnectionFailure,
+    ExecutionTimeout,
     InvalidOperation,
+    NetworkTimeout,
     NotPrimaryError,
     PyMongoError,
+    ServerSelectionTimeoutError,
 )
 from pymongo.monitoring import (
     _SENSITIVE_COMMANDS,
@@ -799,6 +802,7 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
     def process_error(self, exception, spec):
         is_error = spec.get("isError")
         is_client_error = spec.get("isClientError")
+        is_timeout_error = spec.get("isTimeoutError")
         error_contains = spec.get("errorContains")
         error_code = spec.get("errorCode")
         error_code_name = spec.get("errorCodeName")
@@ -818,6 +822,11 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
                 pass
             else:
                 self.assertNotIsInstance(exception, PyMongoError)
+
+        if is_timeout_error:
+            self.assertIsInstance(
+                exception, (NetworkTimeout, ExecutionTimeout, ServerSelectionTimeoutError)
+            )
 
         if error_contains:
             if isinstance(exception, BulkWriteError):
