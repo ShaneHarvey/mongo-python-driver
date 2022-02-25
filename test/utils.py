@@ -1034,6 +1034,8 @@ def prepare_spec_arguments(spec, arguments, opname, entity_map, with_txn_callbac
         # Aggregate uses "batchSize", while find uses batch_size.
         elif (arg_name == "batchSize" or arg_name == "allowDiskUse") and opname == "aggregate":
             continue
+        elif arg_name == "timeoutMode":
+            raise unittest.SkipTest("TODO: timeoutMode is not supported")
         # Requires boolean returnDocument.
         elif arg_name == "returnDocument":
             arguments[c2s] = getattr(ReturnDocument, arguments.pop(arg_name).upper())

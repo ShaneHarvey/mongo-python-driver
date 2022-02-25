@@ -1076,6 +1076,9 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
         self.addCleanup(client.close)
         self.__set_fail_point(client=client, command_args=spec["failPoint"])
 
+    def _testOperation_createEntities(self, spec):
+        self.entity_map.create_entities_from_spec(spec["entities"], uri=self._uri)
+
     def _testOperation_assertSessionTransactionState(self, spec):
         session = self.entity_map[spec["session"]]
         expected_state = getattr(_TxnState, spec["state"].upper())
@@ -1251,6 +1254,7 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
             raise unittest.SkipTest("%s" % (skip_reason,))
 
         # process createEntities
+        self._uri = uri
         self.entity_map = EntityMapUtil(self)
         self.entity_map.create_entities_from_spec(self.TEST_SPEC.get("createEntities", []), uri=uri)
         # process initialData
