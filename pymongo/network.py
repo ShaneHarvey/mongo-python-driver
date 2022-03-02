@@ -104,17 +104,6 @@ def command(
     if collation is not None:
         spec["collation"] = collation
 
-    if client:
-        # CSOT: use remaining timeout when set.
-        timeout = client._local.remaining()
-        if timeout:
-            # TODO: RTT tracking
-            # rtt = 0.1
-            # if timeout - rtt < 0:
-            #     raise
-            spec["maxTimeMS"] = int(timeout * 1000)
-            sock_info.sock.settimeout(timeout)
-
     publish = listeners is not None and listeners.enabled_for_commands
     if publish:
         start = datetime.datetime.now()
@@ -125,6 +114,10 @@ def command(
 
     if client and client._encrypter and not client._encrypter._bypass_auto_encryption:
         spec = orig = client._encrypter.encrypt(dbname, spec, codec_options)
+
+    # Support CSOT
+    if client:
+        sock_info.apply_timeout(client, spec)
 
     if use_op_msg:
         flags = _OpMsg.MORE_TO_COME if unacknowledged else 0

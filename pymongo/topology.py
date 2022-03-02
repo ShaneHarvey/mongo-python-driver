@@ -258,8 +258,7 @@ class Topology(object):
         self._description.check_compatible()
         return server_descriptions
 
-    def select_server(self, selector, server_selection_timeout=None, address=None):
-        """Like select_servers, but choose a random server if several match."""
+    def _select_server(self, selector, server_selection_timeout=None, address=None):
         servers = self.select_servers(selector, server_selection_timeout, address)
         if len(servers) == 1:
             return servers[0]
@@ -268,6 +267,13 @@ class Topology(object):
             return server1
         else:
             return server2
+
+    def select_server(self, selector, server_selection_timeout=None, address=None):
+        """Like select_servers, but choose a random server if several match."""
+        server = self._select_server(selector, server_selection_timeout, address)
+        # TODO: Fix race when Server is updated
+        self._local.set_rtt(server.description.round_trip_time)
+        return server
 
     def select_server_by_address(self, address, server_selection_timeout=None):
         """Return a Server for "address", reconnecting if necessary.
@@ -890,6 +896,18 @@ class ThreadLocal:
             pass
         self.set_timeout(self.default_timeout)
         return self.local.timeout
+
+    def get_rtt(self):
+        return self.local.rtt
+
+    def get_max_time_ms(self):
+        remaning = self.remaining()
+        if remaning is None:
+            return None
+        return remaning - self.get_rtt()
+
+    def set_rtt(self, rtt):
+        self.local.rtt = rtt
 
     def set_timeout(self, timeout):
         self.local.timeout = timeout

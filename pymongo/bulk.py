@@ -330,6 +330,9 @@ class _Bulk(object):
                     session._apply_to(cmd, retryable, ReadPreference.PRIMARY, sock_info)
                 sock_info.send_cluster_time(cmd, session, client)
                 sock_info.add_server_api(cmd)
+                # Support CSOT
+                # TODO: timeout should be applied _after_ encoding the command?
+                sock_info.apply_timeout(client, cmd)
                 ops = islice(run.ops, run.idx_offset, None)
 
                 # Run as many ops as possible in one command.

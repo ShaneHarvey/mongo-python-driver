@@ -320,7 +320,7 @@ class _Query(object):
         sock_info.validate_session(self.client, self.session)
         return use_find_cmd
 
-    def as_command(self, sock_info):
+    def as_command(self, sock_info, apply_timeout=False):
         """Return a find command document for this query."""
         # We use the command twice: on the wire and for command monitoring.
         # Generate it once, for speed and to avoid repeating side-effects.
@@ -356,6 +356,9 @@ class _Query(object):
         client = self.client
         if client._encrypter and not client._encrypter._bypass_auto_encryption:
             cmd = client._encrypter.encrypt(self.db, cmd, self.codec_options)
+        # Support CSOT
+        if apply_timeout:
+            sock_info.apply_timeout(client, cmd)
         self._as_command = cmd, self.db
         return self._as_command
 
@@ -371,7 +374,7 @@ class _Query(object):
         spec = self.spec
 
         if use_cmd:
-            spec = self.as_command(sock_info)[0]
+            spec = self.as_command(sock_info, apply_timeout=True)[0]
             request_id, msg, size, _ = _op_msg(
                 0,
                 spec,

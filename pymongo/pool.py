@@ -47,6 +47,7 @@ from pymongo.errors import (
     ConfigurationError,
     ConnectionFailure,
     DocumentTooLarge,
+    ExecutionTimeout,
     InvalidOperation,
     NetworkTimeout,
     NotPrimaryError,
@@ -571,6 +572,29 @@ class SocketInfo(object):
         self.pinned_txn = False
         self.pinned_cursor = False
         self.active = False
+
+    def apply_timeout(self, client, cmd):
+        # CSOT: use remaining timeout when set.
+        timeout = client._local.remaining()
+        if timeout is None:
+            # TODO: Do we need to reset the socket timeout?
+            self.sock.settimeout(self.opts.socket_timeout)
+            return None
+        # RTT validation.
+        rtt = client._local.get_rtt()
+        max_time_ms = timeout - rtt
+        if max_time_ms < 0:
+            # TODO: better error message?
+            # TODO: event handling?
+            raise ExecutionTimeout(
+                "operation would exceed time limit",
+                50,
+                {"ok": 0, "errmsg": "operation would exceed time limit", "code": 50},
+                self.max_wire_version,
+            )
+        cmd["maxTimeMS"] = int(max_time_ms * 1000)
+        self.sock.settimeout(timeout)
+        return timeout
 
     def pin_txn(self):
         self.pinned_txn = True
