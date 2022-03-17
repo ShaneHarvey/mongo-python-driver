@@ -592,7 +592,8 @@ class SocketInfo(object):
                 {"ok": 0, "errmsg": "operation would exceed time limit", "code": 50},
                 self.max_wire_version,
             )
-        cmd["maxTimeMS"] = int(max_time_ms * 1000)
+        if cmd is not None:
+            cmd["maxTimeMS"] = int(max_time_ms * 1000)
         self.sock.settimeout(timeout)
         return timeout
 

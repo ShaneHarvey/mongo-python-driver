@@ -474,7 +474,7 @@ class _GetMore(object):
         sock_info.validate_session(self.client, self.session)
         return use_cmd
 
-    def as_command(self, sock_info):
+    def as_command(self, sock_info, apply_timeout=False):
         """Return a getMore command document for this query."""
         # See _Query.as_command for an explanation of this caching.
         if self._as_command is not None:
@@ -496,6 +496,9 @@ class _GetMore(object):
         client = self.client
         if client._encrypter and not client._encrypter._bypass_auto_encryption:
             cmd = client._encrypter.encrypt(self.db, cmd, self.codec_options)
+        # Support CSOT
+        if apply_timeout:
+            sock_info.apply_timeout(client, cmd=None)
         self._as_command = cmd, self.db
         return self._as_command
 
@@ -506,7 +509,7 @@ class _GetMore(object):
         ctx = sock_info.compression_context
 
         if use_cmd:
-            spec = self.as_command(sock_info)[0]
+            spec = self.as_command(sock_info, apply_timeout=True)[0]
             if self.sock_mgr:
                 flags = _OpMsg.EXHAUST_ALLOWED
             else:
