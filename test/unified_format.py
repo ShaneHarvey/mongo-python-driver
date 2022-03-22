@@ -781,23 +781,28 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
         self.match_evaluator = MatchEvaluatorUtil(self)
 
     def maybe_skip_test(self, spec):
-        if "change" in spec["description"].lower() or "change" in self.__class__.__name__.lower():
-            raise unittest.SkipTest("CSOT not implemented for watch()")
-        if "cursors" in self.__class__.__name__.lower():
-            raise unittest.SkipTest("CSOT not implemented for cursors")
-        if "withTransaction" in spec["description"].lower():
-            raise unittest.SkipTest("CSOT not implemented for with_transaction")
-        if "transaction" in self.__class__.__name__.lower():
-            raise unittest.SkipTest("CSOT not implemented transactions")
         # add any special-casing for skipping tests here
         if client_context.storage_engine == "mmapv1":
             if (
                 "Dirty explicit session is discarded" in spec["description"]
                 or "Dirty implicit session is discarded" in spec["description"]
             ):
-                raise unittest.SkipTest("MMAPv1 does not support retryWrites=True")
+                self.skipTest("MMAPv1 does not support retryWrites=True")
         elif "Client side error in command starting transaction" in spec["description"]:
-            raise unittest.SkipTest("Implement PYTHON-1894")
+            self.skipTest("Implement PYTHON-1894")
+        class_name = self.__class__.__name__.lower()
+        description = spec["description"].lower()
+        if "csot" in class_name:
+            if "change" in description or "change" in class_name:
+                self.skipTest("CSOT not implemented for watch()")
+            if "cursors" in class_name:
+                self.skipTest("CSOT not implemented for cursors")
+            if "withTransaction" in description:
+                self.skipTest("CSOT not implemented for with_transaction")
+            if "transaction" in class_name:
+                self.skipTest("CSOT not implemented for transactions")
+            if "socket timeout" in description:
+                self.skipTest("CSOT not implemented for socket timeouts")
 
         # Some tests need to be skipped based on the operations they try to run.
         for op in spec["operations"]:
@@ -814,6 +819,16 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
             if not client_context.test_commands_enabled:
                 if name == "failPoint" or name == "targetedFailPoint":
                     self.skipTest("Test commands must be enabled to use fail points")
+            if "timeoutMode" in op.get("arguments", {}):
+                self.skipTest("PyMongo does not support timeoutMode")
+            if name == "createEntities":
+                self.maybe_skip_entity(op.get("arguments", {}).get("entities", []))
+
+    def maybe_skip_entity(self, entities):
+        for entity in entities:
+            entity_type = next(iter(entity))
+            if entity_type == "bucket":
+                self.skipTest("GridFS is not currently supported (PYTHON-2459)")
 
     def process_error(self, exception, spec):
         is_error = spec.get("isError")
