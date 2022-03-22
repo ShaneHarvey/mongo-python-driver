@@ -59,6 +59,7 @@ def command(
     unacknowledged=False,
     user_fields=None,
     exhaust_allowed=False,
+    write_concern=None,
 ):
     """Execute a command over the socket, or raise socket.error.
 
@@ -117,7 +118,9 @@ def command(
 
     # Support CSOT
     if client:
-        sock_info.apply_timeout(client, spec)
+        sock_info.apply_timeout(client, spec, write_concern)
+    elif write_concern and not write_concern.is_server_default:
+        spec["writeConcern"] = write_concern.document
 
     if use_op_msg:
         flags = _OpMsg.MORE_TO_COME if unacknowledged else 0

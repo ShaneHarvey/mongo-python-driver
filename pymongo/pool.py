@@ -573,12 +573,15 @@ class SocketInfo(object):
         self.pinned_cursor = False
         self.active = False
 
-    def apply_timeout(self, client, cmd):
+    def apply_timeout(self, client, cmd, write_concern=None):
         # CSOT: use remaining timeout when set.
         timeout = client._local.remaining()
         if timeout is None:
             # TODO: Do we need to reset the socket timeout?
             self.sock.settimeout(self.opts.socket_timeout)
+
+            if cmd and write_concern and not write_concern.is_server_default:
+                cmd["writeConcern"] = write_concern.document
             return None
         # RTT validation.
         rtt = client._local.get_rtt()
@@ -594,6 +597,10 @@ class SocketInfo(object):
             )
         if cmd is not None:
             cmd["maxTimeMS"] = int(max_time_ms * 1000)
+            wc = write_concern.document if write_concern else {}
+            wc.pop("wtimeout", None)
+            if wc:
+                cmd["writeConcern"] = wc
         self.sock.settimeout(timeout)
         return timeout
 
@@ -753,8 +760,6 @@ class SocketInfo(object):
 
         if not (write_concern is None or write_concern.acknowledged or collation is None):
             raise ConfigurationError("Collation is unsupported for unacknowledged writes.")
-        if write_concern and not write_concern.is_server_default:
-            spec["writeConcern"] = write_concern.document
 
         self.add_server_api(spec)
         if session:
@@ -787,6 +792,7 @@ class SocketInfo(object):
                 unacknowledged=unacknowledged,
                 user_fields=user_fields,
                 exhaust_allowed=exhaust_allowed,
+                write_concern=write_concern,
             )
         except (OperationFailure, NotPrimaryError):
             raise
