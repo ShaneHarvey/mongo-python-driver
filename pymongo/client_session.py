@@ -826,7 +826,7 @@ class ClientSession:
         wc = opts.write_concern
         cmd = SON([(command_name, 1)])
         if command_name == "commitTransaction":
-            if opts.max_commit_time_ms:
+            if opts.max_commit_time_ms and self._client._local.get_timeout() is None:
                 cmd["maxTimeMS"] = opts.max_commit_time_ms
 
             # Transaction spec says that after the initial commit attempt,
