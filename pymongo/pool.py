@@ -572,13 +572,21 @@ class SocketInfo(object):
         self.pinned_txn = False
         self.pinned_cursor = False
         self.active = False
+        self.last_timeout = self.opts.socket_timeout
+
+    def set_socket_timeout(self, timeout):
+        """Cache last timeout to avoid duplicate calls to sock.settimeout."""
+        if timeout == self.last_timeout:
+            return
+        self.last_timeout = timeout
+        self.sock.settimeout(timeout)
 
     def apply_timeout(self, client, cmd, write_concern=None):
         # CSOT: use remaining timeout when set.
         timeout = client._local.remaining()
         if timeout is None:
             # TODO: Do we need to reset the socket timeout?
-            self.sock.settimeout(self.opts.socket_timeout)
+            self.set_socket_timeout(self.opts.socket_timeout)
 
             if cmd and write_concern and not write_concern.is_server_default:
                 cmd["writeConcern"] = write_concern.document
@@ -601,7 +609,7 @@ class SocketInfo(object):
             wc.pop("wtimeout", None)
             if wc:
                 cmd["writeConcern"] = wc
-        self.sock.settimeout(timeout)
+        self.set_socket_timeout(timeout)
         return timeout
 
     def pin_txn(self):
