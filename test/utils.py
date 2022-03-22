@@ -35,6 +35,7 @@ from bson.objectid import ObjectId
 from bson.son import SON
 from pymongo import MongoClient, monitoring, operations, read_preferences
 from pymongo.collection import ReturnDocument
+from pymongo.cursor import CursorType
 from pymongo.errors import ConfigurationError, OperationFailure
 from pymongo.hello import HelloCompat
 from pymongo.monitoring import _SENSITIVE_COMMANDS
@@ -1090,5 +1091,13 @@ def prepare_spec_arguments(spec, arguments, opname, entity_map, with_txn_callbac
             arguments["index_or_name"] = arguments.pop(arg_name)
         elif opname == "rename" and arg_name == "to":
             arguments["new_name"] = arguments.pop(arg_name)
+        elif arg_name == "cursorType":
+            cursor_type = arguments.pop(arg_name)
+            if cursor_type == "tailable":
+                arguments["cursor_type"] = CursorType.TAILABLE
+            elif cursor_type == "tailableAwait":
+                arguments["cursor_type"] = CursorType.TAILABLE
+            else:
+                assert False, f"Unsupported cursorType: {cursor_type}"
         else:
             arguments[c2s] = arguments.pop(arg_name)
