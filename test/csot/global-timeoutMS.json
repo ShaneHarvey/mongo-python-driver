@@ -1171,7 +1171,8 @@
           "arguments": {
             "command": {
               "ping": 1
-            }
+            },
+            "commandName": "ping"
           },
           "expectError": {
             "isTimeoutError": true
@@ -1267,7 +1268,8 @@
           "arguments": {
             "command": {
               "ping": 1
-            }
+            },
+            "commandName": "ping"
           }
         }
       ],

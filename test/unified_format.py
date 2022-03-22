@@ -519,6 +519,11 @@ class MatchEvaluatorUtil(object):
         expected_lsid = self.test.entity_map.get_lsid_for_session(spec)
         self.test.assertEqual(expected_lsid, actual[key_to_compare])
 
+    def _operation_lte(self, spec, actual, key_to_compare):
+        if key_to_compare not in actual:
+            self.test.fail(f"Actual command is missing the {key_to_compare} field: {spec}")
+        self.test.assertLessEqual(actual[key_to_compare], spec)
+
     def _evaluate_special_operation(self, opname, spec, actual, key_to_compare):
         method_name = "_operation_%s" % (opname.strip("$"),)
         try:
@@ -781,6 +786,8 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
             raise unittest.SkipTest("CSOT not implemented for cursors")
         if "withTransaction" in spec["description"].lower():
             raise unittest.SkipTest("CSOT not implemented for with_transaction")
+        if "transaction" in self.__class__.__name__.lower():
+            raise unittest.SkipTest("CSOT not implemented transactions")
         # add any special-casing for skipping tests here
         if client_context.storage_engine == "mmapv1":
             if (
@@ -941,10 +948,16 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
         self.addCleanup(cursor.close)
         return cursor
 
+    def _collectionOperation_count(self, target, *args, **kwargs):
+        self.skipTest("PyMongo does not support collection.count()")
+
     def _collectionOperation_listIndexes(self, target, *args, **kwargs):
         if "batch_size" in kwargs:
             self.skipTest("PyMongo does not support batch_size for list_indexes")
         return target.list_indexes(*args, **kwargs)
+
+    def _collectionOperation_listIndexNames(self, target, *args, **kwargs):
+        self.skipTest("PyMongo does not support list_index_names")
 
     def _sessionOperation_withTransaction(self, target, *args, **kwargs):
         if client_context.storage_engine == "mmapv1":
@@ -1328,7 +1341,7 @@ def generate_test_classes(
     class_name_prefix="",
     expected_failures=[],  # noqa: B006
     bypass_test_generation_errors=False,
-    **kwargs
+    **kwargs,
 ):
     """Method for generating test classes. Returns a dictionary where keys are
     the names of test classes and values are the test class objects."""

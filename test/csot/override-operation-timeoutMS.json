@@ -739,7 +739,8 @@
             "timeoutMS": 1000,
             "command": {
               "ping": 1
-            }
+            },
+            "commandName": "ping"
           }
         }
       ],
@@ -796,7 +797,8 @@
             "timeoutMS": 0,
             "command": {
               "ping": 1
-            }
+            },
+            "commandName": "ping"
           }
         }
       ],
