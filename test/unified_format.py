@@ -739,6 +739,7 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
         for i, collection_data in enumerate(initial_data):
             coll_name = collection_data["collectionName"]
             db_name = collection_data["databaseName"]
+            opts = collection_data.get("collectionOptions", {})
             documents = collection_data["documents"]
 
             # Setup the collection with as few majority writes as possible.
@@ -750,10 +751,12 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
             else:
                 wc = WriteConcern(w=1)
             if documents:
+                if opts:
+                    db.create_collection(coll_name, **opts)
                 db.get_collection(coll_name, write_concern=wc).insert_many(documents)
             else:
                 # Ensure collection exists
-                db.create_collection(coll_name, write_concern=wc)
+                db.create_collection(coll_name, write_concern=wc, **opts)
 
     @classmethod
     def setUpClass(cls):
@@ -801,9 +804,11 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
                 self.skipTest("CSOT not implemented for watch()")
             if "cursors" in class_name:
                 self.skipTest("CSOT not implemented for cursors")
-            if "withTransaction" in description:
+            if "sessions" in class_name:
+                self.skipTest("CSOT not implemented for sessions")
+            if "withtransaction" in description:
                 self.skipTest("CSOT not implemented for with_transaction")
-            if "transaction" in class_name:
+            if "transaction" in class_name or "transaction" in description:
                 self.skipTest("CSOT not implemented for transactions")
             if "socket timeout" in description:
                 self.skipTest("CSOT not implemented for socket timeouts")
