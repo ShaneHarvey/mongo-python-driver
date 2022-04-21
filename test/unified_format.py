@@ -1060,7 +1060,7 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
 
         try:
             inherit_timeout = getattr(target, "timeout", None)
-            if "timeout" in arguments or inherit_timeout:
+            if "timeout" in arguments or inherit_timeout is not None:
                 # TODO support timeout parameter on all methods.
                 timeout = arguments.pop("timeout", None)
                 if timeout is None:

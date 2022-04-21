@@ -1309,6 +1309,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         max_wire_version = 0
         last_error: Optional[Exception] = None
         retrying = False
+        multiple_retries = self._local.get_timeout() is not None
 
         def is_retrying():
             return bulk.retrying if bulk else retrying
@@ -1358,7 +1359,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
                 retryable_error = exc.has_error_label("RetryableWriteError")
                 if retryable_error:
                     session._unpin()
-                if is_retrying() or not retryable_error:
+                if not retryable_error or (is_retrying() and not multiple_retries):
                     raise
                 if bulk:
                     bulk.retrying = True
@@ -1379,6 +1380,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         )
         last_error: Optional[Exception] = None
         retrying = False
+        multiple_retries = self._local.get_timeout() is not None
 
         while True:
             try:
@@ -1404,12 +1406,12 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
             except (ExecutionTimeout, NetworkTimeout):
                 raise
             except ConnectionFailure as exc:
-                if not retryable or retrying:
+                if not retryable or (retrying and not multiple_retries):
                     raise
                 retrying = True
                 last_error = exc
             except OperationFailure as exc:
-                if not retryable or retrying:
+                if not retryable or (retrying and not multiple_retries):
                     raise
                 if exc.code not in helpers._RETRYABLE_ERROR_CODES:
                     raise
@@ -1755,7 +1757,8 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
             raise TypeError("timeout must be None, an int, or a float")
         if timeout and timeout < 0:
             raise TypeError("timeout cannot be negative")
-        timeout = float(timeout) if timeout else None
+        if timeout is not None:
+            timeout = float(timeout)
         return self._local.with_timeout(timeout)
 
     def server_info(self, session: Optional[client_session.ClientSession] = None) -> Dict[str, Any]:
