@@ -2330,7 +2330,10 @@
         },
         {
           "name": "listDatabaseNames",
-          "object": "client"
+          "object": "client",
+          "arguments": {
+            "timeoutMS": 250
+          }
         }
       ],
       "expectEvents": [
@@ -4242,7 +4245,10 @@
         },
         {
           "name": "estimatedDocumentCount",
-          "object": "collection"
+          "object": "collection",
+          "arguments": {
+            "timeoutMS": 250
+          }
         }
       ],
       "expectEvents": [
@@ -5081,7 +5087,10 @@
         },
         {
           "name": "listIndexes",
-          "object": "collection"
+          "object": "collection",
+          "arguments": {
+            "timeoutMS": 250
+          }
         }
       ],
       "expectEvents": [
