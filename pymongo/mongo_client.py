@@ -1279,6 +1279,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
                     )
 
         def _cmd(session, server, sock_info, read_preference):
+            operation.reset()  # Reset op in case of retry.
             return server.run_operation(
                 sock_info, operation, read_preference, self._event_listeners, unpack_res
             )

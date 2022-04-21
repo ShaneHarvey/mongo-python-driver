@@ -300,6 +300,9 @@ class _Query(object):
         self._as_command = None
         self.exhaust = exhaust
 
+    def reset(self):
+        self._as_command = None
+
     def namespace(self):
         return "%s.%s" % (self.db, self.coll)
 
@@ -459,6 +462,9 @@ class _GetMore(object):
         self._as_command = None
         self.exhaust = exhaust
         self.comment = comment
+
+    def reset(self):
+        self._as_command = None
 
     def namespace(self):
         return "%s.%s" % (self.db, self.coll)

@@ -916,8 +916,7 @@ class ThreadLocal:
     def remaining(self):
         if not self.get_timeout():
             return None
-        timeout = self.local.deadline - time.monotonic()
-        return max(timeout, 0.001)  # TODO: fix
+        return self.local.deadline - time.monotonic()
 
     def with_timeout(self, timeout):
         """Set a timeout context for client.settimeout()."""

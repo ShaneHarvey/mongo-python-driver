@@ -208,6 +208,10 @@ class NonLazyCursor(object):
         # Create the server side cursor.
         self.first_result = next(find_cursor, None)
 
+    @property
+    def alive(self):
+        return self.first_result is not None or self.find_cursor.alive
+
     def __next__(self):
         if self.first_result is not None:
             first = self.first_result
@@ -997,7 +1001,11 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
 
     def _cursor_iterateUntilDocumentOrError(self, target, *args, **kwargs):
         self.__raise_if_unsupported("iterateUntilDocumentOrError", target, NonLazyCursor)
-        return next(target)
+        while target.alive:
+            try:
+                return next(target)
+            except StopIteration:
+                pass
 
     def _cursor_close(self, target, *args, **kwargs):
         self.__raise_if_unsupported("close", target, NonLazyCursor)
