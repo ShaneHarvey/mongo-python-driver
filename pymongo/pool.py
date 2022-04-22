@@ -585,8 +585,9 @@ class SocketInfo(object):
         # CSOT: use remaining timeout when set.
         timeout = client._local.remaining()
         if timeout is None:
-            # TODO: Do we need to reset the socket timeout?
-            self.set_socket_timeout(self.opts.socket_timeout)
+            # Reset the socket timeout unless we're performing a streaming monitor check.
+            if not self.more_to_come:
+                self.set_socket_timeout(self.opts.socket_timeout)
 
             if cmd and write_concern and not write_concern.is_server_default:
                 cmd["writeConcern"] = write_concern.document
@@ -656,7 +657,7 @@ class SocketInfo(object):
             awaitable = True
             # If connect_timeout is None there is no timeout.
             if self.opts.connect_timeout:
-                self.sock.settimeout(self.opts.connect_timeout + heartbeat_frequency)
+                self.set_socket_timeout(self.opts.connect_timeout + heartbeat_frequency)
 
         if not performing_handshake and cluster_time is not None:
             cmd["$clusterTime"] = cluster_time
@@ -807,10 +808,6 @@ class SocketInfo(object):
         # Catch socket.error, KeyboardInterrupt, etc. and close ourselves.
         except BaseException as error:
             self._raise_connection_failure(error)
-        finally:
-            # Reset the timeout. TODO: is this needed?
-            if not self.closed:
-                self.sock.settimeout(self.opts.socket_timeout)
 
     def send_message(self, message, max_doc_size):
         """Send a raw BSON message or raise ConnectionFailure.
