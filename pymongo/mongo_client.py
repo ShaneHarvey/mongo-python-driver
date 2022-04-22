@@ -75,9 +75,7 @@ from pymongo.errors import (
     BulkWriteError,
     ConfigurationError,
     ConnectionFailure,
-    ExecutionTimeout,
     InvalidOperation,
-    NetworkTimeout,
     NotPrimaryError,
     OperationFailure,
     PyMongoError,
@@ -1350,8 +1348,6 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
                 # be a persistent outage. Attempting to retry in this case will
                 # most likely be a waste of time.
                 raise
-            except (ExecutionTimeout, NetworkTimeout):
-                raise
             except PyMongoError as exc:
                 if not retryable:
                     raise
@@ -1403,8 +1399,6 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
                 # A ServerSelectionTimeoutError error indicates that there may
                 # be a persistent outage. Attempting to retry in this case will
                 # most likely be a waste of time.
-                raise
-            except (ExecutionTimeout, NetworkTimeout):
                 raise
             except ConnectionFailure as exc:
                 if not retryable or (retrying and not multiple_retries):
