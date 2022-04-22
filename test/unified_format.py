@@ -917,7 +917,6 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
             self.fail("Operation %s not supported for entity of type %s" % (opname, type(target)))
 
     def __entityOperation_createChangeStream(self, target, *args, **kwargs):
-        self.skipTest("CSOT does not support change streams")
         if client_context.storage_engine == "mmapv1":
             self.skipTest("MMAPv1 does not support change streams")
         self.__raise_if_unsupported("createChangeStream", target, MongoClient, Database, Collection)
