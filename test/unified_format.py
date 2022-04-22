@@ -219,6 +219,9 @@ class NonLazyCursor(object):
             return first
         return next(self.find_cursor)
 
+    # Added to support the iterateOnce operation.
+    try_next = __next__
+
     def close(self):
         self.find_cursor.close()
         self.client = None
@@ -719,7 +722,7 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
     a class attribute ``TEST_SPEC``.
     """
 
-    SCHEMA_VERSION = Version.from_string("1.5")
+    SCHEMA_VERSION = Version.from_string("1.8")
     RUN_ON_LOAD_BALANCER = True
     RUN_ON_SERVERLESS = True
     TEST_SPEC: Any
@@ -1001,6 +1004,10 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
             self.skipTest("MMAPv1 does not support document-level locking")
         self.__raise_if_unsupported("startTransaction", target, ClientSession)
         return target.start_transaction(*args, **kwargs)
+
+    def _cursor_iterateOnce(self, target, *args, **kwargs):
+        self.__raise_if_unsupported("iterateOnce", target, NonLazyCursor, ChangeStream)
+        return target.try_next()
 
     def _changeStreamOperation_iterateUntilDocumentOrError(self, target, *args, **kwargs):
         self.__raise_if_unsupported("iterateUntilDocumentOrError", target, ChangeStream)
