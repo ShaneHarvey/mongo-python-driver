@@ -1,6 +1,6 @@
 {
   "description": "collectionOrDatabaseOptions-timeoutMS-type",
-  "schemaVersion": "1.8",
+  "schemaVersion": "1.9",
   "createEntities": [
     {
       "client": {
@@ -13,7 +13,7 @@
         "client": "client0",
         "databaseName": "foo",
         "databaseOptions": {
-          "timeoutMS": {}
+          "timeoutMS": 4.5
         }
       }
     }

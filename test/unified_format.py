@@ -722,7 +722,7 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
     a class attribute ``TEST_SPEC``.
     """
 
-    SCHEMA_VERSION = Version.from_string("1.8")
+    SCHEMA_VERSION = Version.from_string("1.9")
     RUN_ON_LOAD_BALANCER = True
     RUN_ON_SERVERLESS = True
     TEST_SPEC: Any
@@ -742,7 +742,7 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
         for i, collection_data in enumerate(initial_data):
             coll_name = collection_data["collectionName"]
             db_name = collection_data["databaseName"]
-            opts = collection_data.get("collectionOptions", {})
+            opts = collection_data.get("createOptions", {})
             documents = collection_data["documents"]
 
             # Setup the collection with as few majority writes as possible.

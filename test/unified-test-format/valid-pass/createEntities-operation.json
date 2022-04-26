@@ -1,34 +1,6 @@
 {
   "description": "createEntities-operation",
-  "schemaVersion": "1.8",
-  "createEntities": [
-    {
-      "client": {
-        "id": "client0"
-      }
-    },
-    {
-      "database": {
-        "id": "database0",
-        "client": "client0",
-        "databaseName": "database0"
-      }
-    },
-    {
-      "collection": {
-        "id": "collection0",
-        "database": "database0",
-        "collectionName": "collection0"
-      }
-    }
-  ],
-  "initialData": [
-    {
-      "collectionName": "collection0",
-      "databaseName": "database0",
-      "documents": []
-    }
-  ],
+  "schemaVersion": "1.9",
   "tests": [
     {
       "description": "createEntities operation",
@@ -57,7 +29,7 @@
                 "collection": {
                   "id": "collection1",
                   "database": "database1",
-                  "collectionName": "collection1"
+                  "collectionName": "coll1"
                 }
               }
             ]
@@ -80,7 +52,7 @@
             {
               "commandStartedEvent": {
                 "command": {
-                  "delete": "collection1",
+                  "delete": "coll1",
                   "deletes": [
                     {
                       "q": {

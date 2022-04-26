@@ -1,6 +1,6 @@
 {
-  "description": "initialCollectionData-collectionOptions",
-  "schemaVersion": "1.8",
+  "description": "collectionData-createOptions",
+  "schemaVersion": "1.9",
   "runOnRequirements": [
     {
       "minServerVersion": "3.6"
@@ -31,7 +31,7 @@
     {
       "collectionName": "coll0",
       "databaseName": "database0",
-      "collectionOptions": {
+      "createOptions": {
         "capped": true,
         "size": 512
       },
