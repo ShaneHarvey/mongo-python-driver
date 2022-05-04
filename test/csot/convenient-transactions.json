@@ -1,6 +1,6 @@
 {
   "description": "timeoutMS behaves correctly for the withTransaction API",
-  "schemaVersion": "1.5",
+  "schemaVersion": "1.9",
   "runOnRequirements": [
     {
       "minServerVersion": "4.4",
@@ -59,7 +59,7 @@
   ],
   "tests": [
     {
-      "description": "withTransaction raises a client-side error if timeoutMS is overriden inside the callback",
+      "description": "withTransaction raises a client-side error if timeoutMS is overridden inside the callback",
       "operations": [
         {
           "name": "withTransaction",
