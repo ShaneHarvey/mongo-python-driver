@@ -1037,7 +1037,7 @@ def prepare_spec_arguments(spec, arguments, opname, entity_map, with_txn_callbac
         elif (arg_name == "batchSize" or arg_name == "allowDiskUse") and opname == "aggregate":
             continue
         elif arg_name == "timeoutMode":
-            raise unittest.SkipTest("TODO: timeoutMode is not supported")
+            raise unittest.SkipTest("PyMongo does not support timeoutMode")
         # Requires boolean returnDocument.
         elif arg_name == "returnDocument":
             arguments[c2s] = getattr(ReturnDocument, arguments.pop(arg_name).upper())

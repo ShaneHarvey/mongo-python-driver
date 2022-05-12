@@ -899,7 +899,7 @@ class BaseObject(object):
         return self.__read_concern
 
     @property
-    def timeout(self):
+    def timeout(self) -> Optional[float]:
         """Read only access to the timeout of this instance.
 
         .. versionadded:: 4.1
