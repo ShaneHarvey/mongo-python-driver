@@ -71,6 +71,7 @@ from pymongo.results import (
     UpdateResult,
 )
 from pymongo.typings import _CollationIn, _DocumentIn, _DocumentType, _Pipeline
+from pymongo.vars import _VARS
 from pymongo.write_concern import WriteConcern
 
 _FIND_AND_MODIFY_DOC_FIELDS = {"value": 1}
@@ -555,7 +556,7 @@ class Collection(common.BaseObject, Generic[_DocumentType]):
 
     def _set_timeout(self, timeout):
         if timeout is not None:
-            self.__database.client._local.set_timeout(timeout)
+            _VARS.set_timeout(timeout)
 
     def insert_one(
         self,

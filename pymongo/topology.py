@@ -56,6 +56,7 @@ from pymongo.topology_description import (
     _updated_topology_description_srv_polling,
     updated_topology_description,
 )
+from pymongo.vars import _VARS
 
 
 def process_events_queue(queue_ref):
@@ -156,7 +157,6 @@ class Topology(object):
         self._srv_monitor = None
         if self._settings.fqdn is not None and not self._settings.load_balanced:
             self._srv_monitor = SrvMonitor(self, self._settings)
-        self._local = ThreadLocal(None)
 
     def open(self):
         """Start monitoring, or restart after a fork.
@@ -194,7 +194,7 @@ class Topology(object):
 
     def get_server_selection_timeout(self):
         # CSOT: use remaining timeout when set.
-        timeout = self._local.remaining()
+        timeout = _VARS.remaining()
         if timeout is None:
             return self._settings.server_selection_timeout
         return timeout
@@ -272,7 +272,7 @@ class Topology(object):
         """Like select_servers, but choose a random server if several match."""
         server = self._select_server(selector, server_selection_timeout, address)
         # TODO: Fix race when Server is updated
-        self._local.set_rtt(server.description.round_trip_time)
+        _VARS.set_rtt(server.description.round_trip_time)
         return server
 
     def select_server_by_address(self, address, server_selection_timeout=None):
@@ -881,71 +881,3 @@ def _is_stale_server_description(current_sd, new_sd):
     if current_tv["processId"] != new_tv["processId"]:
         return False
     return current_tv["counter"] > new_tv["counter"]
-
-
-class ThreadLocal:
-    def __init__(self, timeout):
-        self.default_timeout = timeout
-        self.local = threading.local()
-
-    def get_timeout(self):
-        # Lazily init this thread's timeout/deadline.
-        try:
-            return self.local.timeout
-        except AttributeError:
-            pass
-        self.set_timeout(self.default_timeout)
-        return self.local.timeout
-
-    def get_rtt(self):
-        return self.local.rtt
-
-    def get_max_time_ms(self):
-        remaning = self.remaining()
-        if remaning is None:
-            return None
-        return remaning - self.get_rtt()
-
-    def set_rtt(self, rtt):
-        self.local.rtt = rtt
-
-    def set_timeout(self, timeout):
-        self.local.timeout = timeout
-        self.local.deadline = time.monotonic() + timeout if timeout else None
-
-    def remaining(self):
-        if not self.get_timeout():
-            return None
-        return self.local.deadline - time.monotonic()
-
-    def with_timeout(self, timeout):
-        """Set a timeout context for client.settimeout()."""
-        return _TimeoutContext(self, timeout)
-
-    def enter(self, timeout):
-        self.set_timeout(timeout)
-
-    def exit(self):
-        self.set_timeout(None)
-
-
-class _TimeoutContext(object):
-    """Internal timeout context manager.
-
-    Use client.settimeout() instead::
-
-      with client.settimeout(0.5):
-          client.test.test.insert_one({})
-    """
-
-    def __init__(self, tlocal, timeout):
-        self._tlocal = tlocal
-        self._timeout = timeout
-
-    def __enter__(self):
-        self._tlocal.enter(self._timeout)
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._tlocal.exit()
-        self._topology = None

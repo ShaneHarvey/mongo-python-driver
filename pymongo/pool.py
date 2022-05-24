@@ -65,6 +65,7 @@ from pymongo.socket_checker import SocketChecker
 from pymongo.ssl_support import HAS_SNI as _HAVE_SNI
 from pymongo.ssl_support import IPADDR_SAFE as _IPADDR_SAFE
 from pymongo.ssl_support import SSLError as _SSLError
+from pymongo.vars import _VARS
 
 
 # For SNI support. According to RFC6066, section 3, IPv4 and IPv6 literals are
@@ -583,7 +584,7 @@ class SocketInfo(object):
 
     def apply_timeout(self, client, cmd, write_concern=None):
         # CSOT: use remaining timeout when set.
-        timeout = client._local.remaining()
+        timeout = _VARS.remaining()
         if timeout is None:
             # Reset the socket timeout unless we're performing a streaming monitor check.
             if not self.more_to_come:
@@ -593,7 +594,7 @@ class SocketInfo(object):
                 cmd["writeConcern"] = write_concern.document
             return None
         # RTT validation.
-        rtt = client._local.get_rtt()
+        rtt = _VARS.get_rtt()
         max_time_ms = timeout - rtt
         if max_time_ms < 0:
             # TODO: better error message?

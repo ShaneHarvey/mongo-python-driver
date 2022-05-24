@@ -95,6 +95,7 @@ from pymongo.uri_parser import (
     _handle_security_options,
     _normalize_options,
 )
+from pymongo.vars import _VARS
 from pymongo.write_concern import DEFAULT_WRITE_CONCERN, WriteConcern
 
 if TYPE_CHECKING:
@@ -831,8 +832,6 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
             from pymongo.encryption import _Encrypter
 
             self._encrypter = _Encrypter(self, self.__options.auto_encryption_opts)
-        # Store timeout info.
-        self._local = self._topology._local
 
     def _duplicate(self, **kwargs):
         args = self.__init_kwargs.copy()
@@ -1308,7 +1307,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         max_wire_version = 0
         last_error: Optional[Exception] = None
         retrying = False
-        multiple_retries = self._local.get_timeout() is not None
+        multiple_retries = _VARS.get_timeout() is not None
 
         def is_retrying():
             return bulk.retrying if bulk else retrying
@@ -1377,7 +1376,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         )
         last_error: Optional[Exception] = None
         retrying = False
-        multiple_retries = self._local.get_timeout() is not None
+        multiple_retries = _VARS.get_timeout() is not None
 
         while True:
             try:
@@ -1754,7 +1753,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
             raise TypeError("timeout cannot be negative")
         if timeout is not None:
             timeout = float(timeout)
-        return self._local.with_timeout(timeout)
+        return _VARS.with_timeout(timeout)
 
     def server_info(self, session: Optional[client_session.ClientSession] = None) -> Dict[str, Any]:
         """Get information about the MongoDB server we're connected to.
