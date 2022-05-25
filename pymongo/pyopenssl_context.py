@@ -70,6 +70,8 @@ _VERIFY_MAP = {
 _REVERSE_VERIFY_MAP = dict((value, key) for key, value in _VERIFY_MAP.items())
 
 
+# For SNI support. According to RFC6066, section 3, IPv4 and IPv6 literals are
+# not permitted for SNI hostname.
 def _is_ip_address(address):
     try:
         _ip_address(address)
@@ -104,8 +106,17 @@ class _sslConn(_SSL.Connection):
         while True:
             try:
                 return call(*args, **kwargs)
-            except _RETRY_ERRORS:
-                self.socket_checker.select(self, True, True, timeout)
+            except _RETRY_ERRORS as exc:
+                if isinstance(_SSL.WantReadError, exc):
+                    want_read = True
+                    want_write = False
+                elif isinstance(_SSL.WantWriteError, exc):
+                    want_read = True
+                    want_write = False
+                else:
+                    want_read = True
+                    want_write = True
+                self.socket_checker.select(self, want_read, want_write, timeout)
                 if timeout and _time.monotonic() - start > timeout:
                     raise _socket.timeout("timed out")
                 continue
