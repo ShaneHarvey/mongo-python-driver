@@ -21,7 +21,7 @@ import struct
 import time
 
 from bson import _decode_all_selective
-from pymongo import helpers, message
+from pymongo import helpers, message, ssl_support
 from pymongo.common import MAX_MESSAGE_SIZE
 from pymongo.compression_support import _NO_COMPRESSION, decompress
 from pymongo.errors import (
@@ -282,6 +282,10 @@ def wait_for_read(sock_info, deadline):
                 raise socket.timeout("timed out")
 
 
+# Errors raised by sockets (and TLS sockets) when in non-blocking mode.
+BLOCKING_IO_ERRORS = (BlockingIOError,) + ssl_support.BLOCKING_IO_ERRORS
+
+
 def _receive_data_on_socket(sock_info, length, deadline):
     buf = bytearray(length)
     mv = memoryview(buf)
@@ -296,7 +300,7 @@ def _receive_data_on_socket(sock_info, length, deadline):
             if _VARS.get_timeout():
                 sock_info.set_socket_timeout(max(deadline - time.monotonic(), 0))
             chunk_length = sock_info.sock.recv_into(mv[bytes_read:])
-        except BlockingIOError:
+        except BLOCKING_IO_ERRORS:
             raise socket.timeout("timed out")
         except (IOError, OSError) as exc:  # noqa: B014
             if _errno_from_exception(exc) == errno.EINTR:
