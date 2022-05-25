@@ -33,6 +33,7 @@ from pymongo.errors import (
 from pymongo.message import _UNPACK_REPLY, _OpMsg
 from pymongo.monitoring import _is_speculative_authenticate
 from pymongo.socket_checker import _errno_from_exception
+from pymongo.vars import _VARS
 
 _UNPACK_HEADER = struct.Struct("<iiii").unpack
 
@@ -205,11 +206,14 @@ _UNPACK_COMPRESSION_HEADER = struct.Struct("<iiB").unpack
 
 def receive_message(sock_info, request_id, max_message_size=MAX_MESSAGE_SIZE):
     """Receive a raw BSON message or raise socket.error."""
-    timeout = sock_info.sock.gettimeout()
-    if timeout:
-        deadline = time.monotonic() + timeout
+    if _VARS.get_timeout():
+        deadline = _VARS.get_deadline()
     else:
-        deadline = None
+        timeout = sock_info.sock.gettimeout()
+        if timeout:
+            deadline = time.monotonic() + timeout
+        else:
+            deadline = None
     # Ignore the response's request id.
     length, _, response_to, op_code = _UNPACK_HEADER(
         _receive_data_on_socket(sock_info, 16, deadline)
@@ -285,7 +289,15 @@ def _receive_data_on_socket(sock_info, length, deadline):
     while bytes_read < length:
         try:
             wait_for_read(sock_info, deadline)
+            # CSOT: update timeout.
+            # When the timeout has expired perform one final non-blocking
+            # recv. This helps avoid spurious timeouts when the response is
+            # actually already buffered on the client.
+            if _VARS.get_timeout():
+                sock_info.set_socket_timeout(max(deadline - time.monotonic(), 0))
             chunk_length = sock_info.sock.recv_into(mv[bytes_read:])
+        except BlockingIOError:
+            raise socket.timeout("timed out")
         except (IOError, OSError) as exc:  # noqa: B014
             if _errno_from_exception(exc) == errno.EINTR:
                 continue

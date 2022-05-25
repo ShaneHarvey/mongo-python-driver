@@ -1476,7 +1476,9 @@ class Pool:
             self.operation_count += 1
 
         # Get a free socket or create one.
-        if self.opts.wait_queue_timeout:
+        if _VARS.get_timeout():
+            deadline = _VARS.get_deadline()
+        elif self.opts.wait_queue_timeout:
             deadline = time.monotonic() + self.opts.wait_queue_timeout
         else:
             deadline = None
@@ -1642,25 +1644,25 @@ class Pool:
             listeners.publish_connection_check_out_failed(
                 self.address, ConnectionCheckOutFailedReason.TIMEOUT
             )
+        timeout = _VARS.get_timeout() or self.opts.wait_queue_timeout
         if self.opts.load_balanced:
             other_ops = self.active_sockets - self.ncursors - self.ntxns
             raise ConnectionFailure(
                 "Timeout waiting for connection from the connection pool. "
                 "maxPoolSize: %s, connections in use by cursors: %s, "
                 "connections in use by transactions: %s, connections in use "
-                "by other operations: %s, wait_queue_timeout: %s"
+                "by other operations: %s, timeout: %s"
                 % (
                     self.opts.max_pool_size,
                     self.ncursors,
                     self.ntxns,
                     other_ops,
-                    self.opts.wait_queue_timeout,
+                    timeout,
                 )
             )
         raise ConnectionFailure(
             "Timed out while checking out a connection from connection pool. "
-            "maxPoolSize: %s, wait_queue_timeout: %s"
-            % (self.opts.max_pool_size, self.opts.wait_queue_timeout)
+            "maxPoolSize: %s, timeout: %s" % (self.opts.max_pool_size, timeout)
         )
 
     def __del__(self):

@@ -16,42 +16,46 @@
 
 import time
 from contextvars import ContextVar
-from typing import Optional
+from typing import ContextManager, Optional
 
 
 class _Vars:
     """Singleton for managing various ContextVars."""
 
     def __init__(self):
-        self.timeout: ContextVar[Optional[float]] = ContextVar("timeout", default=None)
-        self.rtt: ContextVar[float] = ContextVar("rtt", default=0.0)
-        self.deadline: ContextVar[float] = ContextVar("deadline", default=float("inf"))
+        self._timeout: ContextVar[Optional[float]] = ContextVar("timeout", default=None)
+        self._rtt: ContextVar[float] = ContextVar("rtt", default=0.0)
+        self._deadline: ContextVar[float] = ContextVar("deadline", default=float("inf"))
 
     def get_timeout(self) -> Optional[float]:
-        return self.timeout.get(None)
+        return self._timeout.get(None)
 
     def get_rtt(self) -> float:
-        return self.rtt.get()
+        return self._rtt.get()
 
-    def get_max_time_ms(self) -> Optional[float]:
-        remaning = self.remaining()
-        if remaning is None:
-            return None
-        return remaning - self.get_rtt()
+    def get_deadline(self) -> float:
+        return self._deadline.get()
 
     def set_rtt(self, rtt: float) -> None:
-        self.rtt.set(rtt)
+        self._rtt.set(rtt)
 
     def set_timeout(self, timeout: Optional[float]) -> None:
-        self.timeout.set(timeout)
-        self.deadline.set(time.monotonic() + timeout if timeout else float("inf"))
+        self._timeout.set(timeout)
+        self._deadline.set(time.monotonic() + timeout if timeout else float("inf"))
 
     def remaining(self) -> Optional[float]:
         if not self.get_timeout():
             return None
-        return self.deadline.get() - time.monotonic()
+        return self._deadline.get() - time.monotonic()
 
-    def with_timeout(self, timeout: Optional[float]) -> "_TimeoutContext":
+    def clamp_remaining(self, max_timeout: float) -> float:
+        """Return the remaining timeout clamped to a max value."""
+        remaining = self.remaining()
+        if remaining is None:
+            return max_timeout
+        return min(remaining, max_timeout)
+
+    def with_timeout(self, timeout: Optional[float]) -> ContextManager:
         """Set a timeout context for client.settimeout()."""
         return _TimeoutContext(timeout)
 
