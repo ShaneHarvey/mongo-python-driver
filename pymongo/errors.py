@@ -36,6 +36,7 @@ class PyMongoError(Exception):
         super(PyMongoError, self).__init__(message)
         self._message = message
         self._error_labels = set(error_labels or [])
+        self._is_timeout = False
 
     def has_error_label(self, label: str) -> bool:
         """Return True if this error contains the given label.
@@ -51,6 +52,14 @@ class PyMongoError(Exception):
     def _remove_error_label(self, label):
         """Remove the given label from this error."""
         self._error_labels.discard(label)
+
+    @property
+    def is_timeout(self) -> bool:
+        """Return True if this error contains the given label.
+
+        .. versionadded:: 3.7
+        """
+        return self._is_timeout
 
 
 class ProtocolError(PyMongoError):
