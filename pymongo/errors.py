@@ -62,6 +62,13 @@ class PyMongoError(Exception):
         return self._is_timeout
 
 
+class PyMongoTimeoutError(PyMongoError):
+    """Base class for all PyMongo timeout exceptions.
+
+    .. versionadded:: 4.2
+    """
+
+
 class ProtocolError(PyMongoError):
     """Raised for failures related to the wire protocol."""
 
@@ -106,7 +113,7 @@ class AutoReconnect(ConnectionFailure):
         self.errors = self.details = errors or []
 
 
-class NetworkTimeout(AutoReconnect):
+class NetworkTimeout(AutoReconnect, PyMongoTimeoutError):
     """An operation on an open connection exceeded socketTimeoutMS.
 
     The remaining connections in the pool stay open. In the case of a write
@@ -146,7 +153,7 @@ class NotPrimaryError(AutoReconnect):
         )
 
 
-class ServerSelectionTimeoutError(AutoReconnect):
+class ServerSelectionTimeoutError(AutoReconnect, PyMongoTimeoutError):
     """Thrown when no MongoDB server is available for an operation
 
     If there is no suitable server for an operation PyMongo tries for
@@ -217,7 +224,7 @@ class CursorNotFound(OperationFailure):
     """
 
 
-class ExecutionTimeout(OperationFailure):
+class ExecutionTimeout(OperationFailure, PyMongoTimeoutError):
     """Raised when a database operation times out, exceeding the $maxTimeMS
     set in the query or command option.
 
@@ -241,7 +248,7 @@ class WriteError(OperationFailure):
     """
 
 
-class WTimeoutError(WriteConcernError):
+class WTimeoutError(WriteConcernError, PyMongoTimeoutError):
     """Raised when a database operation times out (i.e. wtimeout expires)
     before replication completes.
 
