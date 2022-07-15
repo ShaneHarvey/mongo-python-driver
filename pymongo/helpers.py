@@ -190,11 +190,10 @@ def _raise_last_write_error(write_errors: List[Any]) -> NoReturn:
 
 
 def _raise_write_concern_error(error: Any) -> NoReturn:
-    code = error.get("code")
-    if code == 50 or ("errInfo" in error and error["errInfo"].get("wtimeout")):
+    if "errInfo" in error and error["errInfo"].get("wtimeout"):
         # Make sure we raise WTimeoutError
-        raise WTimeoutError(error.get("errmsg"), code, error)
-    raise WriteConcernError(error.get("errmsg"), code, error)
+        raise WTimeoutError(error.get("errmsg"), error.get("code"), error)
+    raise WriteConcernError(error.get("errmsg"), error.get("code"), error)
 
 
 def _get_wce_doc(result):

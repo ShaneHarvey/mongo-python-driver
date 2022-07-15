@@ -72,10 +72,13 @@ from pymongo.errors import (
     ConfigurationError,
     ConnectionFailure,
     EncryptionError,
+    ExecutionTimeout,
     InvalidOperation,
+    NetworkTimeout,
     NotPrimaryError,
     PyMongoError,
-    PyMongoTimeoutError,
+    ServerSelectionTimeoutError,
+    WriteConcernError,
 )
 from pymongo.monitoring import (
     _SENSITIVE_COMMANDS,
@@ -949,7 +952,13 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
                 self.assertNotIsInstance(exception, PyMongoError)
 
         if is_timeout_error:
-            self.assertIsInstance(exception, PyMongoTimeoutError)
+            # TODO: PYTHON-3291 Implement error transformation.
+            if isinstance(exception, WriteConcernError):
+                self.assertEqual(exception.code, 50)
+            else:
+                self.assertIsInstance(
+                    exception, (NetworkTimeout, ExecutionTimeout, ServerSelectionTimeoutError)
+                )
 
         if error_contains:
             if isinstance(exception, BulkWriteError):
