@@ -55,11 +55,11 @@ class PyMongoError(Exception):
 
     @property
     def is_timeout(self) -> bool:
-        """Return True if this error contains the given label.
+        """True if this error was caused by a timeout.
 
-        .. versionadded:: 3.7
+        .. versionadded:: 4.2
         """
-        return self._is_timeout
+        return False
 
 
 class ProtocolError(PyMongoError):
@@ -77,6 +77,10 @@ class WaitQueueTimeoutError(ConnectionFailure):
 
     .. versionadded:: 4.2
     """
+
+    @property
+    def is_timeout(self) -> bool:
+        return True
 
 
 class AutoReconnect(ConnectionFailure):
@@ -114,6 +118,10 @@ class NetworkTimeout(AutoReconnect):
 
     Subclass of :exc:`~pymongo.errors.AutoReconnect`.
     """
+
+    @property
+    def is_timeout(self) -> bool:
+        return True
 
 
 def _format_detailed_error(message, details):
@@ -157,6 +165,10 @@ class ServerSelectionTimeoutError(AutoReconnect):
     within the timeout window, or if you attempt to query with a Read
     Preference that the replica set cannot satisfy.
     """
+
+    @property
+    def is_timeout(self) -> bool:
+        return True
 
 
 class ConfigurationError(PyMongoError):
@@ -208,6 +220,10 @@ class OperationFailure(PyMongoError):
         """
         return self.__details
 
+    @property
+    def is_timeout(self) -> bool:
+        return self.__code in (50,)
+
 
 class CursorNotFound(OperationFailure):
     """Raised while iterating query results if the cursor is
@@ -225,6 +241,10 @@ class ExecutionTimeout(OperationFailure):
 
     .. versionadded:: 2.7
     """
+
+    @property
+    def is_timeout(self) -> bool:
+        return True
 
 
 class WriteConcernError(OperationFailure):
@@ -251,9 +271,18 @@ class WTimeoutError(WriteConcernError):
     .. versionadded:: 2.7
     """
 
+    @property
+    def is_timeout(self) -> bool:
+        return True
+
 
 class DuplicateKeyError(WriteError):
     """Raised when an insert or update fails due to a duplicate key error."""
+
+
+def _wtimeout_error(error: Any) -> bool:
+    """Return True if this writeConcernError doc is a caused by a timeout."""
+    return error.get("code") == 50 or ("errInfo" in error and error["errInfo"].get("wtimeout"))
 
 
 class BulkWriteError(OperationFailure):
@@ -269,6 +298,19 @@ class BulkWriteError(OperationFailure):
 
     def __reduce__(self) -> Tuple[Any, Any]:
         return self.__class__, (self.details,)
+
+    @property
+    def is_timeout(self) -> bool:
+        # Check the last writeConcernError and last writeError to determine if this
+        # BulkWriteError was caused by a timeout.
+        wces = self.details.get("writeConcernErrors", [])
+        if wces and _wtimeout_error(wces[-1]):
+            return True
+
+        werrs = self.details.get("writeErrors", [])
+        if werrs and werrs[-1].get("code") == 50:
+            return True
+        return False
 
 
 class InvalidOperation(PyMongoError):
@@ -310,6 +352,12 @@ class EncryptionError(PyMongoError):
     def cause(self) -> Exception:
         """The exception that caused this encryption or decryption error."""
         return self.__cause
+
+    @property
+    def is_timeout(self) -> bool:
+        if isinstance(self.__cause, PyMongoError):
+            return self.__cause.is_timeout
+        return False
 
 
 class _OperationCancelled(AutoReconnect):
