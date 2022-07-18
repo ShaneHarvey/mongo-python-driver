@@ -36,7 +36,6 @@ class PyMongoError(Exception):
         super(PyMongoError, self).__init__(message)
         self._message = message
         self._error_labels = set(error_labels or [])
-        self._is_timeout = False
 
     def has_error_label(self, label: str) -> bool:
         """Return True if this error contains the given label.
@@ -54,7 +53,7 @@ class PyMongoError(Exception):
         self._error_labels.discard(label)
 
     @property
-    def is_timeout(self) -> bool:
+    def timeout(self) -> bool:
         """True if this error was caused by a timeout.
 
         .. versionadded:: 4.2
@@ -79,7 +78,7 @@ class WaitQueueTimeoutError(ConnectionFailure):
     """
 
     @property
-    def is_timeout(self) -> bool:
+    def timeout(self) -> bool:
         return True
 
 
@@ -120,7 +119,7 @@ class NetworkTimeout(AutoReconnect):
     """
 
     @property
-    def is_timeout(self) -> bool:
+    def timeout(self) -> bool:
         return True
 
 
@@ -167,7 +166,7 @@ class ServerSelectionTimeoutError(AutoReconnect):
     """
 
     @property
-    def is_timeout(self) -> bool:
+    def timeout(self) -> bool:
         return True
 
 
@@ -221,7 +220,7 @@ class OperationFailure(PyMongoError):
         return self.__details
 
     @property
-    def is_timeout(self) -> bool:
+    def timeout(self) -> bool:
         return self.__code in (50,)
 
 
@@ -243,7 +242,7 @@ class ExecutionTimeout(OperationFailure):
     """
 
     @property
-    def is_timeout(self) -> bool:
+    def timeout(self) -> bool:
         return True
 
 
@@ -272,7 +271,7 @@ class WTimeoutError(WriteConcernError):
     """
 
     @property
-    def is_timeout(self) -> bool:
+    def timeout(self) -> bool:
         return True
 
 
@@ -300,7 +299,7 @@ class BulkWriteError(OperationFailure):
         return self.__class__, (self.details,)
 
     @property
-    def is_timeout(self) -> bool:
+    def timeout(self) -> bool:
         # Check the last writeConcernError and last writeError to determine if this
         # BulkWriteError was caused by a timeout.
         wces = self.details.get("writeConcernErrors", [])
@@ -354,9 +353,9 @@ class EncryptionError(PyMongoError):
         return self.__cause
 
     @property
-    def is_timeout(self) -> bool:
+    def timeout(self) -> bool:
         if isinstance(self.__cause, PyMongoError):
-            return self.__cause.is_timeout
+            return self.__cause.timeout
         return False
 
 

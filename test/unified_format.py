@@ -949,7 +949,7 @@ class UnifiedSpecTestMixinV1(IntegrationTest):
 
         if is_timeout_error:
             self.assertIsInstance(exception, PyMongoError)
-            self.assertTrue(exception.is_timeout, msg=exception)
+            self.assertTrue(exception.timeout, msg=exception)
 
         if error_contains:
             if isinstance(exception, BulkWriteError):
