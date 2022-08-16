@@ -13,6 +13,7 @@
 # permissions and limitations under the License.
 
 import collections
+import concurrent.futures
 import contextlib
 import copy
 import os
@@ -1201,6 +1202,7 @@ class Pool:
         self.__pinned_sockets = set()
         self.ncursors = 0
         self.ntxns = 0
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=self._max_connecting)
 
     def ready(self):
         # Take the lock to avoid the race condition described in PYTHON-2699.
@@ -1255,6 +1257,7 @@ class Pool:
                 sock_info.close_socket(ConnectionClosedReason.POOL_CLOSED)
             if self.enabled_for_cmap:
                 listeners.publish_pool_closed(self.address)
+            self._executor.shutdown(wait=False)
         else:
             if old_state != PoolState.PAUSED and self.enabled_for_cmap:
                 listeners.publish_pool_cleared(self.address, service_id=service_id)
@@ -1337,6 +1340,27 @@ class Pool:
                 with self.size_cond:
                     self.requests -= 1
                     self.size_cond.notify()
+
+    def create_connection(self, handler):
+        """Create a connection in a background thread."""
+        timeout = _csot.remaining()
+        # Optimization: create connection on current thread if no timeout is configured or
+        # the timeout is larger than connect_timeout.
+        if not timeout or timeout >= self.opts.connect_timeout:
+            return self.connect(handler)
+
+        future = self._executor.submit(self.connect, handler)
+        try:
+            return future.result(timeout)
+        except concurrent.futures.TimeoutError:
+
+            def return_conn(fut):
+                with self.lock:
+                    self.sockets.appendleft(fut.result())
+
+            # Make sure the connection gets added to the pool eventually.
+            future.add_done_callback(return_conn)
+            raise NetworkTimeout("timed out")
 
     def connect(self, handler=None):
         """Connect to Mongo and return a new SocketInfo.
@@ -1517,7 +1541,7 @@ class Pool:
                         continue
                 else:  # We need to create a new connection
                     try:
-                        sock_info = self.connect(handler=handler)
+                        sock_info = self.create_connection(handler=handler)
                     finally:
                         with self._max_connecting_cond:
                             self._pending -= 1
