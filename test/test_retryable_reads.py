@@ -216,6 +216,58 @@ class TestPoolPausedError(IntegrationTest):
         failed = cmd_listener.failed_events
         self.assertEqual(1, len(failed), msg)
 
+    def test_implicit_session_during_shutdown(self):
+        import logging
+        from test.utils import get_pool, single_client
+
+        from pymongo.errors import AutoReconnect
+        from pymongo.event_loggers import (
+            CommandLogger,
+            ConnectionPoolLogger,
+            HeartbeatLogger,
+            ServerLogger,
+            TopologyLogger,
+        )
+        from pymongo.topology import _ErrorContext
+
+        # Enable logs in this format:
+        # 2023-01-11 14:32:12,610 INFO event_loggers Heartbeat to server ('localhost', 27017) succeeded with reply {'helloOk': True, ...}
+        FORMAT = "%(asctime)s %(levelname)s %(module)s %(message)s"
+        logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+        # once = [False]
+        # class ResetListener(CMAPListener):
+        #     def connection_checked_out(self, event):
+        #         super().connection_checked_out(event)
+        #         if once[0]:
+        #             return
+        #         once[0] = True
+        #         try:
+        #             client.admin.command('shutdown', 1, force=True)
+        #         except AutoReconnect:
+        #             pass
+        #         # Reset the server to unknown
+        #         exc = AutoReconnect("closed")
+        #         ctx = _ErrorContext(exc, 0, pool.gen.get_overall(), True, None)
+        #         client._topology.handle_error(pool.address, ctx)
+        #         print(client.topology_description)
+        #         print(event)
+        #
+        # cmap_listener = ResetListener()
+
+        client = rs_or_single_client(
+            event_listeners=[HeartbeatLogger(), TopologyLogger(), ServerLogger()]
+        )
+        # pool = get_pool(client)
+        self.addCleanup(client.close)
+        client.test.test.insert_one({})
+        for _ in range(100000):
+            # client = rs_or_single_client()
+            client.test.test.find_one()
+            # client.close()
+        import time
+
+        time.sleep(2)
+
 
 if __name__ == "__main__":
     unittest.main()

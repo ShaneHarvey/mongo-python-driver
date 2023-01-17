@@ -950,7 +950,9 @@ class ClientSession:
     def _materialize(self):
         if isinstance(self._server_session, _EmptyServerSession):
             old = self._server_session
+            # print(f'_materialize: {self._client.topology_description}')
             self._server_session = self._client._topology.get_server_session()
+            # print(f'_materialize: {self._client.topology_description}')
             if old.started_retryable_write:
                 self._server_session.inc_transaction_id()
 
