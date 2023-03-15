@@ -119,11 +119,15 @@ if TYPE_CHECKING:
 
 
 class _CoreClient:
-    def __init__(self, client_opts, topology_settings):
+    cache_lock = _create_lock()
+    cache: Dict[int, "_CoreClient"] = {}
+
+    def __init__(self, init_kwargs, topology_settings):
+        self._ref_count = 1
+        self._init_kwargs = init_kwargs
+        self._topology_settings = topology_settings
         self.__lock = _create_lock()
         self.__kill_cursors_queue: List = []
-        self.__options = client_opts
-        self._topology_settings = topology_settings
         self._topology = None
         self._encrypter = None
         self._init_background()
@@ -149,6 +153,18 @@ class _CoreClient:
         # this closure. When the client is freed, stop the executor soon.
         self_ref: Any = weakref.ref(self, executor.close)
         self._kill_cursors_executor = executor
+
+    @classmethod
+    def create(cls, init_kwargs, topology_settings):
+        with cls.cache_lock:
+            for k, client in cls.cache.items():
+                if init_kwargs == client._init_kwargs:
+                    with client.__lock:
+                        client._ref_count += 1
+                    return client
+            client = _CoreClient(init_kwargs, topology_settings)
+            cls.cache[client._topology._topology_id] = client
+            return client
 
     def _get_topology(self):
         """Get the internal :class:`~pymongo.topology.Topology` object.
@@ -421,6 +437,16 @@ class _CoreClient:
             pass
 
     def close(self):
+        close = False
+        with _CoreClient.cache_lock:
+            self._ref_count -= 1
+            if self._ref_count < 1:
+                del _CoreClient.cache[self._topology._topology_id]
+                close = True
+        if close:
+            self._close()
+
+    def _close(self):
         session_ids = self._topology.pop_all_sessions()
         if session_ids:
             self._end_sessions(session_ids)
@@ -1141,7 +1167,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
             srv_max_hosts=srv_max_hosts,
         )
 
-        self._core = _CoreClient(self.__options, self._topology_settings)
+        self._core = _CoreClient.create(self.__init_kwargs, self._topology_settings)
 
         if connect:
             self._get_topology()
