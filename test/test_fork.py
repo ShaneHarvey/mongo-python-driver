@@ -39,7 +39,7 @@ class TestFork(IntegrationTest):
         # Forks the client with some items locked.
         # Parent => All locks should be as before the fork.
         # Child => All locks should be reset.
-        with self.client._MongoClient__lock:
+        with self.client._core._CoreClient__lock:
 
             def target():
                 self.client.admin.command("ping")

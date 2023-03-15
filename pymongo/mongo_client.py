@@ -118,6 +118,319 @@ if TYPE_CHECKING:
         from typing import Generator
 
 
+class _CoreClient:
+    def __init__(self, client_opts, topology_settings):
+        self.__lock = _create_lock()
+        self.__kill_cursors_queue: List = []
+        self.__options = client_opts
+        self._topology_settings = topology_settings
+        self._topology = None
+        self._encrypter = None
+        self._init_background()
+
+    def _init_background(self):
+        self._topology = Topology(self._topology_settings)
+
+        def target():
+            core = self_ref()
+            if core is None:
+                return False  # Stop the executor.
+            _CoreClient._process_periodic_tasks(core)
+            return True
+
+        executor = periodic_executor.PeriodicExecutor(
+            interval=common.KILL_CURSOR_FREQUENCY,
+            min_interval=common.MIN_HEARTBEAT_INTERVAL,
+            target=target,
+            name="pymongo_kill_cursors_thread",
+        )
+
+        # We strongly reference the executor and it weakly references us via
+        # this closure. When the client is freed, stop the executor soon.
+        self_ref: Any = weakref.ref(self, executor.close)
+        self._kill_cursors_executor = executor
+
+    def _get_topology(self):
+        """Get the internal :class:`~pymongo.topology.Topology` object.
+
+        If this client was created with "connect=False", calling _get_topology
+        launches the connection process in the background.
+        """
+        self._topology.open()
+        with self.__lock:
+            self._kill_cursors_executor.open()
+        return self._topology
+
+    @contextlib.contextmanager
+    def _get_socket(self, server, session):
+        in_txn = session and session.in_transaction
+        with _MongoClientErrorHandler(self, server, session) as err_handler:
+            # Reuse the pinned connection, if it exists.
+            if in_txn and session._pinned_connection:
+                err_handler.contribute_socket(session._pinned_connection)
+                yield session._pinned_connection
+                return
+            with server.get_socket(handler=err_handler) as sock_info:
+                # Pin this session to the selected server or connection.
+                if in_txn and server.description.server_type in (
+                    SERVER_TYPE.Mongos,
+                    SERVER_TYPE.LoadBalancer,
+                ):
+                    session._pin(server, sock_info)
+                err_handler.contribute_socket(sock_info)
+                if (
+                    self._encrypter
+                    and not self._encrypter._bypass_auto_encryption
+                    and sock_info.max_wire_version < 8
+                ):
+                    raise ConfigurationError(
+                        "Auto-encryption requires a minimum MongoDB version of 4.2"
+                    )
+                yield sock_info
+
+    def _select_server(self, server_selector, session, address=None):
+        """Select a server to run an operation on this client.
+
+        :Parameters:
+          - `server_selector`: The server selector to use if the session is
+            not pinned and no address is given.
+          - `session`: The ClientSession for the next operation, or None. May
+            be pinned to a mongos server address.
+          - `address` (optional): Address when sending a message
+            to a specific server, used for getMore.
+        """
+        try:
+            topology = self._get_topology()
+            if session and not session.in_transaction:
+                session._transaction.reset()
+            address = address or (session and session._pinned_address)
+            if address:
+                # We're running a getMore or this session is pinned to a mongos.
+                server = topology.select_server_by_address(address)
+                if not server:
+                    raise AutoReconnect("server %s:%d no longer available" % address)
+            else:
+                server = topology.select_server(server_selector)
+            return server
+        except PyMongoError as exc:
+            # Server selection errors in a transaction are transient.
+            if session and session.in_transaction:
+                exc._add_error_label("TransientTransactionError")
+                session._unpin()
+            raise
+
+    def _socket_for_writes(self, session):
+        server = self._select_server(writable_server_selector, session)
+        return self._get_socket(server, session)
+
+    @contextlib.contextmanager
+    def _socket_from_server(self, read_preference, server, session):
+        assert read_preference is not None, "read_preference must not be None"
+        # Get a socket for a server matching the read preference, and yield
+        # sock_info with the effective read preference. The Server Selection
+        # Spec says not to send any $readPreference to standalones and to
+        # always send primaryPreferred when directly connected to a repl set
+        # member.
+        # Thread safe: if the type is single it cannot change.
+        topology = self._get_topology()
+        single = topology.description.topology_type == TOPOLOGY_TYPE.Single
+
+        with self._get_socket(server, session) as sock_info:
+            if single:
+                if sock_info.is_repl and not (session and session.in_transaction):
+                    # Use primary preferred to ensure any repl set member
+                    # can handle the request.
+                    read_preference = ReadPreference.PRIMARY_PREFERRED
+                elif sock_info.is_standalone:
+                    # Don't send read preference to standalones.
+                    read_preference = ReadPreference.PRIMARY
+            yield sock_info, read_preference
+
+    def _socket_for_reads(self, read_preference, session):
+        assert read_preference is not None, "read_preference must not be None"
+        _ = self._get_topology()
+        server = self._select_server(read_preference, session)
+        return self._socket_from_server(read_preference, server, session)
+
+    def _send_cluster_time(self, command, session):
+        topology_time = self._topology.max_cluster_time()
+        session_time = session.cluster_time if session else None
+        if topology_time and session_time:
+            if topology_time["clusterTime"] > session_time["clusterTime"]:
+                cluster_time = topology_time
+            else:
+                cluster_time = session_time
+        else:
+            cluster_time = topology_time or session_time
+        if cluster_time:
+            command["$clusterTime"] = cluster_time
+
+    def _process_response(self, reply, session):
+        self._topology.receive_cluster_time(reply.get("$clusterTime"))
+        if session is not None:
+            session._process_response(reply)
+
+    def _cleanup_cursor(
+        self, locks_allowed, cursor_id, address, sock_mgr, session, explicit_session
+    ):
+        """Cleanup a cursor from cursor.close() or __del__.
+
+        This method handles cleanup for Cursors/CommandCursors including any
+        pinned connection or implicit session attached at the time the cursor
+        was closed or garbage collected.
+
+        :Parameters:
+          - `locks_allowed`: True if we are allowed to acquire locks.
+          - `cursor_id`: The cursor id which may be 0.
+          - `address`: The _CursorAddress.
+          - `sock_mgr`: The _SocketManager for the pinned connection or None.
+          - `session`: The cursor's session.
+          - `explicit_session`: True if the session was passed explicitly.
+        """
+        if locks_allowed:
+            if cursor_id:
+                if sock_mgr and sock_mgr.more_to_come:
+                    # If this is an exhaust cursor and we haven't completely
+                    # exhausted the result set we *must* close the socket
+                    # to stop the server from sending more data.
+                    sock_mgr.sock.close_socket(ConnectionClosedReason.ERROR)
+                else:
+                    self._close_cursor_now(cursor_id, address, session=session, sock_mgr=sock_mgr)
+            if sock_mgr:
+                sock_mgr.close()
+        else:
+            # The cursor will be closed later in a different session.
+            if cursor_id or sock_mgr:
+                self._close_cursor_soon(cursor_id, address, sock_mgr)
+        if session and not explicit_session:
+            session._end_session(lock=locks_allowed)
+
+    def _close_cursor_soon(self, cursor_id, address, sock_mgr=None):
+        """Request that a cursor and/or connection be cleaned up soon."""
+        self.__kill_cursors_queue.append((address, cursor_id, sock_mgr))
+
+    def _close_cursor_now(self, cursor_id, address=None, session=None, sock_mgr=None):
+        """Send a kill cursors message with the given id.
+
+        The cursor is closed synchronously on the current thread.
+        """
+        if not isinstance(cursor_id, int):
+            raise TypeError("cursor_id must be an instance of int")
+
+        try:
+            if sock_mgr:
+                with sock_mgr.lock:
+                    # Cursor is pinned to LB outside of a transaction.
+                    self._kill_cursor_impl([cursor_id], address, session, sock_mgr.sock)
+            else:
+                self._kill_cursors([cursor_id], address, self._get_topology(), session)
+        except PyMongoError:
+            # Make another attempt to kill the cursor later.
+            self._close_cursor_soon(cursor_id, address)
+
+    def _kill_cursors(self, cursor_ids, address, topology, session):
+        """Send a kill cursors message with the given ids."""
+        if address:
+            # address could be a tuple or _CursorAddress, but
+            # select_server_by_address needs (host, port).
+            server = topology.select_server_by_address(tuple(address))
+        else:
+            # Application called close_cursor() with no address.
+            server = topology.select_server(writable_server_selector)
+
+        with self._get_socket(server, session) as sock_info:
+            self._kill_cursor_impl(cursor_ids, address, session, sock_info)
+
+    def _kill_cursor_impl(self, cursor_ids, address, session, sock_info):
+        namespace = address.namespace
+        db, coll = namespace.split(".", 1)
+        spec = SON([("killCursors", coll), ("cursors", cursor_ids)])
+        sock_info.command(db, spec, session=session, client=self)
+
+    def _process_kill_cursors(self):
+        """Process any pending kill cursors requests."""
+        address_to_cursor_ids = defaultdict(list)
+        pinned_cursors = []
+
+        # Other threads or the GC may append to the queue concurrently.
+        while True:
+            try:
+                address, cursor_id, sock_mgr = self.__kill_cursors_queue.pop()
+            except IndexError:
+                break
+
+            if sock_mgr:
+                pinned_cursors.append((address, cursor_id, sock_mgr))
+            else:
+                address_to_cursor_ids[address].append(cursor_id)
+
+        for address, cursor_id, sock_mgr in pinned_cursors:
+            try:
+                self._cleanup_cursor(True, cursor_id, address, sock_mgr, None, False)
+            except Exception as exc:
+                if isinstance(exc, InvalidOperation) and self._topology._closed:
+                    # Raise the exception when client is closed so that it
+                    # can be caught in _process_periodic_tasks
+                    raise
+                else:
+                    helpers._handle_exception()
+
+        # Don't re-open topology if it's closed and there's no pending cursors.
+        if address_to_cursor_ids:
+            topology = self._get_topology()
+            for address, cursor_ids in address_to_cursor_ids.items():
+                try:
+                    self._kill_cursors(cursor_ids, address, topology, session=None)
+                except Exception as exc:
+                    if isinstance(exc, InvalidOperation) and self._topology._closed:
+                        raise
+                    else:
+                        helpers._handle_exception()
+
+    # This method is run periodically by a background thread.
+    def _process_periodic_tasks(self):
+        """Process any pending kill cursors requests and
+        maintain connection pool parameters."""
+        try:
+            self._process_kill_cursors()
+            self._topology.update_pool()
+        except Exception as exc:
+            if isinstance(exc, InvalidOperation) and self._topology._closed:
+                return
+            else:
+                helpers._handle_exception()
+
+    def _end_sessions(self, session_ids):
+        """Send endSessions command(s) with the given session ids."""
+        try:
+            # Use SocketInfo.command directly to avoid implicitly creating
+            # another session.
+            with self._socket_for_reads(ReadPreference.PRIMARY_PREFERRED, None) as (
+                sock_info,
+                read_pref,
+            ):
+                if not sock_info.supports_sessions:
+                    return
+
+                for i in range(0, len(session_ids), common._MAX_END_SESSIONS):
+                    spec = SON([("endSessions", session_ids[i : i + common._MAX_END_SESSIONS])])
+                    sock_info.command("admin", spec, read_preference=read_pref, client=self)
+        except PyMongoError:
+            # Drivers MUST ignore any errors returned by the endSessions
+            # command.
+            pass
+
+    def close(self):
+        session_ids = self._topology.pop_all_sessions()
+        if session_ids:
+            self._end_sessions(session_ids)
+        # Stop the periodic task thread and then send pending killCursor
+        # requests before closing the topology.
+        self._kill_cursors_executor.close()
+        self._process_kill_cursors()
+        self._topology.close()
+
+
 class MongoClient(common.BaseObject, Generic[_DocumentType]):
     """
     A client-side representation of a MongoDB cluster.
@@ -801,8 +1114,6 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         self.__options = options = ClientOptions(username, password, dbase, opts)
 
         self.__default_database_name = dbase
-        self.__lock = _create_lock()
-        self.__kill_cursors_queue: List = []
 
         self._event_listeners = options.pool_options._event_listeners
         super(MongoClient, self).__init__(
@@ -830,7 +1141,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
             srv_max_hosts=srv_max_hosts,
         )
 
-        self._init_background()
+        self._core = _CoreClient(self.__options, self._topology_settings)
 
         if connect:
             self._get_topology()
@@ -840,38 +1151,21 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
             from pymongo.encryption import _Encrypter
 
             self._encrypter = _Encrypter(self, self.__options.auto_encryption_opts)
+        self._core._encrypter = self._encrypter
         self._timeout = self.__options.timeout
 
         if _HAS_REGISTER_AT_FORK:
             # Add this client to the list of weakly referenced items.
             # This will be used later if we fork.
-            MongoClient._clients[self._topology._topology_id] = self
-
-    def _init_background(self):
-        self._topology = Topology(self._topology_settings)
-
-        def target():
-            client = self_ref()
-            if client is None:
-                return False  # Stop the executor.
-            MongoClient._process_periodic_tasks(client)
-            return True
-
-        executor = periodic_executor.PeriodicExecutor(
-            interval=common.KILL_CURSOR_FREQUENCY,
-            min_interval=common.MIN_HEARTBEAT_INTERVAL,
-            target=target,
-            name="pymongo_kill_cursors_thread",
-        )
-
-        # We strongly reference the executor and it weakly references us via
-        # this closure. When the client is freed, stop the executor soon.
-        self_ref: Any = weakref.ref(self, executor.close)
-        self._kill_cursors_executor = executor
+            MongoClient._clients[id(self)] = self
 
     def _after_fork(self):
         """Resets topology in a child after successfully forking."""
-        self._init_background()
+        self._core._init_background()
+
+    @property
+    def _topology(self):
+        return self._core._topology
 
     def _duplicate(self, **kwargs):
         args = self.__init_kwargs.copy()
@@ -1157,26 +1451,6 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         """
         return self.__options
 
-    def _end_sessions(self, session_ids):
-        """Send endSessions command(s) with the given session ids."""
-        try:
-            # Use SocketInfo.command directly to avoid implicitly creating
-            # another session.
-            with self._socket_for_reads(ReadPreference.PRIMARY_PREFERRED, None) as (
-                sock_info,
-                read_pref,
-            ):
-                if not sock_info.supports_sessions:
-                    return
-
-                for i in range(0, len(session_ids), common._MAX_END_SESSIONS):
-                    spec = SON([("endSessions", session_ids[i : i + common._MAX_END_SESSIONS])])
-                    sock_info.command("admin", spec, read_preference=read_pref, client=self)
-        except PyMongoError:
-            # Drivers MUST ignore any errors returned by the endSessions
-            # command.
-            pass
-
     def close(self) -> None:
         """Cleanup client resources and disconnect from MongoDB.
 
@@ -1192,119 +1466,34 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         .. versionchanged:: 3.6
            End all server sessions created by this client.
         """
-        session_ids = self._topology.pop_all_sessions()
-        if session_ids:
-            self._end_sessions(session_ids)
-        # Stop the periodic task thread and then send pending killCursor
-        # requests before closing the topology.
-        self._kill_cursors_executor.close()
-        self._process_kill_cursors()
-        self._topology.close()
+        self._core.close()
         if self._encrypter:
             # TODO: PYTHON-1921 Encrypted MongoClients cannot be re-opened.
             self._encrypter.close()
 
+    @property
     def _get_topology(self):
-        """Get the internal :class:`~pymongo.topology.Topology` object.
+        return self._core._get_topology
 
-        If this client was created with "connect=False", calling _get_topology
-        launches the connection process in the background.
-        """
-        self._topology.open()
-        with self.__lock:
-            self._kill_cursors_executor.open()
-        return self._topology
+    @property
+    def _get_socket(self):
+        return self._core._get_socket
 
-    @contextlib.contextmanager
-    def _get_socket(self, server, session):
-        in_txn = session and session.in_transaction
-        with _MongoClientErrorHandler(self, server, session) as err_handler:
-            # Reuse the pinned connection, if it exists.
-            if in_txn and session._pinned_connection:
-                err_handler.contribute_socket(session._pinned_connection)
-                yield session._pinned_connection
-                return
-            with server.get_socket(handler=err_handler) as sock_info:
-                # Pin this session to the selected server or connection.
-                if in_txn and server.description.server_type in (
-                    SERVER_TYPE.Mongos,
-                    SERVER_TYPE.LoadBalancer,
-                ):
-                    session._pin(server, sock_info)
-                err_handler.contribute_socket(sock_info)
-                if (
-                    self._encrypter
-                    and not self._encrypter._bypass_auto_encryption
-                    and sock_info.max_wire_version < 8
-                ):
-                    raise ConfigurationError(
-                        "Auto-encryption requires a minimum MongoDB version of 4.2"
-                    )
-                yield sock_info
+    @property
+    def _select_server(self):
+        return self._core._select_server
 
-    def _select_server(self, server_selector, session, address=None):
-        """Select a server to run an operation on this client.
+    @property
+    def _socket_for_writes(self):
+        return self._core._socket_for_writes
 
-        :Parameters:
-          - `server_selector`: The server selector to use if the session is
-            not pinned and no address is given.
-          - `session`: The ClientSession for the next operation, or None. May
-            be pinned to a mongos server address.
-          - `address` (optional): Address when sending a message
-            to a specific server, used for getMore.
-        """
-        try:
-            topology = self._get_topology()
-            if session and not session.in_transaction:
-                session._transaction.reset()
-            address = address or (session and session._pinned_address)
-            if address:
-                # We're running a getMore or this session is pinned to a mongos.
-                server = topology.select_server_by_address(address)
-                if not server:
-                    raise AutoReconnect("server %s:%d no longer available" % address)
-            else:
-                server = topology.select_server(server_selector)
-            return server
-        except PyMongoError as exc:
-            # Server selection errors in a transaction are transient.
-            if session and session.in_transaction:
-                exc._add_error_label("TransientTransactionError")
-                session._unpin()
-            raise
+    @property
+    def _socket_from_server(self):
+        return self._core._socket_from_server
 
-    def _socket_for_writes(self, session):
-        server = self._select_server(writable_server_selector, session)
-        return self._get_socket(server, session)
-
-    @contextlib.contextmanager
-    def _socket_from_server(self, read_preference, server, session):
-        assert read_preference is not None, "read_preference must not be None"
-        # Get a socket for a server matching the read preference, and yield
-        # sock_info with the effective read preference. The Server Selection
-        # Spec says not to send any $readPreference to standalones and to
-        # always send primaryPreferred when directly connected to a repl set
-        # member.
-        # Thread safe: if the type is single it cannot change.
-        topology = self._get_topology()
-        single = topology.description.topology_type == TOPOLOGY_TYPE.Single
-
-        with self._get_socket(server, session) as sock_info:
-            if single:
-                if sock_info.is_repl and not (session and session.in_transaction):
-                    # Use primary preferred to ensure any repl set member
-                    # can handle the request.
-                    read_preference = ReadPreference.PRIMARY_PREFERRED
-                elif sock_info.is_standalone:
-                    # Don't send read preference to standalones.
-                    read_preference = ReadPreference.PRIMARY
-            yield sock_info, read_preference
-
-    def _socket_for_reads(self, read_preference, session):
-        assert read_preference is not None, "read_preference must not be None"
-        _ = self._get_topology()
-        server = self._select_server(read_preference, session)
-        return self._socket_from_server(read_preference, server, session)
+    @property
+    def _socket_for_reads(self):
+        return self._core._socket_for_reads
 
     def _should_pin_cursor(self, session):
         return self.__options.load_balanced and not (session and session.in_transaction)
@@ -1548,6 +1737,9 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
           - `name`: the name of the database to get
         """
         if name.startswith("_"):
+            a = getattr(self._core, name, None)
+            if a is not None:
+                return a
             raise AttributeError(
                 "MongoClient has no attribute %r. To access the %s"
                 " database, use client[%r]." % (name, name, name)
@@ -1565,135 +1757,13 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         """
         return database.Database(self, name)
 
-    def _cleanup_cursor(
-        self, locks_allowed, cursor_id, address, sock_mgr, session, explicit_session
-    ):
-        """Cleanup a cursor from cursor.close() or __del__.
+    @property
+    def _cleanup_cursor(self):
+        return self._core._cleanup_cursor
 
-        This method handles cleanup for Cursors/CommandCursors including any
-        pinned connection or implicit session attached at the time the cursor
-        was closed or garbage collected.
-
-        :Parameters:
-          - `locks_allowed`: True if we are allowed to acquire locks.
-          - `cursor_id`: The cursor id which may be 0.
-          - `address`: The _CursorAddress.
-          - `sock_mgr`: The _SocketManager for the pinned connection or None.
-          - `session`: The cursor's session.
-          - `explicit_session`: True if the session was passed explicitly.
-        """
-        if locks_allowed:
-            if cursor_id:
-                if sock_mgr and sock_mgr.more_to_come:
-                    # If this is an exhaust cursor and we haven't completely
-                    # exhausted the result set we *must* close the socket
-                    # to stop the server from sending more data.
-                    sock_mgr.sock.close_socket(ConnectionClosedReason.ERROR)
-                else:
-                    self._close_cursor_now(cursor_id, address, session=session, sock_mgr=sock_mgr)
-            if sock_mgr:
-                sock_mgr.close()
-        else:
-            # The cursor will be closed later in a different session.
-            if cursor_id or sock_mgr:
-                self._close_cursor_soon(cursor_id, address, sock_mgr)
-        if session and not explicit_session:
-            session._end_session(lock=locks_allowed)
-
-    def _close_cursor_soon(self, cursor_id, address, sock_mgr=None):
-        """Request that a cursor and/or connection be cleaned up soon."""
-        self.__kill_cursors_queue.append((address, cursor_id, sock_mgr))
-
-    def _close_cursor_now(self, cursor_id, address=None, session=None, sock_mgr=None):
-        """Send a kill cursors message with the given id.
-
-        The cursor is closed synchronously on the current thread.
-        """
-        if not isinstance(cursor_id, int):
-            raise TypeError("cursor_id must be an instance of int")
-
-        try:
-            if sock_mgr:
-                with sock_mgr.lock:
-                    # Cursor is pinned to LB outside of a transaction.
-                    self._kill_cursor_impl([cursor_id], address, session, sock_mgr.sock)
-            else:
-                self._kill_cursors([cursor_id], address, self._get_topology(), session)
-        except PyMongoError:
-            # Make another attempt to kill the cursor later.
-            self._close_cursor_soon(cursor_id, address)
-
-    def _kill_cursors(self, cursor_ids, address, topology, session):
-        """Send a kill cursors message with the given ids."""
-        if address:
-            # address could be a tuple or _CursorAddress, but
-            # select_server_by_address needs (host, port).
-            server = topology.select_server_by_address(tuple(address))
-        else:
-            # Application called close_cursor() with no address.
-            server = topology.select_server(writable_server_selector)
-
-        with self._get_socket(server, session) as sock_info:
-            self._kill_cursor_impl(cursor_ids, address, session, sock_info)
-
-    def _kill_cursor_impl(self, cursor_ids, address, session, sock_info):
-        namespace = address.namespace
-        db, coll = namespace.split(".", 1)
-        spec = SON([("killCursors", coll), ("cursors", cursor_ids)])
-        sock_info.command(db, spec, session=session, client=self)
-
-    def _process_kill_cursors(self):
-        """Process any pending kill cursors requests."""
-        address_to_cursor_ids = defaultdict(list)
-        pinned_cursors = []
-
-        # Other threads or the GC may append to the queue concurrently.
-        while True:
-            try:
-                address, cursor_id, sock_mgr = self.__kill_cursors_queue.pop()
-            except IndexError:
-                break
-
-            if sock_mgr:
-                pinned_cursors.append((address, cursor_id, sock_mgr))
-            else:
-                address_to_cursor_ids[address].append(cursor_id)
-
-        for address, cursor_id, sock_mgr in pinned_cursors:
-            try:
-                self._cleanup_cursor(True, cursor_id, address, sock_mgr, None, False)
-            except Exception as exc:
-                if isinstance(exc, InvalidOperation) and self._topology._closed:
-                    # Raise the exception when client is closed so that it
-                    # can be caught in _process_periodic_tasks
-                    raise
-                else:
-                    helpers._handle_exception()
-
-        # Don't re-open topology if it's closed and there's no pending cursors.
-        if address_to_cursor_ids:
-            topology = self._get_topology()
-            for address, cursor_ids in address_to_cursor_ids.items():
-                try:
-                    self._kill_cursors(cursor_ids, address, topology, session=None)
-                except Exception as exc:
-                    if isinstance(exc, InvalidOperation) and self._topology._closed:
-                        raise
-                    else:
-                        helpers._handle_exception()
-
-    # This method is run periodically by a background thread.
+    @property
     def _process_periodic_tasks(self):
-        """Process any pending kill cursors requests and
-        maintain connection pool parameters."""
-        try:
-            self._process_kill_cursors()
-            self._topology.update_pool()
-        except Exception as exc:
-            if isinstance(exc, InvalidOperation) and self._topology._closed:
-                return
-            else:
-                helpers._handle_exception()
+        return self._core._process_periodic_tasks
 
     def __start_session(self, implicit, **kwargs):
         # Raises ConfigurationError if sessions are not supported.
@@ -1788,23 +1858,13 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         else:
             yield None
 
-    def _send_cluster_time(self, command, session):
-        topology_time = self._topology.max_cluster_time()
-        session_time = session.cluster_time if session else None
-        if topology_time and session_time:
-            if topology_time["clusterTime"] > session_time["clusterTime"]:
-                cluster_time = topology_time
-            else:
-                cluster_time = session_time
-        else:
-            cluster_time = topology_time or session_time
-        if cluster_time:
-            command["$clusterTime"] = cluster_time
+    @property
+    def _send_cluster_time(self):
+        return self._core._send_cluster_time
 
-    def _process_response(self, reply, session):
-        self._topology.receive_cluster_time(reply.get("$clusterTime"))
-        if session is not None:
-            session._process_response(reply)
+    @property
+    def _process_response(self):
+        return self._core._process_response
 
     def server_info(self, session: Optional[client_session.ClientSession] = None) -> Dict[str, Any]:
         """Get information about the MongoDB server we're connected to.

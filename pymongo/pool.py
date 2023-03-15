@@ -878,7 +878,7 @@ class SocketInfo(object):
         Raises error if the client is not the one that created the session.
         """
         if session:
-            if session._client is not client:
+            if session._client._topology is not client._topology:
                 raise InvalidOperation("Can only use session with the MongoClient that started it")
 
     def close_socket(self, reason):
