@@ -89,7 +89,7 @@ KMS_PROVIDERS = {"local": {"key": b"\x00" * 96}}
 
 
 def get_client_opts(client):
-    return client._core._CoreClient__options
+    return client._MongoClient__options
 
 
 class TestAutoEncryptionOpts(PyMongoTestCase):

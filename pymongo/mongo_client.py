@@ -33,6 +33,7 @@ access:
 
 import contextlib
 import os
+import time
 import weakref
 from collections import defaultdict
 from typing import (
@@ -86,7 +87,7 @@ from pymongo.errors import (
 from pymongo.lock import _HAS_REGISTER_AT_FORK, _create_lock, _release_locks
 from pymongo.pool import ConnectionClosedReason
 from pymongo.read_preferences import ReadPreference, _ServerMode
-from pymongo.server_selectors import writable_server_selector
+from pymongo.server_selectors import any_server_selector, writable_server_selector
 from pymongo.server_type import SERVER_TYPE
 from pymongo.settings import TopologySettings
 from pymongo.topology import Topology, _ErrorContext
@@ -120,10 +121,11 @@ if TYPE_CHECKING:
 
 class _CoreClient:
     cache_lock = _create_lock()
-    cache: Dict[int, "_CoreClient"] = {}
+    cache: Set["_CoreClient"] = set()
 
     def __init__(self, init_kwargs, topology_settings):
         self._ref_count = 1
+        self._last_decrefed = time.monotonic()
         self._init_kwargs = init_kwargs
         self._topology_settings = topology_settings
         self.__lock = _create_lock()
@@ -157,13 +159,13 @@ class _CoreClient:
     @classmethod
     def create(cls, init_kwargs, topology_settings):
         with cls.cache_lock:
-            for k, client in cls.cache.items():
+            for client in cls.cache:
                 if init_kwargs == client._init_kwargs:
                     with client.__lock:
                         client._ref_count += 1
                     return client
             client = _CoreClient(init_kwargs, topology_settings)
-            cls.cache[client._topology._topology_id] = client
+            cls.cache.add(client)
             return client
 
     def _get_topology(self):
@@ -408,6 +410,9 @@ class _CoreClient:
         """Process any pending kill cursors requests and
         maintain connection pool parameters."""
         try:
+            self._maintain_cache()
+            if self._topology._closed:
+                return
             self._process_kill_cursors()
             self._topology.update_pool()
         except Exception as exc:
@@ -415,6 +420,16 @@ class _CoreClient:
                 return
             else:
                 helpers._handle_exception()
+
+    def _maintain_cache(self):
+        """Clear clients that have 0 ref counts for over a minute."""
+        close = False
+        with _CoreClient.cache_lock:
+            if self._ref_count < 1 and time.monotonic() - self._last_decrefed > 60:
+                _CoreClient.cache.discard(self)
+                close = True
+        if close:
+            self._close()
 
     def _end_sessions(self, session_ids):
         """Send endSessions command(s) with the given session ids."""
@@ -441,7 +456,7 @@ class _CoreClient:
         with _CoreClient.cache_lock:
             self._ref_count -= 1
             if self._ref_count < 1:
-                del _CoreClient.cache[self._topology._topology_id]
+                _CoreClient.cache.discard(self)
                 close = True
         if close:
             self._close()
@@ -1168,6 +1183,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         )
 
         self._core = _CoreClient.create(self.__init_kwargs, self._topology_settings)
+        # self._gc_hook = weakref.
 
         if connect:
             self._get_topology()
@@ -1380,6 +1396,9 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         .. versionadded:: 3.0
         """
         topology_type = self._topology._description.topology_type
+        if topology_type == TOPOLOGY_TYPE.Unknown:
+            self._topology.select_server(any_server_selector)
+            topology_type = self._topology._description.topology_type
         if (
             topology_type == TOPOLOGY_TYPE.Sharded
             and len(self.topology_description.server_descriptions()) > 1
@@ -1388,12 +1407,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
                 'Cannot use "address" property when load balancing among'
                 ' mongoses, use "nodes" instead.'
             )
-        if topology_type not in (
-            TOPOLOGY_TYPE.ReplicaSetWithPrimary,
-            TOPOLOGY_TYPE.Single,
-            TOPOLOGY_TYPE.LoadBalanced,
-            TOPOLOGY_TYPE.Sharded,
-        ):
+        if topology_type == TOPOLOGY_TYPE.ReplicaSetNoPrimary:
             return None
         return self._server_property("address")
 
