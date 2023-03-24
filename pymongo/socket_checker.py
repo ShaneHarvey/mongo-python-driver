@@ -40,6 +40,7 @@ class SocketChecker(object):
             self._poller = select.poll()
         else:
             self._poller = None
+        self.last_sock = None
 
     def select(
         self, sock: Any, read: bool = False, write: bool = False, timeout: Optional[float] = 0
@@ -57,19 +58,19 @@ class SocketChecker(object):
                         mask = mask | select.POLLIN | select.POLLPRI
                     if write:
                         mask = mask | select.POLLOUT
-                    self._poller.register(sock, mask)
-                    try:
-                        # poll() timeout is in milliseconds. select()
-                        # timeout is in seconds.
-                        timeout_ = None if timeout is None else timeout * 1000
-                        res = self._poller.poll(timeout_)
-                        # poll returns a possibly-empty list containing
-                        # (fd, event) 2-tuples for the descriptors that have
-                        # events or errors to report. Return True if the list
-                        # is not empty.
-                        return bool(res)
-                    finally:
-                        self._poller.unregister(sock)
+                    if self.last_sock != sock:
+                        if self.last_sock is not None:
+                            self._poller.unregister(self.last_sock)
+                        self._poller.register(sock, mask)
+                    # poll() timeout is in milliseconds. select()
+                    # timeout is in seconds.
+                    timeout_ = None if timeout is None else timeout * 1000
+                    res = self._poller.poll(timeout_)
+                    # poll returns a possibly-empty list containing
+                    # (fd, event) 2-tuples for the descriptors that have
+                    # events or errors to report. Return True if the list
+                    # is not empty.
+                    return bool(res)
                 else:
                     rlist = [sock] if read else []
                     wlist = [sock] if write else []
