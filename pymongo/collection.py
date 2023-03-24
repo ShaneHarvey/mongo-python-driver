@@ -13,8 +13,9 @@
 # limitations under the License.
 
 """Collection level utilities for Mongo."""
-
+import time
 from collections import abc
+from concurrent.futures import Future
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -46,12 +47,14 @@ from pymongo.command_cursor import CommandCursor, RawBatchCommandCursor
 from pymongo.common import _ecc_coll_name, _ecoc_coll_name, _esc_coll_name
 from pymongo.cursor import Cursor, RawBatchCursor
 from pymongo.errors import (
+    BulkWriteError,
     ConfigurationError,
     InvalidName,
     InvalidOperation,
     OperationFailure,
 )
 from pymongo.helpers import _check_write_command_response
+from pymongo.lock import _create_lock
 from pymongo.message import _UNICODE_REPLACE_CODEC_OPTIONS
 from pymongo.operations import (
     DeleteMany,
@@ -227,6 +230,9 @@ class Collection(common.BaseObject, Generic[_DocumentType]):
             unicode_decode_error_handler="replace", document_class=dict
         )
         self._timeout = database.client.options.timeout
+        self._coalesce_inserts = False
+        self.__lock = _create_lock()
+        self._inserts = {}
         encrypted_fields = kwargs.pop("encryptedFields", None)
         if create or kwargs or collation:
             if encrypted_fields:
@@ -621,6 +627,53 @@ class Collection(common.BaseObject, Generic[_DocumentType]):
         common.validate_is_document_type("document", document)
         if not (isinstance(document, RawBSONDocument) or "_id" in document):
             document["_id"] = ObjectId()  # type: ignore[index]
+
+        # HELP-43739/DRIVERS-2582- Quick implementation of insert coalescing.
+        if session is None and False:
+            key = (bypass_document_validation, comment)
+            f = Future()
+            with self.__lock:
+                _cache = self._inserts.setdefault(key, {})
+                index = len(_cache)
+                _cache[f] = document
+            time.sleep(0.001)
+            wait = False
+            with self.__lock:
+                if f in self._inserts.get(key, {}):
+                    # Leader
+                    inserts = self._inserts.pop(key)
+                else:
+                    # Follower
+                    wait = True
+            if wait:
+                # Translate BulkWriteError to equivalent insert_one exception.
+                try:
+                    return f.result()
+                except BulkWriteError as exc:
+                    for write_err in exc.details["writeErrors"]:
+                        if write_err.get("index") == index:
+                            helpers._raise_write_error(write_err)
+                    wces = exc.details["writeConcernErrors"]
+                    if wces:
+                        helpers._raise_write_concern_error(wces[-1])
+                    raise
+
+            futures = list(inserts.keys())
+            documents = list(inserts.values())
+            try:
+                res = self.insert_many(
+                    documents,
+                    ordered=False,
+                    bypass_document_validation=bypass_document_validation,
+                    comment=comment,
+                )
+            except BaseException as exc:
+                for i, f in enumerate(futures):
+                    f.set_exception(exc)
+                raise
+            for i, f in enumerate(futures):
+                f.set_result(InsertOneResult(res.inserted_ids[i], res.acknowledged))
+            return f.result()
 
         write_concern = self._write_concern_for(session)
         return InsertOneResult(

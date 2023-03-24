@@ -191,13 +191,16 @@ def _check_command_response(
     raise OperationFailure(errmsg, code, response, max_wire_version)
 
 
-def _raise_last_write_error(write_errors: List[Any]) -> NoReturn:
-    # If the last batch had multiple errors only report
-    # the last error to emulate continue_on_error.
-    error = write_errors[-1]
+def _raise_write_error(error: Any) -> NoReturn:
     if error.get("code") == 11000:
         raise DuplicateKeyError(error.get("errmsg"), 11000, error)
     raise WriteError(error.get("errmsg"), error.get("code"), error)
+
+
+def _raise_last_write_error(write_errors: List[Any]) -> NoReturn:
+    # If the last batch had multiple errors only report
+    # the last error to emulate continue_on_error.
+    _raise_write_error(write_errors[-1])
 
 
 def _raise_write_concern_error(error: Any) -> NoReturn:
