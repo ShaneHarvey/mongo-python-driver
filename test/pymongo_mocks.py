@@ -76,11 +76,13 @@ class DummyMonitor(object):
 
 
 class MockMonitor(Monitor):
-    def __init__(self, client, server_description, topology, pool, topology_settings):
+    def __init__(
+        self, client, server_description, topology, pool, overflow_pool, topology_settings
+    ):
         # MockMonitor gets a 'client' arg, regular monitors don't. Weakref it
         # to avoid cycles.
         self.client = weakref.proxy(client)
-        Monitor.__init__(self, server_description, topology, pool, topology_settings)
+        Monitor.__init__(self, server_description, topology, pool, overflow_pool, topology_settings)
 
     def _check_once(self):
         client = self.client

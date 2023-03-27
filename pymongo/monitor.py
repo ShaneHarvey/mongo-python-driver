@@ -15,13 +15,19 @@
 """Class to monitor a MongoDB server on a background thread."""
 
 import atexit
+import contextlib
 import time
 import weakref
 from typing import Any, Mapping, cast
 
 from pymongo import common, periodic_executor
 from pymongo._csot import MovingMinimum
-from pymongo.errors import NotPrimaryError, OperationFailure, _OperationCancelled
+from pymongo.errors import (
+    NotPrimaryError,
+    OperationFailure,
+    WaitQueueTimeoutError,
+    _OperationCancelled,
+)
 from pymongo.hello import Hello
 from pymongo.lock import _create_lock
 from pymongo.periodic_executor import _shutdown_executors
@@ -99,7 +105,7 @@ class MonitorBase(object):
 
 
 class Monitor(MonitorBase):
-    def __init__(self, server_description, topology, pool, topology_settings):
+    def __init__(self, server_description, topology, pool, overflow_pool, topology_settings):
         """Class to monitor a MongoDB server on a background thread.
 
         Pass an initial ServerDescription, a Topology, a Pool, and
@@ -116,6 +122,7 @@ class Monitor(MonitorBase):
         )
         self._server_description = server_description
         self._pool = pool
+        self._overflow_pool = overflow_pool
         self._settings = topology_settings
         self._listeners = self._settings._pool_options._event_listeners
         pub = self._listeners is not None
@@ -124,9 +131,9 @@ class Monitor(MonitorBase):
         self._rtt_monitor = _RttMonitor(
             topology,
             topology_settings,
+            pool,
             topology._create_pool_for_monitor(server_description.address),
         )
-        self.heartbeater = None
 
     def cancel_check(self):
         """Cancel any concurrent hello check.
@@ -164,7 +171,7 @@ class Monitor(MonitorBase):
 
     def _reset_connection(self):
         # Clear our pooled connection.
-        self._pool.reset()
+        self._overflow_pool.reset()
 
     def _run(self):
         try:
@@ -234,6 +241,16 @@ class Monitor(MonitorBase):
             # Server type defaults to Unknown.
             return ServerDescription(address, error=error)
 
+    @contextlib.contextmanager
+    def _get_socket(self):
+        try:
+            self._pool.ready()
+            with self._pool.get_socket(wait_queue_timeout=2, handshake=False) as sock_info:
+                yield sock_info
+        except WaitQueueTimeoutError:
+            with self._overflow_pool.get_socket(handshake=False) as sock_info:
+                yield sock_info
+
     def _check_once(self):
         """A single attempt to call hello.
 
@@ -245,7 +262,7 @@ class Monitor(MonitorBase):
 
         if self._cancel_context and self._cancel_context.cancelled:
             self._reset_connection()
-        with self._pool.get_socket() as sock_info:
+        with self._get_socket() as sock_info:
             self._cancel_context = sock_info.cancel_context
             response, round_trip_time = self._check_with_socket(sock_info)
             if not response.awaitable:
@@ -338,7 +355,7 @@ class SrvMonitor(MonitorBase):
 
 
 class _RttMonitor(MonitorBase):
-    def __init__(self, topology, topology_settings, pool):
+    def __init__(self, topology, topology_settings, pool, overflow_pool):
         """Maintain round trip times for a server.
 
         The Topology is weakly referenced.
@@ -351,6 +368,7 @@ class _RttMonitor(MonitorBase):
         )
 
         self._pool = pool
+        self._overflow_pool = overflow_pool
         self._moving_average = MovingAverage()
         self._moving_min = MovingMinimum()
         self._lock = _create_lock()
@@ -391,9 +409,19 @@ class _RttMonitor(MonitorBase):
         except Exception:
             self._pool.reset()
 
+    @contextlib.contextmanager
+    def _get_socket(self):
+        try:
+            self._pool.ready()
+            with self._pool.get_socket(wait_queue_timeout=2, handshake=False) as sock_info:
+                yield sock_info
+        except WaitQueueTimeoutError:
+            with self._overflow_pool.get_socket(handshake=False) as sock_info:
+                yield sock_info
+
     def _ping(self):
         """Run a "hello" command and return the RTT."""
-        with self._pool.get_socket() as sock_info:
+        with self._get_socket() as sock_info:
             if self._executor._stopped:
                 raise Exception("_RttMonitor closed")
             start = time.monotonic()

@@ -548,9 +548,6 @@ class SocketInfo(object):
         self.generation = self.pool_gen.get_overall()
         self.ready = False
         self.cancel_context = None
-        if not pool.handshake:
-            # This is a Monitor connection.
-            self.cancel_context = _CancellationContext()
         self.opts = pool.opts
         self.more_to_come = False
         # For load balancer support.
@@ -1338,7 +1335,7 @@ class Pool:
                     self.requests -= 1
                     self.size_cond.notify()
 
-    def connect(self, handler=None):
+    def connect(self, handler=None, handshake=None):
         """Connect to Mongo and return a new SocketInfo.
 
         Can raise ConnectionFailure.
@@ -1369,7 +1366,7 @@ class Pool:
 
         sock_info = SocketInfo(sock, self, self.address, conn_id)
         try:
-            if self.handshake:
+            if handshake:
                 sock_info.hello()
                 self.is_writable = sock_info.is_writable
             if handler:
@@ -1383,7 +1380,7 @@ class Pool:
         return sock_info
 
     @contextlib.contextmanager
-    def get_socket(self, handler=None):
+    def get_socket(self, handler=None, wait_queue_timeout=None, handshake=None):
         """Get a socket from the pool. Use with a "with" statement.
 
         Returns a :class:`SocketInfo` object wrapping a connected
@@ -1404,7 +1401,14 @@ class Pool:
         if self.enabled_for_cmap:
             listeners.publish_connection_check_out_started(self.address)
 
-        sock_info = self._get_socket(handler=handler)
+        sock_info = self._get_socket(
+            handler=handler, wait_queue_timeout=wait_queue_timeout, handshake=handshake
+        )
+        if handshake:
+            # This is a Monitor connection.
+            sock_info.cancel_context = _CancellationContext()
+        else:
+            sock_info.cancel_context = None
 
         if self.enabled_for_cmap:
             listeners.publish_connection_checked_out(self.address, sock_info.id)
@@ -1443,7 +1447,7 @@ class Pool:
                 )
             _raise_connection_failure(self.address, AutoReconnect("connection pool paused"))
 
-    def _get_socket(self, handler=None):
+    def _get_socket(self, handler=None, wait_queue_timeout=None, handshake=None):
         """Get or create a SocketInfo. Can raise ConnectionFailure."""
         # We use the pid here to avoid issues with fork / multiprocessing.
         # See test.test_client:TestClient.test_fork for an example of
@@ -1466,6 +1470,8 @@ class Pool:
         # Get a free socket or create one.
         if _csot.get_timeout():
             deadline = _csot.get_deadline()
+        elif wait_queue_timeout:
+            deadline = time.monotonic() + wait_queue_timeout
         elif self.opts.wait_queue_timeout:
             deadline = time.monotonic() + self.opts.wait_queue_timeout
         else:
@@ -1517,7 +1523,7 @@ class Pool:
                         continue
                 else:  # We need to create a new connection
                     try:
-                        sock_info = self.connect(handler=handler)
+                        sock_info = self.connect(handler=handler, handshake=handshake)
                     finally:
                         with self._max_connecting_cond:
                             self._pending -= 1
@@ -1568,6 +1574,7 @@ class Pool:
                         self.address, sock_info.id, ConnectionClosedReason.ERROR
                     )
             else:
+                sock_info.set_socket_timeout(self.opts.socket_timeout)
                 with self.lock:
                     # Hold the lock to ensure this section does not race with
                     # Pool.reset().

@@ -724,10 +724,12 @@ class Topology(object):
         """
         for address, sd in self._description.server_descriptions().items():
             if address not in self._servers:
+                app_pool = self._create_pool_for_server(address)
                 monitor = self._settings.monitor_class(
                     server_description=sd,
                     topology=self,
-                    pool=self._create_pool_for_monitor(address),
+                    pool=app_pool,
+                    overflow_pool=self._create_pool_for_monitor(address),
                     topology_settings=self._settings,
                 )
 
@@ -736,7 +738,7 @@ class Topology(object):
                     weak = weakref.ref(self._events)
                 server = Server(
                     server_description=sd,
-                    pool=self._create_pool_for_server(address),
+                    pool=app_pool,
                     monitor=monitor,
                     topology_id=self._topology_id,
                     listeners=self._listeners,

@@ -215,7 +215,7 @@ class Server(object):
         return response
 
     def get_socket(self, handler=None):
-        return self.pool.get_socket(handler)
+        return self.pool.get_socket(handler, handshake=True)
 
     @property
     def description(self):
