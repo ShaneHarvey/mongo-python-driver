@@ -112,6 +112,10 @@ if TYPE_CHECKING:
     from pymongo.read_concern import ReadConcern
 
 
+# Max batch size when automatically batching write operations.
+_AUTO_BATCH_SIZE = 50
+
+
 class Collection(common.BaseObject, Generic[_DocumentType]):
     """A Mongo collection."""
 
@@ -576,6 +580,19 @@ class Collection(common.BaseObject, Generic[_DocumentType]):
         if not isinstance(doc, RawBSONDocument):
             return doc.get("_id")
 
+    def _gather_result(self, future, index, timeout=None):
+        # Translate BulkWriteError to equivalent insert_one exception.
+        try:
+            return future.result(timeout=timeout)
+        except BulkWriteError as exc:
+            for write_err in exc.details["writeErrors"]:
+                if write_err.get("index") == index:
+                    helpers._raise_write_error(write_err)
+            wces = exc.details["writeConcernErrors"]
+            if wces:
+                helpers._raise_write_concern_error(wces[-1])
+            raise
+
     def insert_one(
         self,
         document: Union[_DocumentType, RawBSONDocument],
@@ -629,34 +646,34 @@ class Collection(common.BaseObject, Generic[_DocumentType]):
             document["_id"] = ObjectId()  # type: ignore[index]
 
         # HELP-43739/DRIVERS-2582- Quick implementation of insert coalescing.
-        if session is None and False:
+        if session is None:
             key = (bypass_document_validation, comment)
             f = Future()
+            sleep = True
+            follower = False
             with self.__lock:
                 _cache = self._inserts.setdefault(key, {})
                 index = len(_cache)
                 _cache[f] = document
-            time.sleep(0.001)
-            wait = False
-            with self.__lock:
-                if f in self._inserts.get(key, {}):
-                    # Leader
+                if len(_cache) >= _AUTO_BATCH_SIZE:
+                    # Leader fastpath
                     inserts = self._inserts.pop(key)
-                else:
-                    # Follower
-                    wait = True
-            if wait:
-                # Translate BulkWriteError to equivalent insert_one exception.
+                    sleep = False
+            if sleep:
+                # Follower fastpath
                 try:
-                    return f.result()
-                except BulkWriteError as exc:
-                    for write_err in exc.details["writeErrors"]:
-                        if write_err.get("index") == index:
-                            helpers._raise_write_error(write_err)
-                    wces = exc.details["writeConcernErrors"]
-                    if wces:
-                        helpers._raise_write_concern_error(wces[-1])
-                    raise
+                    return self._gather_result(f, index, timeout=0.001)
+                except TimeoutError:
+                    pass
+                with self.__lock:
+                    if f in self._inserts.get(key, {}):
+                        # Leader
+                        inserts = self._inserts.pop(key)
+                    else:
+                        # Follower
+                        follower = True
+            if follower:
+                return self._gather_result(f, index)
 
             futures = list(inserts.keys())
             documents = list(inserts.values())

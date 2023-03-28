@@ -21,18 +21,25 @@ def insert_auto(coll):
     """
     global BUFFER
     f = Future()
-    with LOCK:
-        BUFFER[f] = gen_doc()
-    # Briefly sleep to allow other threads to append to the buffer.
-    time.sleep(0.001)
+    sleep = True
     follower = False
     with LOCK:
-        if f in BUFFER:
-            # Leader
+        BUFFER[f] = gen_doc()
+        if len(BUFFER) >= 50:
+            sleep = False
+            # Leader fast path
             batch = BUFFER
             BUFFER = {}
-        else:
-            follower = True
+    if sleep:
+        # Briefly sleep to allow other threads to append to the buffer.
+        time.sleep(0.001)
+        with LOCK:
+            if f in BUFFER:
+                # Leader
+                batch = BUFFER
+                BUFFER = {}
+            else:
+                follower = True
     if follower:
         return f.result()
     futures = list(batch.keys())
