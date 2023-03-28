@@ -167,6 +167,9 @@ if [ -n "$TEST_ENCRYPTION" ]; then
     fi
     # Only run the encryption tests.
     TEST_ARGS="-s test.test_encryption"
+else
+    # Investigate PYTHON-3522
+    TEST_ARGS="-s test.test_csot"
 fi
 
 if [ -n "$TEST_FLE_AZURE_AUTO" ] || [ -n "$TEST_FLE_GCP_AUTO" ]; then

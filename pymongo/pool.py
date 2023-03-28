@@ -579,18 +579,23 @@ class SocketInfo(object):
                 self.set_socket_timeout(self.opts.socket_timeout)
             return None
         # RTT validation.
-        rtt = _csot.get_rtt()
-        if rtt is None:
+        sd = _csot.get_sd()
+        if sd is None or sd.min_round_trip_time is None:
             rtt = self.connect_rtt
-        max_time_ms = timeout - rtt
-        if max_time_ms < 0:
+        else:
+            rtt = sd.min_round_trip_time
+        max_time = timeout - rtt
+        print(
+            f'apply_timeout: {next(iter(cmd or ["getMore"]))}, timeout={timeout}, rtt={rtt}, max_time={max_time}, connect_rtt={self.connect_rtt}, sd={sd}, sd.min_round_trip_time={sd.min_round_trip_time}'
+        )
+        if max_time < 0:
             # CSOT: raise an error without running the command since we know it will time out.
             errmsg = f"operation would exceed time limit, remaining timeout:{timeout:.5f} <= network round trip time:{rtt:.5f}"
             raise ExecutionTimeout(
                 errmsg, 50, {"ok": 0, "errmsg": errmsg, "code": 50}, self.max_wire_version
             )
         if cmd is not None:
-            cmd["maxTimeMS"] = int(max_time_ms * 1000)
+            cmd["maxTimeMS"] = int(max_time * 1000)
         self.set_socket_timeout(timeout)
         return timeout
 

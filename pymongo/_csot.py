@@ -18,12 +18,25 @@ import functools
 import time
 from collections import deque
 from contextvars import ContextVar, Token
-from typing import Any, Callable, Deque, MutableMapping, Optional, Tuple, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Deque,
+    MutableMapping,
+    Optional,
+    Tuple,
+    TypeVar,
+    cast,
+)
 
 from pymongo.write_concern import WriteConcern
 
+if TYPE_CHECKING:
+    from pymongo.server_description import ServerDescription
+
 TIMEOUT: ContextVar[Optional[float]] = ContextVar("TIMEOUT", default=None)
-RTT: ContextVar[float] = ContextVar("RTT", default=0.0)
+RTT: ContextVar[Optional["ServerDescription"]] = ContextVar("RTT", default=None)
 DEADLINE: ContextVar[float] = ContextVar("DEADLINE", default=float("inf"))
 
 
@@ -31,16 +44,23 @@ def get_timeout() -> Optional[float]:
     return TIMEOUT.get(None)
 
 
-def get_rtt() -> float:
+def get_sd() -> Optional["ServerDescription"]:
     return RTT.get()
+
+
+def get_rtt() -> float:
+    sd = get_sd()
+    if sd:
+        return sd.min_round_trip_time
+    return 0.0
 
 
 def get_deadline() -> float:
     return DEADLINE.get()
 
 
-def set_rtt(rtt: float) -> None:
-    RTT.set(rtt)
+def set_rtt(sd: "ServerDescription") -> None:
+    RTT.set(sd)
 
 
 def remaining() -> Optional[float]:
@@ -77,7 +97,7 @@ class _TimeoutContext(object):
         prev_deadline = DEADLINE.get()
         next_deadline = time.monotonic() + self._timeout if self._timeout else float("inf")
         deadline_token = DEADLINE.set(min(prev_deadline, next_deadline))
-        rtt_token = RTT.set(0.0)
+        rtt_token = RTT.set(None)
         self._tokens = (timeout_token, deadline_token, rtt_token)
         return self
 
