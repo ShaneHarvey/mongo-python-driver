@@ -1154,6 +1154,41 @@ global_knobs = client_knobs(events_queue_frequency=0.05)
 
 
 def setup():
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import byref
+
+        ntdll = ctypes.WinDLL("NTDLL.DLL")
+
+        def query_resolution():
+            """Query resolution of system timer
+            Return a tuple of (min, max, current) resolution, in 100-ns units.
+            Ref to NtQueryTimerResolution
+            http://undocumented.ntinternals.net/index.html?page=UserMode%2FUndocumented%20Functions%2FTime%2FNtQueryTimerResolution.html
+            """
+            min_res = ctypes.c_ulong()
+            max_res = ctypes.c_ulong()
+            cur_res = ctypes.c_ulong()
+            ntdll.NtQueryTimerResolution(byref(min_res), byref(max_res), byref(cur_res))
+            return min_res.value, max_res.value, cur_res.value
+
+        def set_resolution(res=0):
+            """Set resolution of system timer
+            Input:
+            res[default 0], in 100-ns units.
+            This function will auto revision the value if it is out of range,
+            so default 0 means set maximum resolution.
+            Should be used in `with' statement, target is current resolution,
+            in 100-ns units.
+            """
+            minres, maxres, _ = query_resolution()
+            res = min(res, minres)
+            res = max(res, maxres)
+            cur_res = ctypes.c_ulong()
+            ntdll.NtSetTimerResolution(res, 1, byref(cur_res))
+
+        # Set resolution to 1.0 ms
+        set_resolution(10000)
     client_context.init()
     warnings.resetwarnings()
     warnings.simplefilter("always")
