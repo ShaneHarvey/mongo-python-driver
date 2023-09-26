@@ -539,10 +539,20 @@ class Topology:
                 server.close()
 
             # Mark all servers Unknown.
+            td_old = self._description
             self._description = self._description.reset()
             for address, sd in self._description.server_descriptions().items():
                 if address in self._servers:
                     self._servers[address].description = sd
+
+            if self._publish_tp and td_old != self._description:
+                assert self._events is not None
+                self._events.put(
+                    (
+                        self._listeners.publish_topology_description_changed,
+                        (td_old, self._description, self._topology_id),
+                    )
+                )
 
             # Stop SRV polling thread.
             if self._srv_monitor:
@@ -555,6 +565,10 @@ class Topology:
         if self._publish_tp:
             assert self._events is not None
             self._events.put((self._listeners.publish_topology_closed, (self._topology_id,)))
+
+        # TODO: signal event thread to shutdown: self.__events_executor.join()
+        while self._events and not self._events.empty():
+            time.sleep(0.1)
         if self._publish_server or self._publish_tp:
             self.__events_executor.close()
 
