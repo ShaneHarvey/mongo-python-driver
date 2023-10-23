@@ -810,11 +810,6 @@ def repl_set_step_down(client, **kwargs):
     client.admin.command(cmd)
 
 
-def is_mongos(client):
-    res = client.admin.command(HelloCompat.LEGACY_CMD)
-    return res.get("msg", "") == "isdbgrid"
-
-
 def assertRaisesExactly(cls, fn, *args, **kwargs):
     """
     Unlike the standard assertRaises, this checks that a function raises a

@@ -1313,8 +1313,10 @@ class TestClient(IntegrationTest):
             lambda: client.test_lazy_connect_w0.test.count_documents({}) == 0, "delete one document"
         )
 
-    @client_context.require_no_mongos
     def test_exhaust_network_error(self):
+        if client_context.is_mongos and not client_context.version.at_least(7, 1):
+            self.skipTest("Exhaust on mongos requires MongoDB 7.1+")
+
         # When doing an exhaust query, the socket stays checked out on success
         # but must be checked in on error to avoid semaphore leaks.
         client = rs_or_single_client(maxPoolSize=1, retryReads=False)
@@ -1853,8 +1855,8 @@ class TestExhaustCursor(IntegrationTest):
 
     def setUp(self):
         super().setUp()
-        if client_context.is_mongos:
-            raise SkipTest("mongos doesn't support exhaust, SERVER-2627")
+        if client_context.is_mongos and not client_context.version.at_least(7, 1):
+            self.skipTest("Exhaust on mongos requires MongoDB 7.1+")
 
     def test_exhaust_query_server_error(self):
         # When doing an exhaust query, the socket stays checked out on success

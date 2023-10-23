@@ -421,6 +421,9 @@ class _Query:
         ns = self.namespace()
         spec = self.spec
 
+        if self.exhaust and conn.is_mongos and conn.max_wire_version < 22:
+            raise InvalidOperation("Exhaust cursors on mongos require MongoDB 7.1+")
+
         if use_cmd:
             spec = self.as_command(conn, apply_timeout=True)[0]
             request_id, msg, size, _ = _op_msg(
@@ -562,6 +565,9 @@ class _GetMore:
         """Get a getmore message."""
         ns = self.namespace()
         ctx = conn.compression_context
+
+        if self.exhaust and conn.is_mongos and conn.max_wire_version < 22:
+            raise InvalidOperation("Exhaust cursors on mongos require MongoDB 7.1+")
 
         if use_cmd:
             spec = self.as_command(conn, apply_timeout=True)[0]

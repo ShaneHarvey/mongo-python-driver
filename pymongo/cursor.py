@@ -284,8 +284,6 @@ class Cursor(Generic[_DocumentType]):
 
         # Exhaust cursor support
         if cursor_type == CursorType.EXHAUST:
-            if self.__collection.database.client.is_mongos:
-                raise InvalidOperation("Exhaust cursors are not supported by mongos")
             if limit:
                 raise InvalidOperation("Can't use limit and exhaust together.")
             self.__exhaust = True
@@ -517,8 +515,6 @@ class Cursor(Generic[_DocumentType]):
         if mask & _QUERY_OPTIONS["exhaust"]:
             if self.__limit:
                 raise InvalidOperation("Can't use limit and exhaust together.")
-            if self.__collection.database.client.is_mongos:
-                raise InvalidOperation("Exhaust cursors are not supported by mongos")
             self.__exhaust = True
 
         self.__query_flags |= mask
@@ -1052,9 +1048,6 @@ class Cursor(Generic[_DocumentType]):
         Can raise ConnectionFailure.
         """
         client = self.__collection.database.client
-        # OP_MSG is required to support exhaust cursors with encryption.
-        if client._encrypter and self.__exhaust:
-            raise InvalidOperation("exhaust cursors do not support auto encryption")
 
         try:
             response = client._run_operation(

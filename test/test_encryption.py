@@ -421,12 +421,8 @@ class TestClientMaxWireVersion(IntegrationTest):
         with self.assertRaisesRegex(InvalidOperation, msg):
             client.test.test.aggregate_raw_batches([])
 
-        if client_context.is_mongos:
-            msg = "Exhaust cursors are not supported by mongos"
-        else:
-            msg = "exhaust cursors do not support auto encryption"
-        with self.assertRaisesRegex(InvalidOperation, msg):
-            next(client.test.test.find(cursor_type=CursorType.EXHAUST))
+        # TODO: move to new test?
+        list(client.test.test.find(cursor_type=CursorType.EXHAUST))
 
 
 class TestExplicitSimple(EncryptionIntegrationTest):

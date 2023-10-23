@@ -411,8 +411,10 @@ class TestCommandMonitoring(IntegrationTest):
         self.assertTrue(isinstance(failed.duration_micros, int))
         self.assertEqual(error, failed.failure)
 
-    @client_context.require_no_mongos
     def test_exhaust(self):
+        if client_context.is_mongos and not client_context.version.at_least(7, 1):
+            self.skipTest("Exhaust on mongos requires MongoDB 7.1+")
+
         self.client.pymongo_test.test.drop()
         self.client.pymongo_test.test.insert_many([{} for _ in range(11)])
         self.listener.reset()

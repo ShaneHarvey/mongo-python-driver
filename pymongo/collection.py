@@ -1631,8 +1631,7 @@ class Collection(common.BaseObject, Generic[_DocumentType]):
 
           - The `limit` option can not be used with an exhaust cursor.
 
-          - Exhaust cursors are not supported by mongos and can not be
-            used with a sharded cluster.
+          - Exhaust cursors on a sharded cluster requires MongoDB 7.1 or later.
 
           - A :class:`~pymongo.cursor.Cursor` instance created with the
             :attr:`~pymongo.cursor.CursorType.EXHAUST` cursor_type requires an

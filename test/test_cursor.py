@@ -123,10 +123,10 @@ class TestCursor(IntegrationTest):
         self.assertEqual(0, cursor._Cursor__query_flags)
 
     def test_add_remove_option_exhaust(self):
-        # Exhaust - which mongos doesn't support
-        if client_context.is_mongos:
+        if client_context.is_mongos and not client_context.version.at_least(7, 1):
+            # Exhaust - which mongos doesn't support
             with self.assertRaises(InvalidOperation):
-                self.db.test.find(cursor_type=CursorType.EXHAUST)
+                next(self.db.test.find(cursor_type=CursorType.EXHAUST))
         else:
             cursor = self.db.test.find(cursor_type=CursorType.EXHAUST)
             self.assertEqual(64, cursor._Cursor__query_flags)
@@ -1411,8 +1411,10 @@ class TestRawBatchCursor(IntegrationTest):
         self.assertIsInstance(next(cursor.clone()), bytes)
         self.assertIsInstance(next(copy.copy(cursor)), bytes)
 
-    @client_context.require_no_mongos
     def test_exhaust(self):
+        if client_context.is_mongos and not client_context.version.at_least(7, 1):
+            self.skipTest("Exhaust on mongos requires MongoDB 7.1+")
+
         c = self.db.test
         c.drop()
         c.insert_many({"_id": i} for i in range(200))
@@ -1645,8 +1647,10 @@ class TestRawBatchCommandCursor(IntegrationTest):
             listener.reset()
 
     @client_context.require_version_min(5, 0, -1)
-    @client_context.require_no_mongos
     def test_exhaust_cursor_db_set(self):
+        if client_context.is_mongos and not client_context.version.at_least(7, 1):
+            self.skipTest("Exhaust on mongos requires MongoDB 7.1+")
+
         listener = OvertCommandListener()
         client = rs_or_single_client(event_listeners=[listener])
         self.addCleanup(client.close)

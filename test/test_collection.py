@@ -32,7 +32,6 @@ from test.utils import (
     IMPOSSIBLE_WRITE_CONCERN,
     EventListener,
     get_pool,
-    is_mongos,
     rs_or_single_client,
     single_client,
     wait_until,
@@ -1694,8 +1693,9 @@ class TestCollection(IntegrationTest):
         list(self.db.test.find(no_cursor_timeout=False))
 
     def test_exhaust(self):
-        if is_mongos(self.db.client):
-            self.assertRaises(InvalidOperation, self.db.test.find, cursor_type=CursorType.EXHAUST)
+        if client_context.is_mongos and not client_context.version.at_least(7, 1):
+            cursor = self.db.test.find(cursor_type=CursorType.EXHAUST)
+            self.assertRaises(InvalidOperation, next, cursor)
             return
 
         # Limit is incompatible with exhaust.
