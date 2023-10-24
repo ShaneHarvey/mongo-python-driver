@@ -471,6 +471,17 @@ class ClientContext:
                         hello = mongos_client.admin.command(HelloCompat.LEGACY_CMD)
                         if hello.get("msg") == "isdbgrid":
                             self.mongoses.append(next_address)
+            if (
+                self.version.at_least(4, 4)
+                and (self.is_mongos or self.is_rs)
+                and not self.serverless
+                and not self.is_data_lake
+            ):
+                self.client.admin.command(
+                    "setDefaultRWConcern",
+                    defaultReadConcern={"level": "local"},
+                    defaultWriteConcern={"w": 1, "wtimeout": 5 * 60 * 60},
+                )
 
     def init(self):
         with self.conn_lock:
