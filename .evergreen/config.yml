@@ -102,6 +102,19 @@ functions:
           fi
           echo "{ \"releases\": { \"default\": \"$MONGODB_BINARIES\" }}" > $MONGO_ORCHESTRATION_HOME/orchestration.config
 
+  "upload top-output" :
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file:  src/top-output.txt
+        optional: true
+        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${version_id}/${build_id}/logs/top-output-${task_id}-${execution}.txt
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/html
+        display_name: "top-output.txt"
+
   "upload coverage" :
     - command: s3.put
       params:
@@ -920,6 +933,7 @@ pre:
 post:
   # Disabled, causing timeouts
   # - func: "upload working dir"
+  - func: "upload top-output"
   - func: "upload coverage"
   - func: "upload mo artifacts"
   - func: "upload test results"
