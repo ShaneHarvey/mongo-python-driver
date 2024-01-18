@@ -330,10 +330,6 @@ def wait_for_read(conn: Connection, deadline: Optional[float]) -> None:
 # Errors raised by sockets (and TLS sockets) when in non-blocking mode.
 BLOCKING_IO_ERRORS = (BlockingIOError, *ssl_support.BLOCKING_IO_ERRORS)
 
-from collections import defaultdict
-
-_lengths = defaultdict(int)
-
 
 def _receive_data_on_socket(conn: Connection, length: int, deadline: Optional[float]) -> memoryview:
     buf = bytearray(length)
@@ -347,10 +343,9 @@ def _receive_data_on_socket(conn: Connection, length: int, deadline: Optional[fl
             # the response is actually already buffered on the client.
             if _csot.get_timeout() and deadline is not None:
                 conn.set_conn_timeout(max(deadline - time.monotonic(), 0))
-            chunk = conn.conn.recv(len(mv[bytes_read:]))
-            chunk_length = len(chunk)
-            mv[bytes_read : bytes_read + chunk_length] = chunk
-            _lengths[chunk_length] += 1
+            chunk_length = conn.conn.recv_into(
+                mv[bytes_read:], nbytes=min(length - bytes_read, conn.recv_size)
+            )
         except BLOCKING_IO_ERRORS:
             raise socket.timeout("timed out") from None
         except OSError as exc:
@@ -363,163 +358,3 @@ def _receive_data_on_socket(conn: Connection, length: int, deadline: Optional[fl
         bytes_read += chunk_length
 
     return mv
-
-
-import atexit
-
-
-def print_stats(lengths=_lengths):
-    print("length\t\tcount")
-    for length in sorted(lengths):
-        print(f"{length}\t\t{_lengths[length]}")
-
-
-atexit.register(print_stats)
-
-"""
-WITH TLS, local standalone:
-length          count
-0               10
-16              78
-22              4
-29              8
-90              1
-91              1
-98              2
-113             1
-114             1
-191             10
-288             1
-313             5
-982             1
-2907            1
-6315            10
-8596            1
-9198            1
-14572           20
-14573           10
-16368           42
-16384           31938
-
-NO TLS:
-length          count
-16              80
-22              4
-29              8
-90              1
-91              1
-98              2
-113             1
-114             1
-191             10
-208             944
-288             1
-313             6
-787             1
-2907            2
-6240            1
-6315            3
-10300           1
-10716           1
-14728           2
-14729           5
-16332           1637
-16540           1386
-16748           2
-17164           1
-19768           1
-22855           3
-29436           1
-31060           2
-31061           1
-32664           1923
-32872           1280
-33080           2
-39187           1
-44860           1
-47392           4
-48996           900
-49204           753
-55028           1
-55519           1
-63724           7
-63725           2
-63932           2
-63933           1
-64912           1
-65328           596
-65536           1451
-65744           54
-68552           1
-71851           2
-73979           1
-74092           1
-75808           1
-78640           1
-80264           1
-81660           12
-81868           392
-82076           25
-96596           1
-97992           16
-98200           260
-98408           25
-107482          1
-114324          4
-114532          49
-114740          16
-129468          1
-129469          1
-130656          1
-130864          22
-131072          52
-131280          6
-146988          2
-147404          15
-147612          2
-163736          5
-163944          3
-180068          2
-180276          7
-196400          6
-196608          18
-196816          1
-212940          8
-213148          2
-229272          3
-229480          2
-245604          2
-245812          1
-261312          1
-261936          3
-262144          17
-262352          1
-278476          4
-294808          2
-311140          1
-327680          3
-342972          1
-344012          1
-359304          1
-360344          2
-376676          1
-393216          2
-524272          1
-737212          1
-753544          2
-786416          1
-819080          1
-851744          6
-917488          7
-982816          1
-983024          9
-999356          1
-1015688         1
-1048560         2
-1064892         1
-1130428         1
-1179424         1
-1212296         1
-1245168         2
-1774112         1
-"""

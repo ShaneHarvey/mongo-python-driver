@@ -710,6 +710,7 @@ class Connection:
     ):
         self.pool_ref = weakref.ref(pool)
         self.conn = conn
+        self.recv_size = 2**14 if pool.opts._ssl_context else 2**18
         self.address = address
         self.id = id
         self.closed = False
