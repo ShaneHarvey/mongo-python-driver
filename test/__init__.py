@@ -380,10 +380,10 @@ class ClientContext:
                     self.auth_enabled = self._server_started_with_auth()
 
             if self.auth_enabled:
-                if not self.serverless:
-                    # See if db_user already exists.
-                    if not self._check_user_provided():
-                        _create_user(self.client.admin, db_user, db_pwd)
+                # if not self.serverless:
+                #     # See if db_user already exists.
+                #     if not self._check_user_provided():
+                #         _create_user(self.client.admin, db_user, db_pwd)
 
                 self.client = self._connect(
                     host,

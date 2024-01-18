@@ -36,8 +36,8 @@ from bson import decode, encode, json_util
 from gridfs import GridFSBucket
 from pymongo import MongoClient
 
-NUM_ITERATIONS = 100
-MAX_ITERATION_TIME = 300
+NUM_ITERATIONS = 10
+MAX_ITERATION_TIME = 30
 NUM_DOCS = 10000
 
 TEST_PATH = os.environ.get(
@@ -85,9 +85,7 @@ class PerformanceTest:
         name = self.__class__.__name__[4:]
         median = self.percentile(50)
         megabytes_per_sec = self.data_size / median / 1000000
-        print(
-            f"Running {self.__class__.__name__}. MB/s={megabytes_per_sec}, MEDIAN={self.percentile(50)}"
-        )
+        print(f"Running {self.__class__.__name__}. MB/s={megabytes_per_sec}, MEDIAN={median}")
         result_data.append(
             {
                 "info": {
@@ -392,7 +390,9 @@ class TestGridFsUpload(GridFsTest, unittest.TestCase):
 class TestGridFsDownload(GridFsTest, unittest.TestCase):
     def setUp(self):
         super().setUp()
-        self.uploaded_id = self.bucket.upload_from_stream("gridfstest", self.document)
+        self.uploaded_id = self.bucket.upload_from_stream(
+            "gridfstest", self.document, chunk_size_bytes=((256 * 32) - 1) * 1024
+        )
 
     def do_task(self):
         self.bucket.open_download_stream(self.uploaded_id).read()
