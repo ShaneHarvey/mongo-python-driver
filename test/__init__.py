@@ -262,7 +262,7 @@ class ClientContext:
         self.tls = False
         self.tlsCertificateKeyFile = False
         self.server_is_resolvable = is_server_resolvable()
-        self.default_client_options: Dict = {}
+        self.default_client_options: Dict = {"w": 1}
         self.sessions_enabled = False
         self.client = None  # type: ignore
         self.conn_lock = threading.Lock()
