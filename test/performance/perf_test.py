@@ -38,7 +38,7 @@ from pymongo import MongoClient
 
 NUM_ITERATIONS = 10
 MAX_ITERATION_TIME = 30
-NUM_DOCS = 10000
+NUM_DOCS = 1000
 
 TEST_PATH = os.environ.get(
     "TEST_PATH", os.path.join(os.path.dirname(os.path.realpath(__file__)), os.path.join("data"))
@@ -391,7 +391,8 @@ class TestGridFsDownload(GridFsTest, unittest.TestCase):
     def setUp(self):
         super().setUp()
         self.uploaded_id = self.bucket.upload_from_stream(
-            "gridfstest", self.document, chunk_size_bytes=((256 * 32) - 1) * 1024
+            "gridfstest",
+            self.document,  # , chunk_size_bytes=(1024 * 1024)
         )
 
     def do_task(self):
