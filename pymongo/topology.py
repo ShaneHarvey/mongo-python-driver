@@ -753,7 +753,14 @@ class Topology:
         if self._settings.load_balanced and not service_id and not err_ctx.completed_handshake:
             return
 
-        if isinstance(error, NetworkTimeout) and err_ctx.completed_handshake:
+        if isinstance(error, NetworkTimeout) and (
+            err_ctx.completed_handshake
+            or (
+                err_ctx.connect_timeout is not None
+                and err_ctx.connect_timeout
+                < (self._settings.pool_options.connect_timeout or common.CONNECT_TIMEOUT)
+            )
+        ):
             # The socket has been closed. Don't reset the server.
             # Server Discovery And Monitoring Spec: "When an application
             # operation fails because of any network error besides a socket
@@ -975,12 +982,14 @@ class _ErrorContext:
         sock_generation: int,
         completed_handshake: bool,
         service_id: Optional[ObjectId],
+        connect_timeout: Optional[float] = None,
     ):
         self.error = error
         self.max_wire_version = max_wire_version
         self.sock_generation = sock_generation
         self.completed_handshake = completed_handshake
         self.service_id = service_id
+        self.connect_timeout = connect_timeout
 
 
 def _is_stale_error_topology_version(

@@ -1225,7 +1225,9 @@ class Connection:
         )
 
 
-def _create_connection(address: _Address, options: PoolOptions) -> socket.socket:
+def _create_connection(
+    address: _Address, options: PoolOptions, handler: Optional[_MongoClientErrorHandler] = None
+) -> socket.socket:
     """Given (host, port) and PoolOptions, connect and return a socket object.
 
     Can raise socket.error.
@@ -1256,6 +1258,7 @@ def _create_connection(address: _Address, options: PoolOptions) -> socket.socket
         family = socket.AF_UNSPEC
 
     err = None
+    timeout = options.connect_timeout
     for res in socket.getaddrinfo(host, port, family, socket.SOCK_STREAM):
         af, socktype, proto, dummy, sa = res
         # SOCK_CLOEXEC was new in CPython 3.2, and only available on a limited
@@ -1273,6 +1276,8 @@ def _create_connection(address: _Address, options: PoolOptions) -> socket.socket
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             # CSOT: apply timeout to socket connect.
             timeout = _csot.remaining()
+            if handler:
+                handler.set_connect_timeout(timeout)
             if timeout is None:
                 timeout = options.connect_timeout
             elif timeout <= 0:
@@ -1296,14 +1301,16 @@ def _create_connection(address: _Address, options: PoolOptions) -> socket.socket
         raise OSError("getaddrinfo failed")
 
 
-def _configured_socket(address: _Address, options: PoolOptions) -> Union[socket.socket, _sslConn]:
+def _configured_socket(
+    address: _Address, options: PoolOptions, handler: Optional[_MongoClientErrorHandler] = None
+) -> Union[socket.socket, _sslConn]:
     """Given (host, port) and PoolOptions, return a configured socket.
 
     Can raise socket.error, ConnectionFailure, or _CertificateError.
 
     Sets socket's SSL and timeout options.
     """
-    sock = _create_connection(address, options)
+    sock = _create_connection(address, options, handler=handler)
     ssl_context = options._ssl_context
 
     if ssl_context is None:
@@ -1683,7 +1690,7 @@ class Pool:
                 )
 
         try:
-            sock = _configured_socket(self.address, self.opts)
+            sock = _configured_socket(self.address, self.opts, handler=handler)
         except BaseException as error:
             if self.enabled_for_cmap:
                 assert listeners is not None
@@ -1775,7 +1782,7 @@ class Pool:
             with self.lock:
                 self.active_contexts.add(conn.cancel_context)
             yield conn
-        except BaseException:
+        except BaseException as exc:
             # Exception in caller. Ensure the connection gets returned.
             # Note that when pinned is True, the session owns the
             # connection and it is responsible for checking the connection
@@ -1784,8 +1791,7 @@ class Pool:
             if handler:
                 # Perform SDAM error handling rules while the connection is
                 # still checked out.
-                exc_type, exc_val, _ = sys.exc_info()
-                handler.handle(exc_type, exc_val)
+                handler.handle(exc)
             if not pinned and conn.active:
                 self.checkin(conn)
             raise

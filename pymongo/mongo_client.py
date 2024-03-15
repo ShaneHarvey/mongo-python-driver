@@ -2224,6 +2224,7 @@ class _MongoClientErrorHandler:
         "completed_handshake",
         "service_id",
         "handled",
+        "connect_timeout",
     )
 
     def __init__(self, client: MongoClient, server: Server, session: Optional[ClientSession]):
@@ -2239,6 +2240,10 @@ class _MongoClientErrorHandler:
         self.completed_handshake = False
         self.service_id: Optional[ObjectId] = None
         self.handled = False
+        self.connect_timeout = None
+
+    def set_connect_timeout(self, timeout: Optional[float]) -> None:
+        self.connect_timeout = timeout
 
     def contribute_socket(self, conn: Connection, completed_handshake: bool = True) -> None:
         """Provide socket information to the error handler."""
@@ -2247,9 +2252,7 @@ class _MongoClientErrorHandler:
         self.service_id = conn.service_id
         self.completed_handshake = completed_handshake
 
-    def handle(
-        self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException]
-    ) -> None:
+    def handle(self, exc_val: Optional[BaseException]) -> None:
         if self.handled or exc_val is None:
             return
         self.handled = True
@@ -2270,6 +2273,7 @@ class _MongoClientErrorHandler:
             self.sock_generation,
             self.completed_handshake,
             self.service_id,
+            self.connect_timeout,
         )
         self.client._topology.handle_error(self.server_address, err_ctx)
 
@@ -2282,7 +2286,7 @@ class _MongoClientErrorHandler:
         exc_val: Optional[Exception],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        return self.handle(exc_type, exc_val)
+        return self.handle(exc_val)
 
 
 class _ClientConnectionRetryable(Generic[T]):

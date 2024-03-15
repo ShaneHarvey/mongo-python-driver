@@ -22,10 +22,13 @@ sys.path[0:0] = [""]
 
 from test import IntegrationTest, client_context, unittest
 from test.unified_format import generate_test_classes
+from test.utils import CMAPListener, rs_or_single_client
 
 import pymongo
 from pymongo import _csot
 from pymongo.errors import PyMongoError
+from pymongo.hello import HelloCompat
+from pymongo.monitoring import PoolClearedEvent
 
 # Location of JSON test specifications.
 TEST_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "csot")
@@ -101,6 +104,49 @@ class TestCSOT(IntegrationTest):
                 self.assertTrue(ctx.exception.timeout)
             self.assertTrue(stream.alive)
         self.assertFalse(stream.alive)
+
+    @client_context.require_failCommand_blockConnection
+    def test_avoid_pool_clear_with_short_connect_timeout_hello(self):
+        listener = CMAPListener()
+        client = rs_or_single_client(event_listeners=[listener])
+        self.addCleanup(client.close)
+        fail_command = {
+            "mode": {"times": 100},
+            "data": {
+                "failCommands": [HelloCompat.LEGACY_CMD, "hello"],
+                "blockConnection": True,
+                "blockTimeMS": 150,
+            },
+        }
+        with self.fail_point(fail_command):
+            for _ in range(5):
+                with pymongo.timeout(0.1):
+                    with self.assertRaises(PyMongoError) as ctx:
+                        client.admin.command("ping")
+                self.assertTrue(ctx.exception.timeout)
+        self.assertEqual(listener.events_by_type(PoolClearedEvent), [])
+
+    @client_context.require_failCommand_blockConnection
+    @client_context.require_auth
+    def test_avoid_pool_clear_with_short_connect_timeout_auth(self):
+        listener = CMAPListener()
+        client = rs_or_single_client(event_listeners=[listener])
+        self.addCleanup(client.close)
+        fail_command = {
+            "mode": {"times": 100},
+            "data": {
+                "failCommands": ["saslContinue"],
+                "blockConnection": True,
+                "blockTimeMS": 150,
+            },
+        }
+        with self.fail_point(fail_command):
+            for _ in range(5):
+                with pymongo.timeout(0.1):
+                    with self.assertRaises(PyMongoError) as ctx:
+                        client.admin.command("ping")
+                self.assertTrue(ctx.exception.timeout)
+        self.assertEqual(listener.events_by_type(PoolClearedEvent), [])
 
 
 if __name__ == "__main__":
