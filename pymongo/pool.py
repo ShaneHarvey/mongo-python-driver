@@ -761,6 +761,26 @@ class Connection:
         self.connect_rtt = 0.0
         self._client_id = pool._client_id
         self.creation_time = time.monotonic()
+        # Pending data from previously timed out operation.
+        self.pending_data = False
+        self.pending_request_id: Optional[int] = None
+
+    def complete_pending_op(self) -> None:
+        assert self.pending_data
+        self.pending_data = False
+        # TODO: what about events?
+        try:
+            reply = self.receive_message(self.pending_request_id)
+        except OperationFailure:
+            if self.pending_data:
+                # Pending operation hasn't completed within this op's timeout, abandon.
+                raise
+        else:
+            # TODO: move to _perished()?
+            # Check if the connection is in a usable state.
+            if reply.more_to_come:
+                self.close_conn(ConnectionClosedReason.ERROR)
+                raise NetworkTimeout("timed out")  # TODO: validate
 
     def set_conn_timeout(self, timeout: Optional[float]) -> None:
         """Cache last timeout to avoid duplicate calls to conn.settimeout."""
@@ -1023,6 +1043,8 @@ class Connection:
                 "supports BSON document sizes up to %d bytes." % (max_doc_size, self.max_bson_size)
             )
 
+        if self.pending_data:
+            self.complete_pending_op()
         try:
             self.conn.sendall(message)
         except BaseException as error:
@@ -1035,6 +1057,8 @@ class Connection:
         """
         try:
             return receive_message(self, request_id, self.max_message_size)
+        except (OperationFailure, NotPrimaryError):
+            raise
         except BaseException as error:
             self._raise_connection_failure(error)
 
@@ -2045,16 +2069,22 @@ class Pool:
             conn.close_conn(ConnectionClosedReason.IDLE)
             return True
 
-        if self._check_interval_seconds is not None and (
-            self._check_interval_seconds == 0 or idle_time_seconds > self._check_interval_seconds
+        if self.stale_generation(conn.generation, conn.service_id):
+            conn.close_conn(ConnectionClosedReason.STALE)
+            return True
+
+        # Skip check when the connection is pending.
+        if (
+            not conn.pending_data
+            and self._check_interval_seconds is not None
+            and (
+                self._check_interval_seconds == 0
+                or idle_time_seconds > self._check_interval_seconds
+            )
         ):
             if conn.conn_closed():
                 conn.close_conn(ConnectionClosedReason.ERROR)
                 return True
-
-        if self.stale_generation(conn.generation, conn.service_id):
-            conn.close_conn(ConnectionClosedReason.STALE)
-            return True
 
         return False
 
