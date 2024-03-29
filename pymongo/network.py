@@ -37,6 +37,7 @@ from pymongo import _csot, helpers, message, ssl_support
 from pymongo.common import MAX_MESSAGE_SIZE
 from pymongo.compression_support import _NO_COMPRESSION, decompress
 from pymongo.errors import (
+    ExecutionTimeout,
     NotPrimaryError,
     OperationFailure,
     ProtocolError,
@@ -46,6 +47,7 @@ from pymongo.logger import _COMMAND_LOGGER, _CommandStatusMessage, _debug_log
 from pymongo.message import _UNPACK_REPLY, _OpMsg, _OpReply
 from pymongo.monitoring import _is_speculative_authenticate
 from pymongo.socket_checker import _errno_from_exception
+from pymongo.ssl_support import SSLError
 
 if TYPE_CHECKING:
     from bson import CodecOptions
@@ -193,6 +195,8 @@ def command(
         )
 
     try:
+        if conn.pending_data:
+            conn.complete_pending_op()
         conn.conn.sendall(msg)
         if use_op_msg and unacknowledged:
             # Unacknowledged, fake a successful command response.
@@ -305,7 +309,8 @@ def receive_message(
     conn: Connection, request_id: Optional[int], max_message_size: int = MAX_MESSAGE_SIZE
 ) -> Union[_OpReply, _OpMsg]:
     """Receive a raw BSON message or raise socket.error."""
-    if _csot.get_timeout():
+    csot_enabled = _csot.get_timeout()
+    if csot_enabled:
         deadline = _csot.get_deadline()
     else:
         timeout = conn.conn.gettimeout()
@@ -313,8 +318,30 @@ def receive_message(
             deadline = time.monotonic() + timeout
         else:
             deadline = None
-    # Ignore the response's request id.
-    length, _, response_to, op_code = _UNPACK_HEADER(_receive_data_on_socket(conn, 16, deadline))
+    try:
+        # Ignore the response's request id.
+        length, _, response_to, op_code = _UNPACK_HEADER(
+            _receive_data_on_socket(conn, 16, deadline)
+        )
+    except Exception as exc:
+        # Avoid closing the connection after a network timeout when CSOT is enabled.
+        # TODO: check if maxTimeMS was added.
+        if (
+            csot_enabled
+            and isinstance(exc, socket.timeout)
+            or isinstance(exc, SSLError)
+            and "timed out" in str(exc)
+        ):
+            conn.pending_data = True
+            conn.pending_request_id = request_id
+            errmsg = "operation exceeded time limit"
+            raise ExecutionTimeout(
+                errmsg,
+                50,
+                {"ok": 0, "errmsg": errmsg, "code": 50},
+                conn.max_wire_version,
+            ) from exc
+        raise
     # No request_id for exhaust cursor "getMore".
     if request_id is not None:
         if request_id != response_to:

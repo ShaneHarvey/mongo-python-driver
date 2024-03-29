@@ -22,10 +22,12 @@ sys.path[0:0] = [""]
 
 from test import IntegrationTest, client_context, unittest
 from test.unified_format import generate_test_classes
+from test.utils import CMAPListener, rs_or_single_client
 
 import pymongo
 from pymongo import _csot
 from pymongo.errors import PyMongoError
+from pymongo.monitoring import ConnectionClosedEvent, ConnectionCreatedEvent, PoolClearedEvent
 
 # Location of JSON test specifications.
 TEST_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "csot")
@@ -101,6 +103,22 @@ class TestCSOT(IntegrationTest):
                 self.assertTrue(ctx.exception.timeout)
             self.assertTrue(stream.alive)
         self.assertFalse(stream.alive)
+
+    def test_avoid_connection_churn(self):
+        listener = CMAPListener()
+        client = rs_or_single_client(event_listeners=[listener])
+        self.addCleanup(client.close)
+        coll = client.test.test
+        coll.insert_one({})
+        for i in range(100):
+            with pymongo.timeout(i / 10000.0):
+                try:
+                    coll.find_one()
+                except PyMongoError as exc:
+                    self.assertTrue(exc.timeout, f"{exc} does not have .timeout=True")
+        self.assertEqual(listener.event_count(ConnectionCreatedEvent), 1)
+        self.assertEqual(listener.event_count(ConnectionClosedEvent), 0)
+        self.assertEqual(listener.event_count(PoolClearedEvent), 0)
 
 
 if __name__ == "__main__":
