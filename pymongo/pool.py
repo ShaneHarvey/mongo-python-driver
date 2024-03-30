@@ -762,7 +762,7 @@ class Connection:
         self._client_id = pool._client_id
         self.creation_time = time.monotonic()
         # Pending data from previously timed out operation.
-        self.pending_data = False
+        self.pending_data: bool = False
         self.pending_request_id: Optional[int] = None
 
     def complete_pending_op(self) -> None:
