@@ -325,6 +325,7 @@ def receive_message(
         )
     except Exception as exc:
         # Avoid closing the connection after a network timeout when CSOT is enabled.
+        # TODO: check if maxTimeMS was added.
         if (
             csot_enabled
             and isinstance(exc, socket.timeout)
