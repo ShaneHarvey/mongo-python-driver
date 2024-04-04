@@ -328,9 +328,16 @@ class TopologyDescription:
 
         # Apply custom selector followed by localThresholdMS.
         if custom_selector is not None and selection:
-            selection = selection.with_server_descriptions(
-                custom_selector(selection.server_descriptions)
-            )
+            new_servers = custom_selector(selection.server_descriptions)
+            for s in new_servers:
+                if s not in selection.server_descriptions:
+                    msg = (
+                        f"Custom server_selector is invalid because it returned a ServerDescription that was "
+                        f"not supplied to it, server_selector: {custom_selector}, given servers: "
+                        f"{selection.server_descriptions}, returned servers: {new_servers}"
+                    )
+                    raise ConfigurationError(msg)
+            selection = selection.with_server_descriptions(new_servers)
         return self._apply_local_threshold(selection)
 
     def has_readable_server(self, read_preference: _ServerMode = ReadPreference.PRIMARY) -> bool:
