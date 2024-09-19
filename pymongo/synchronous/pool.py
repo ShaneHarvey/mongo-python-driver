@@ -1539,10 +1539,7 @@ class Pool:
         conn.active = False
         conn.pinned_txn = False
         conn.pinned_cursor = False
-        self.__pinned_sockets.discard(conn)
         listeners = self.opts._event_listeners
-        with self.lock:
-            self.active_contexts.discard(conn.cancel_context)
         if self.enabled_for_cmap:
             assert listeners is not None
             listeners.publish_connection_checked_in(self.address, conn.id)
@@ -1590,8 +1587,21 @@ class Pool:
                         self.conns.appendleft(conn)
                         # Notify any threads waiting to create a connection.
                         self._max_connecting_cond.notify()
+                    self.__pinned_sockets.discard(conn)
+                    self.active_contexts.discard(conn.cancel_context)
+                    if txn:
+                        self.ntxns -= 1
+                    elif cursor:
+                        self.ncursors -= 1
+                    self.requests -= 1
+                    self.active_sockets -= 1
+                    self.operation_count -= 1
+                    self.size_cond.notify()
+                    return
 
         with self.size_cond:
+            self.__pinned_sockets.discard(conn)
+            self.active_contexts.discard(conn.cancel_context)
             if txn:
                 self.ntxns -= 1
             elif cursor:
