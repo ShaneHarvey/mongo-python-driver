@@ -494,6 +494,17 @@ class ClientSession:
     :meth:`~pymongo.mongo_client.MongoClient.start_session`.
     """
 
+    __slots__ = (
+        "_client",
+        "_server_session",
+        "_options",
+        "_cluster_time",
+        "_operation_time",
+        "_snapshot_time",
+        "_implicit",
+        "_transaction",
+    )
+
     def __init__(
         self,
         client: MongoClient,
@@ -1068,6 +1079,8 @@ class _EmptyServerSession:
 
 
 class _ServerSession:
+    __slots__ = "session_id", "last_use", "_transaction_id", "dirty", "generation"
+
     def __init__(self, generation: int):
         # Ensure id is type 4, regardless of CodecOptions.uuid_representation.
         self.session_id = {"id": Binary(uuid.uuid4().bytes, 4)}
@@ -1107,6 +1120,8 @@ class _ServerSessionPool(collections.deque):
 
     This class is thread-safe.
     """
+
+    __slots__ = ("generation",)
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
