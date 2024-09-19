@@ -338,7 +338,10 @@ class TopologyDescription:
         ):
             for sd in self._server_descriptions.values():
                 if sd.server_type == SERVER_TYPE.RSPrimary:
-                    return [sd]
+                    servers = [sd]
+                    if custom_selector is not None:
+                        servers = custom_selector(servers)
+                    return servers
 
         selection = Selection.from_topology_description(self)
         # Ignore read preference for sharded clusters.
