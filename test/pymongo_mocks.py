@@ -88,8 +88,16 @@ class SyncMockMonitor(Monitor):
     def _check_once(self):
         client = self.client
         address = self._server_description.address
-        response, rtt = client.mock_hello("%s:%d" % address)  # type: ignore[str-format]
-        return ServerDescription(address, Hello(response), rtt)
+        host = "%s:%d" % address  # type: ignore[str-format]
+        try:
+            response, rtt = client.mock_hello(host)
+        except Exception as exc:
+            print(f"_check_once failed {host}: {exc}")
+            raise
+
+        sd = ServerDescription(address, Hello(response), rtt)
+        print(f"_check_once succeeded {host}: {sd}")
+        return sd
 
 
 class MockClient(MongoClient):

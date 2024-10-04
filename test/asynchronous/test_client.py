@@ -2404,6 +2404,11 @@ class TestMongoClientFailover(AsyncMockClientTest):
         self.assertLess(len(c.nodes), 3)
 
     async def test_reconnect(self):
+        for i in range(10):
+            print(f"\ntest_reconnect: {i}\n")
+            await self._test_reconnect()
+
+    async def _test_reconnect(self):
         # Verify the node list isn't forgotten during a network failure.
         c = await AsyncMockClient.get_async_mock_client(
             standalones=[],
@@ -2413,6 +2418,7 @@ class TestMongoClientFailover(AsyncMockClientTest):
             replicaSet="rs",
             retryReads=False,
             serverSelectionTimeoutMS=1000,
+            heartbeatFrequencyMS=500,
         )
         self.addAsyncCleanup(c.close)
 
@@ -2427,14 +2433,15 @@ class TestMongoClientFailover(AsyncMockClientTest):
         # ServerSelectionTimeoutError or AutoReconnect (from
         # AsyncMockPool.get_socket).
         with self.assertRaises(AutoReconnect):
-            await c.db.collection.find_one()
+            await c.db.collection.find_one()  # "mock error"
 
         # But it can reconnect.
         c.revive_host("a:1")
         await (await c._get_topology()).select_servers(
-            writable_server_selector, _Op.TEST, server_selection_timeout=10
+            writable_server_selector, _Op.TEST, server_selection_timeout=1
         )
         self.assertEqual(await c.address, ("a", 1))
+        await c.close()
 
     async def _test_network_error(self, operation_callback):
         # Verify only the disconnected server is reset by a network failure.
