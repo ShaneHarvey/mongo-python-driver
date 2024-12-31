@@ -779,15 +779,9 @@ class AsyncCollection(common.BaseObject, Generic[_DocumentType]):
 
         .. versionadded:: 3.0
         """
-        common.validate_list("requests", requests)
+        # common.validate_list("requests", requests)
 
-        blk = _AsyncBulk(self, ordered, bypass_document_validation, comment=comment, let=let)
-        for request in requests:
-            try:
-                request._add_to_bulk(blk)
-            except AttributeError:
-                raise TypeError(f"{request!r} is not a valid request") from None
-
+        blk = _AsyncBulk(self, ordered, bypass_document_validation, comment=comment, let=let, requests=requests)
         write_concern = self._write_concern_for(session)
         bulk_api_result = await blk.execute(write_concern, session, _Op.INSERT)
         if bulk_api_result is not None:

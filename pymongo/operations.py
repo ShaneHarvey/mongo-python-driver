@@ -108,7 +108,7 @@ class InsertOne(Generic[_DocumentType]):
 
     def _add_to_bulk(self, bulkobj: _AgnosticBulk) -> None:
         """Add this operation to the _AsyncBulk/_Bulk instance `bulkobj`."""
-        bulkobj.add_insert(self._doc)  # type: ignore[arg-type]
+        return bulkobj.add_insert(self._doc)  # type: ignore[arg-type]
 
     def _add_to_client_bulk(self, bulkobj: _AgnosticClientBulk) -> None:
         """Add this operation to the _AsyncClientBulk/_ClientBulk instance `bulkobj`."""

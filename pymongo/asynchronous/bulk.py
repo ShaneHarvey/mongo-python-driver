@@ -86,6 +86,7 @@ class _AsyncBulk:
     def __init__(
         self,
         collection: AsyncCollection[_DocumentType],
+        requests: Any,
         ordered: bool,
         bypass_document_validation: bool,
         comment: Optional[str] = None,
@@ -102,7 +103,7 @@ class _AsyncBulk:
             common.validate_is_document_type("let", self.let)
         self.comment: Optional[str] = comment
         self.ordered = ordered
-        self.ops: list[tuple[int, Mapping[str, Any]]] = []
+        self.ops = (op._add_to_bulk(self) for op in requests)
         self.executed = False
         self.bypass_doc_val = bypass_document_validation
         self.uses_collation = False
@@ -134,7 +135,7 @@ class _AsyncBulk:
         # Generate ObjectId client side.
         if not (isinstance(document, RawBSONDocument) or "_id" in document):
             document["_id"] = ObjectId()
-        self.ops.append((_INSERT, document))
+        return _INSERT, document
 
     def add_update(
         self,
