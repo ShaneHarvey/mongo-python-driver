@@ -360,6 +360,7 @@ def wait_for_read(conn: Connection, deadline: Optional[float]) -> None:
 
 
 def receive_data(conn: Connection, length: int, deadline: Optional[float]) -> memoryview:
+    start = time.monotonic()
     buf = bytearray(length)
     mv = memoryview(buf)
     bytes_read = 0
@@ -412,4 +413,9 @@ def receive_data(conn: Connection, length: int, deadline: Optional[float]) -> me
     finally:
         conn.set_conn_timeout(orig_timeout)
 
+    if DEBUG:
+        print(f"read: {time.monotonic()-start} secs, {length} bytes")
     return mv
+
+
+DEBUG = False
