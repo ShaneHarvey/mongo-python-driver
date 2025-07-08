@@ -53,6 +53,8 @@ class ObjectId:
 
     _inc = SystemRandom().randint(0, _MAX_COUNTER_VALUE)
     _inc_lock = threading.Lock()
+    _timestamp = 0
+    _inc_start = 0
 
     __random = _random_bytes()
 
@@ -165,12 +167,22 @@ class ObjectId:
 
     def __generate(self) -> None:
         """Generate a new value for this ObjectId."""
+        timestamp = int(time.time())
         with ObjectId._inc_lock:
             inc = ObjectId._inc
             ObjectId._inc = (inc + 1) % (_MAX_COUNTER_VALUE + 1)
+            # Error if we would generate a duplicate id.
+            if timestamp == ObjectId._timestamp:
+                if inc == ObjectId._inc_start:
+                    raise Exception(
+                        "ObjectId overflow would generate duplicate _id. Cannot generate more than 16,777,215 ids within the same second"
+                    )
+            else:
+                ObjectId._timestamp = timestamp
+                ObjectId._inc_start = inc
 
         # 4 bytes current time, 5 bytes random, 3 bytes inc.
-        self.__id = _PACK_INT_RANDOM(int(time.time()), ObjectId._random()) + _PACK_INT(inc)[1:4]
+        self.__id = _PACK_INT_RANDOM(timestamp, ObjectId._random()) + _PACK_INT(inc)[1:4]
 
     def __validate(self, oid: Any) -> None:
         """Validate and use the given id for this ObjectId.
