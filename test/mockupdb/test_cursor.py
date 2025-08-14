@@ -15,13 +15,22 @@
 """Test PyMongo cursor does not set exhaustAllowed automatically (PYTHON-4007)."""
 from __future__ import annotations
 
+import logging
+
+# Enable logs in this format:
+# 2020-06-08 23:49:35,982 DEBUG ocsp_support Peer did not staple an OCSP response
+FORMAT = "%(asctime)s %(levelname)s %(module)s %(message)s"
+# logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+import sys
 import unittest
+
+sys.path[0:0] = [""]
 from test import PyMongoTestCase
 
 import pytest
 
 try:
-    from mockupdb import MockupDB, OpMsg, going
+    from mockupdb import MockupDB, OpMsg, Request, going
 
     _HAVE_MOCKUPDB = True
 except ImportError:
@@ -30,9 +39,62 @@ except ImportError:
 
 from bson.objectid import ObjectId
 from pymongo.common import MIN_SUPPORTED_WIRE_VERSION
-from pymongo.errors import OperationFailure
+from pymongo.errors import OperationFailure, PyMongoError
 
 pytestmark = pytest.mark.mockupdb
+
+
+class TestTransactionRetry(PyMongoTestCase):
+    def test_retry_commit_error(self):
+        server = MockupDB()
+        server.autoresponds(
+            "ismaster",
+            isWritablePrimary=True,
+            msg="isdbgrid",
+            minWireVersion=0,
+            maxWireVersion=8,
+            logicalSessionTimeoutMinutes=30,
+        )
+        server.autoresponds("endSessions", ok=1)
+        server.run()
+        self.addCleanup(server.stop)
+
+        client = self.simple_client(server.uri)
+        self.addCleanup(client.close)
+        client.admin.command("ismaster")
+        with client.start_session() as session:
+            session.start_transaction()
+            # start the transaction:
+            print("Starting transaction")
+            try:
+                client.admin.command("ismaster", session=session)
+            except Exception as exc:
+                print(f"Exception during ismaster: {exc}")
+            print("Commit transaction")
+
+            # simulate the commit error:
+            try:
+                with going(session.commit_transaction):
+                    request = server.receives(OpMsg({"commitTransaction": 1}))
+                    request.reply(
+                        {
+                            "ok": 0,
+                            "code": 90,
+                            "codeName": "CallbackCanceled",
+                            "errmsg": "Transaction was aborted :: caused by :: WaitForMajorityService::waitUntilMajority canceled",
+                            "writeConcernError": {
+                                "code": 6,
+                                "codeName": "HostUnreachable",
+                                "errmsg": "operation was interrupted",
+                                "errInfo": {"writeConcern": {"w": 1, "wtimeout": 0}},
+                            },
+                        }
+                    )
+                    # request = server.receives(OpMsg({"commitTransaction": 1}))
+                    # request.ok()
+            except PyMongoError as exc:
+                print(f"Exception during commit: {exc}")
+                print(f"error labels: {exc._error_labels}")
 
 
 class TestCursor(PyMongoTestCase):

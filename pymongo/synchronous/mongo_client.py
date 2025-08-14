@@ -1686,9 +1686,9 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
                 if not conn.supports_sessions:
                     return
 
-                for i in range(0, len(session_ids), common._MAX_END_SESSIONS):
-                    spec = {"endSessions": session_ids[i : i + common._MAX_END_SESSIONS]}
-                    conn.command("admin", spec, read_preference=read_pref, client=self)
+                # for i in range(0, len(session_ids), common._MAX_END_SESSIONS):
+                #     spec = {"endSessions": session_ids[i : i + common._MAX_END_SESSIONS]}
+                #     conn.command("admin", spec, read_preference=read_pref, client=self)
         except PyMongoError:
             # Drivers MUST ignore any errors returned by the endSessions
             # command.
