@@ -63,6 +63,7 @@ from bson.codec_options import DEFAULT_CODEC_OPTIONS, CodecOptions, TypeRegistry
 from bson.timestamp import Timestamp
 from pymongo import _csot, common, helpers_shared, periodic_executor
 from pymongo.asynchronous import client_session, database, uri_parser
+from pymongo.asynchronous.backpressure import TokenBucket
 from pymongo.asynchronous.change_stream import AsyncChangeStream, AsyncClusterChangeStream
 from pymongo.asynchronous.client_bulk import _AsyncClientBulk
 from pymongo.asynchronous.client_session import _EmptyServerSession
@@ -773,6 +774,7 @@ class AsyncMongoClient(common.BaseObject, Generic[_DocumentType]):
         self._timeout: float | None = None
         self._topology_settings: TopologySettings = None  # type: ignore[assignment]
         self._event_listeners: _EventListeners | None = None
+        self._retry_token_bucket = TokenBucket()
 
         # _pool_class, _monitor_class, and _condition_class are for deep
         # customization of PyMongo, e.g. Motor.

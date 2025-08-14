@@ -106,6 +106,7 @@ from pymongo.server_description import ServerDescription
 from pymongo.server_selectors import writable_server_selector
 from pymongo.server_type import SERVER_TYPE
 from pymongo.synchronous import client_session, database, uri_parser
+from pymongo.synchronous.backpressure import TokenBucket
 from pymongo.synchronous.change_stream import ChangeStream, ClusterChangeStream
 from pymongo.synchronous.client_bulk import _ClientBulk
 from pymongo.synchronous.client_session import _EmptyServerSession
@@ -773,6 +774,7 @@ class MongoClient(common.BaseObject, Generic[_DocumentType]):
         self._timeout: float | None = None
         self._topology_settings: TopologySettings = None  # type: ignore[assignment]
         self._event_listeners: _EventListeners | None = None
+        self._retry_token_bucket = TokenBucket()
 
         # _pool_class, _monitor_class, and _condition_class are for deep
         # customization of PyMongo, e.g. Motor.
