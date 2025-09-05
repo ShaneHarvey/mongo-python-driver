@@ -77,7 +77,10 @@ def _handle_reauth(func: F) -> F:
     return cast(F, inner)
 
 
-_MAX_RETRIES = 3
+# 5 retries leads to a max backoff of 0.1 + 0.2 + 0.4 + 0.8 + 1.6 = 3.1s
+# 6 retries leads to a max backoff of +3.2 = 6.3s
+# 7 retries leads to a max backoff of +6.4 = 12.7s
+_MAX_RETRIES = 5
 _BACKOFF_INITIAL = 0.05
 _BACKOFF_MAX = 10
 # DRIVERS-3240 will determine these defaults.
