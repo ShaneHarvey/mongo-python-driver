@@ -108,17 +108,21 @@ class _TokenBucket:
 
     async def consume(self) -> bool:
         """Consume a token from the bucket if available."""
-        async with self.lock:
-            if self.tokens >= 1:
-                self.tokens -= 1
-                return True
-            return False
+        # Noop
+        return True
+        # async with self.lock:
+        #     if self.tokens >= 1:
+        #         self.tokens -= 1
+        #         return True
+        #     return False
 
     async def deposit(self, retry: bool = False) -> None:
         """Deposit a token back into the bucket."""
-        retry_token = 1 if retry else 0
-        async with self.lock:
-            self.tokens = min(self.capacity, self.tokens + retry_token + self.return_rate)
+        # Noop
+        return
+        # retry_token = 1 if retry else 0
+        # async with self.lock:
+        #     self.tokens = min(self.capacity, self.tokens + retry_token + self.return_rate)
 
 
 class _RetryPolicy:
