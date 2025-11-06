@@ -1033,7 +1033,8 @@ class Pool:
         # If found, set backoff and add error labels.
         if self.is_sdam or type(error) != AutoReconnect:
             return
-        self._backoff += 1
+        # Disable PoolBackoff
+        # self._backoff += 1
         error._add_error_label("SystemOverloadedError")
         error._add_error_label("RetryableError")
         # Log the pool backoff message.
