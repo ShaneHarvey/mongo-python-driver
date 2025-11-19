@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import asyncio
 import os
+import random
 import threading
 from pathlib import Path
+from string import ascii_lowercase
 from test import IntegrationTest, client_context, unittest
 from test.helpers import ConcurrentRunner
 from test.utils import flaky
@@ -26,6 +28,7 @@ from test.utils_selection_tests import create_topology
 from test.utils_shared import (
     CMAPListener,
     OvertCommandListener,
+    delay,
     wait_until,
 )
 from test.utils_spec_runner import SpecTestCreator
@@ -106,17 +109,25 @@ class FinderTask(ConcurrentRunner):
         self.collection = collection
         self.iterations = iterations
         self.passed = False
+        self.n_overload_errors = 0
 
     def run(self):
+        from pymongo.errors import PyMongoError
+
         for _ in range(self.iterations):
-            self.collection.find_one({})
+            try:
+                self.collection.find_one({"$where": delay(0.025)})
+            except PyMongoError as exc:
+                if not exc.has_error_label("SystemOverloadedError"):
+                    raise
+                self.n_overload_errors += 1
         self.passed = True
 
 
 class TestProse(IntegrationTest):
     def frequencies(self, client, listener, n_finds=10):
         coll = client.test.test
-        N_TASKS = 10
+        N_TASKS = 20
         tasks = [FinderTask(coll, n_finds) for _ in range(N_TASKS)]
         for task in tasks:
             task.start()
@@ -126,7 +137,7 @@ class TestProse(IntegrationTest):
             self.assertTrue(task.passed)
 
         events = listener.started_events
-        self.assertEqual(len(events), n_finds * N_TASKS)
+        self.assertGreaterEqual(len(events), n_finds * N_TASKS)
         nodes = client.nodes
         self.assertEqual(len(nodes), 2)
         freqs = {address: 0.0 for address in nodes}
@@ -134,6 +145,9 @@ class TestProse(IntegrationTest):
             freqs[event.connection_id] += 1
         for address in freqs:
             freqs[address] = freqs[address] / float(len(events))
+        freqs["overload_errors"] = sum(task.n_overload_errors for task in tasks)
+        freqs["operations"] = sum(task.iterations for task in tasks)
+        freqs["error_rate"] = freqs["overload_errors"] / float(freqs["operations"])
         return freqs
 
     @client_context.require_failCommand_appName
@@ -174,6 +188,52 @@ class TestProse(IntegrationTest):
         listener.reset()
         freqs = self.frequencies(client, listener, n_finds=150)
         self.assertAlmostEqual(freqs[delayed_server], 0.50, delta=0.15)
+
+    @client_context.require_failCommand_appName
+    @client_context.require_multiple_mongoses
+    def test_load_balancing_overload(self):
+        listener = OvertCommandListener()
+        cmap_listener = CMAPListener()
+        # PYTHON-2584: Use a large localThresholdMS to avoid the impact of
+        # varying RTTs.
+        client = self.rs_client(
+            client_context.mongos_seeds(),
+            appName="loadBalancingTest",
+            event_listeners=[listener, cmap_listener],
+            localThresholdMS=30000,
+            minPoolSize=10,
+        )
+        wait_until(lambda: len(client.nodes) == 2, "discover both nodes")
+        # Wait for both pools to be populated.
+        cmap_listener.wait_for_event(ConnectionReadyEvent, 20)
+        # enable rate limiter
+        client.test.test.insert_many(
+            [{"str": "".join(random.choices(ascii_lowercase, k=512))} for _ in range(10)]
+        )
+        listener.reset()
+
+        # Mock rate limiter errors on only one mongos.
+        rejection_rate = 0.75
+        delay_finds = {
+            "configureFailPoint": "failCommand",
+            "mode": {"activationProbability": rejection_rate},
+            "data": {
+                "failCommands": ["find"],
+                "errorCode": 462,
+                # Intentionally omit "RetryableError" to avoid retry behavior from impacting this test.
+                "errorLabels": ["SystemOverloadedError"],
+                "appName": "loadBalancingTest",
+            },
+        }
+        nodes = client_context.client.nodes
+        self.assertEqual(len(nodes), 1)
+        delayed_server = next(iter(nodes))
+        listener.reset()
+        with self.fail_point(delay_finds):
+            freqs = self.frequencies(client, listener, n_finds=200)
+            print(f"\nOverloaded server: {delayed_server}")
+            print(freqs)
+            self.assertAlmostEqual(freqs[delayed_server], 1 - rejection_rate, delta=0.15)
 
 
 if __name__ == "__main__":

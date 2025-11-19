@@ -813,6 +813,14 @@ class Pool:
         self.__pinned_sockets: set[AsyncConnection] = set()
         self.ncursors = 0
         self.ntxns = 0
+        self.error_times: collections.deque[tuple[float, int]] = collections.deque()
+
+    async def get_error_rate(self) -> float:
+        async with self.lock:
+            # Require at least 10 samples to compute an error rate.
+            if len(self.error_times) < 10:
+                return 0.0
+            return sum(t[1] for t in self.error_times) / (len(self.error_times) or 1)
 
     async def ready(self) -> None:
         # Take the lock to avoid the race condition described in PYTHON-2699.
@@ -1182,7 +1190,16 @@ class Pool:
                 serverPort=self.address[1],
             )
 
-        conn = await self._get_conn(checkout_started_time, handler=handler)
+        try:
+            conn = await self._get_conn(checkout_started_time, handler=handler)
+        except Exception:
+            self.error_times.append((time.monotonic(), 1))
+            raise
+
+        # clear old info from error rate >10 seconds old
+        watermark = time.monotonic() - 10
+        while self.error_times and self.error_times[0][0] < watermark:
+            self.error_times.popleft()
 
         duration = time.monotonic() - checkout_started_time
         if self.enabled_for_cmap:
@@ -1202,8 +1219,10 @@ class Pool:
             async with self.lock:
                 self.active_contexts.add(conn.cancel_context)
             yield conn
+            self.error_times.append((time.monotonic(), 0))
         # Catch KeyboardInterrupt, CancelledError, etc. and cleanup.
         except BaseException:
+            self.error_times.append((time.monotonic(), 1))
             # Exception in caller. Ensure the connection gets returned.
             # Note that when pinned is True, the session owns the
             # connection and it is responsible for checking the connection

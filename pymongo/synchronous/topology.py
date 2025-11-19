@@ -391,10 +391,17 @@ class Topology:
         if len(servers) == 1:
             return servers[0]
         server1, server2 = random.sample(servers, 2)
-        if server1.pool.operation_count <= server2.pool.operation_count:
+        error_rate1 = server1.pool.get_error_rate()
+        error_rate2 = server2.pool.get_error_rate()
+        if error_rate1 < error_rate2 and (random.random() < (error_rate2 - error_rate1)):  # noqa: S311
             return server1
-        else:
+        elif error_rate1 > error_rate2 and (random.random() < (error_rate1 - error_rate2)):  # noqa: S311
             return server2
+        else:
+            if server1.pool.operation_count <= server2.pool.operation_count:
+                return server1
+            else:
+                return server2
 
     def select_server(
         self,
